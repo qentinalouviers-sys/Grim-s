@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta, date
@@ -56,8 +57,29 @@ UA = {
 }
 
 
-def fetch(url: str, timeout: int = 25) -> tuple[str | None, dict]:
-    """@returns (texte, métadonnées) — les métadonnées servent au diagnostic."""
+def fetch(url: str, timeout: int = 25, attempts: int = 3) -> tuple[str | None, dict]:
+    """
+    @returns (texte, métadonnées) — les métadonnées servent au diagnostic.
+
+    Le service SHOM est intermittent : observé en CI, il répond correctement
+    puis reste muet au passage suivant, surtout après plusieurs appels
+    rapprochés. Trois tentatives espacées suffisent à absorber ça. Un
+    rafraîchissement raté n'est pas grave en soi — l'archive attend le
+    passage d'après — mais autant ne pas perdre une journée pour un hoquet.
+    """
+    meta = {"url": url}
+    for attempt in range(attempts):
+        text, meta = _fetch_once(url, timeout)
+        if text:
+            if attempt:
+                print(f"    (obtenu à la tentative {attempt + 1})")
+            return text, meta
+        if attempt < attempts - 1:
+            time.sleep(3 * (attempt + 1))
+    return None, meta
+
+
+def _fetch_once(url: str, timeout: int) -> tuple[str | None, dict]:
     meta = {"url": url}
     try:
         req = urllib.request.Request(url, headers=UA)
