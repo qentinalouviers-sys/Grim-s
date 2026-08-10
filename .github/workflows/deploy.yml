@@ -51,13 +51,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ⚠ PRÉREQUIS MANUEL, UNE SEULE FOIS :
+      #   Settings → Pages → Build and deployment → Source : GitHub Actions
+      # Sans ça cette étape échoue sur « Get Pages site failed / Not Found ».
+      # `enablement: true` ne suffit pas : créer le site Pages demande un droit
+      # d'administration que le GITHUB_TOKEN d'un workflow n'a pas
+      # (« Resource not accessible by integration »). Seul le propriétaire du
+      # dépôt peut l'activer.
       - uses: actions/configure-pages@v5
-        # enablement: active Pages et le bascule en source « GitHub Actions »
-        # si ce n'est pas déjà fait. Sans ça, le tout premier déploiement d'un
-        # dépôt neuf échoue sur « Get Pages site failed / Not Found » et il faut
-        # aller cliquer dans les réglages — un piège classique.
-        with:
-          enablement: true
 
       - name: Empaquetage
         uses: actions/upload-pages-artifact@v3

@@ -29,7 +29,13 @@ import re
 import sys
 import urllib.request
 import urllib.error
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
+
+try:  # zoneinfo est standard depuis 3.9 ; on dégrade proprement s'il manque
+    from zoneinfo import ZoneInfo
+    PARIS = ZoneInfo("Europe/Paris")
+except Exception:  # noqa: BLE001
+    PARIS = None
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "data", "tide-dieppe.json")
@@ -112,6 +118,113 @@ def diagnose(text: str, meta: dict) -> None:
 
 TIME_RE = r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?"
 
+MONTHS = {
+    "janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4, "mai": 5,
+    "juin": 6, "juillet": 7, "août": 8, "aout": 8, "septembre": 9,
+    "octobre": 10, "novembre": 11, "décembre": 12, "decembre": 12,
+}
+
+
+def unwrap_vignette(js: str) -> str:
+    """
+    La vignette SHOM n'est pas une page : c'est un SCRIPT qui fabrique une
+    iframe puis y écrit le HTML ligne par ligne en document.write('…'), avec
+    les guillemets échappés. Chercher la donnée directement dans ce JS ne
+    donne rien — il faut d'abord rejouer les écritures pour reconstituer le
+    document. C'est exactement ce qui faisait échouer le parsing.
+    """
+    parts = re.findall(r"document\.write\(\s*'((?:\\.|[^'\\])*)'\s*\)", js)
+    parts += re.findall(r'document\.write\(\s*"((?:\\.|[^"\\])*)"\s*\)', js)
+    html = "".join(parts)
+    for a, b in (('\\"', '"'), ("\\'", "'"), ("\\/", "/"), ("\\n", "\n"), ("\\t", "\t")):
+        html = html.replace(a, b)
+    return html
+
+
+def strip_tags(html: str) -> str:
+    """HTML → texte, en gardant les séparations de cellules et de lignes."""
+    txt = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+    txt = re.sub(r"(?i)</(tr|div|p|li|h\d)>", "\n", txt)
+    txt = re.sub(r"(?i)</(td|th|span)>", " | ", txt)
+    txt = re.sub(r"<[^>]+>", " ", txt)
+    txt = (txt.replace("&nbsp;", " ").replace("&#39;", "'")
+              .replace("&amp;", "&").replace("&eacute;", "é").replace("&egrave;", "è"))
+    return re.sub(r"[ \t]+", " ", txt)
+
+
+def parse_vignette_text(text: str, now: datetime) -> list[dict]:
+    """
+    Lit la table PM/BM du texte reconstitué. Le SHOM la présente par journée :
+    un intitulé de date, puis des lignes « PM 04h35 8.42 m » et un coefficient.
+
+    Les heures sont sans date ; on les rattache au jour courant de la lecture.
+    Le SHOM affiche l'heure LÉGALE française, pas UTC : on convertit via la
+    zone Europe/Paris, sinon tout glisse d'une ou deux heures selon la saison —
+    l'erreur exacte qui rendrait le carnet de marée inutilisable.
+    """
+    out: list[dict] = []
+    current: date | None = None
+    utc_offset_h: float | None = None
+
+    # « (Heure UTC) » ou « (Heure légale) » : le SHOM le précise en en-tête.
+    if re.search(r"heure\s*(?:utc|tu)\b", text, re.I):
+        utc_offset_h = 0.0
+
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+
+        # Intitulé de jour : « lundi 10 août 2026 », « 10/08/2026 », « 10 août »
+        m = re.search(r"(\d{1,2})\s+(" + "|".join(MONTHS) + r")\s*(\d{4})?", line, re.I)
+        if m:
+            year = int(m.group(3)) if m.group(3) else now.year
+            try:
+                current = date(year, MONTHS[m.group(2).lower()], int(m.group(1)))
+            except ValueError:
+                pass
+        else:
+            m = re.search(r"\b(\d{1,2})/(\d{1,2})/(\d{2,4})\b", line)
+            if m:
+                y = int(m.group(3))
+                y += 2000 if y < 100 else 0
+                try:
+                    current = date(y, int(m.group(2)), int(m.group(1)))
+                except ValueError:
+                    pass
+
+        # Ligne de marée : un type, une heure, une hauteur, parfois un coefficient.
+        row = re.search(
+            r"(PM|BM|pleine\s*mer|basse\s*mer)\D{0,12}?(\d{1,2})\s*[h:]\s*(\d{2})"
+            r"\D{0,12}?(\d{1,2}[.,]\d{1,2})\s*m?"
+            r"(?:\D{0,12}?(\d{2,3})\b)?",
+            line, re.I,
+        )
+        if not row or current is None:
+            continue
+
+        kind = "HW" if row.group(1).lower().startswith(("pm", "pleine")) else "LW"
+        hh, mm = int(row.group(2)), int(row.group(3))
+        if hh > 23 or mm > 59:
+            continue
+        height = float(row.group(4).replace(",", "."))
+        if not (-2 <= height <= 15):
+            continue
+
+        naive = datetime(current.year, current.month, current.day, hh, mm)
+        if utc_offset_h == 0.0:
+            stamp = naive.replace(tzinfo=timezone.utc)
+        else:
+            stamp = naive.replace(tzinfo=PARIS) if PARIS else naive.replace(tzinfo=timezone.utc)
+
+        e = {"t": int(stamp.timestamp() * 1000), "h": round(height, 3), "kind": kind}
+        coef = row.group(5)
+        if coef and 20 <= int(coef) <= 130:
+            e["coefficient"] = int(coef)
+        out.append(e)
+
+    return dedupe(out)
+
 
 def parse_curve(text: str, day_hint: datetime) -> list[dict]:
     """
@@ -191,7 +304,7 @@ def dedupe(items: list[dict]) -> list[dict]:
 # Archive
 # ═══════════════════════════════════════════════════════════════════════════
 
-def merge_history(curve: list[dict]) -> list[dict]:
+def merge_history(curve: list[dict], extrema: list[dict] | None = None) -> list[dict]:
     hist = []
     if os.path.exists(HISTORY):
         try:
@@ -201,6 +314,15 @@ def merge_history(curve: list[dict]) -> list[dict]:
             print(f"  ! archive illisible, on repart de zéro ({e})", file=sys.stderr)
 
     merged = {p["t"]: p for p in hist}
+
+    # Les PM/BM sont des observations (t, hauteur) à part entière, et les plus
+    # informatives qui soient pour un ajustement harmonique : elles portent
+    # l'amplitude ET la phase. Quand le SHOM ne publie pas de courbe — c'est le
+    # cas de la vignette — elles constituent à elles seules la série d'entrée.
+    # On les garde à leur horodatage exact, sans arrondi.
+    for e in extrema or []:
+        merged[e["t"]] = {"t": e["t"], "h": e["h"], "x": 1}
+
     for p in curve:
         if p["t"] % HISTORY_STEP_MS < 60_000 or p["t"] % HISTORY_STEP_MS > HISTORY_STEP_MS - 60_000:
             merged[p["t"] - p["t"] % HISTORY_STEP_MS] = {
@@ -228,12 +350,21 @@ def main() -> int:
         if not text:
             diagnostics.append((None, meta))
             continue
+
+        # La charge utile est un script qui écrit une iframe : on reconstitue
+        # le document avant toute tentative de lecture.
+        html = unwrap_vignette(text)
+        plain = strip_tags(html) if html else ""
+        meta["unwrappedBytes"] = len(html)
+
         curve = parse_curve(text, now)
-        extrema = parse_extrema(text)
-        print(f"    {len(curve)} points de courbe, {len(extrema)} extrema")
+        extrema = parse_extrema(text) or parse_vignette_text(plain, now)
+        print(f"    {len(html)} octets reconstitués · "
+              f"{len(curve)} points de courbe, {len(extrema)} extrema")
         if curve or extrema:
             used = url
             break
+        meta["plain"] = plain
         diagnostics.append((text, meta))
 
     if not curve and not extrema:
@@ -261,8 +392,8 @@ def main() -> int:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     print(f"  ✓ {OUT} — {len(curve)} points, {len(extrema)} extrema")
 
-    if curve:
-        hist = merge_history(curve)
+    if curve or extrema:
+        hist = merge_history(curve, extrema)
         with open(HISTORY, "w", encoding="utf-8") as f:
             json.dump(
                 {
@@ -275,7 +406,9 @@ def main() -> int:
                 f, ensure_ascii=False, separators=(",", ":"),
             )
         span = (hist[-1]["t"] - hist[0]["t"]) / 86_400_000 if len(hist) > 1 else 0
-        print(f"  ✓ {HISTORY} — {len(hist)} points, {span:.0f} jours d'historique")
+        n_ext = sum(1 for p in hist if p.get("x"))
+        print(f"  ✓ {HISTORY} — {len(hist)} points dont {n_ext} PM/BM, "
+              f"{span:.0f} jours d'historique")
 
     return 0
 

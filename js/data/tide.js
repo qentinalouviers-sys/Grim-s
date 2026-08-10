@@ -38,37 +38,50 @@ export function init() {
 
     model = new TideModel(h.data && h.data.constituents ? h.data : EMERGENCY_SPEC);
 
-    if (s.data?.curve?.length) {
-      const series = s.data.curve
-        .map((p) => ({ t: p.t ?? Date.parse(p.time), heightM: p.h ?? p.heightM }))
-        .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.heightM))
-        .sort((a, b) => a.t - b.t);
-      if (series.length > 10) {
-        shom = {
-          series,
-          extrema: (s.data.extrema || [])
-            .map((e) => ({
-              t: e.t ?? Date.parse(e.time),
-              heightM: e.h ?? e.heightM,
-              kind: e.kind,
-              coefficient: e.coefficient ?? null,
-            }))
-            .filter((e) => Number.isFinite(e.t)),
-          fetchedAt: s.fetchedAt,
-          from: series[0].t,
-          to: series[series.length - 1].t,
-        };
-        // Contrôle qualité permanent : on mesure ce que vaut le modèle
-        // harmonique contre la donnée officielle, et on l'affiche.
-        model.rmsM = model.rmsAgainst(series.filter((_, i) => i % 6 === 0));
-      }
+    // La vignette SHOM publie les PM/BM mais PAS la courbe. Ces extrema sont
+    // la donnée officielle qui compte le plus — heures et coefficients — et on
+    // les utilise même sans courbe : le modèle harmonique fournit alors la
+    // hauteur entre deux extrema, le SHOM fournit les extrema eux-mêmes.
+    const series = (s.data?.curve || [])
+      .map((p) => ({ t: p.t ?? Date.parse(p.time), heightM: p.h ?? p.heightM }))
+      .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.heightM))
+      .sort((a, b) => a.t - b.t);
+
+    const officialExtrema = (s.data?.extrema || [])
+      .map((e) => ({
+        t: e.t ?? Date.parse(e.time),
+        heightM: e.h ?? e.heightM,
+        kind: e.kind,
+        coefficient: e.coefficient ?? null,
+      }))
+      .filter((e) => Number.isFinite(e.t) && Number.isFinite(e.heightM))
+      .sort((a, b) => a.t - b.t);
+
+    if (series.length > 10 || officialExtrema.length >= 4) {
+      const covering = series.length > 10 ? series : officialExtrema;
+      shom = {
+        series,
+        extrema: officialExtrema,
+        fetchedAt: s.fetchedAt,
+        from: covering[0].t,
+        to: covering[covering.length - 1].t,
+        /** true seulement si on a une vraie courbe interpolable. */
+        hasCurve: series.length > 10,
+      };
+      // Contrôle qualité permanent : on mesure ce que vaut le modèle
+      // harmonique contre la donnée officielle, et on l'affiche.
+      const ref = series.length > 10 ? series.filter((_, i) => i % 6 === 0) : officialExtrema;
+      model.rmsM = model.rmsAgainst(ref);
     }
     return true;
   })();
   return ready;
 }
 
-const inShom = (t) => shom && t >= shom.from && t <= shom.to;
+/** Hauteur interpolable depuis le SHOM : exige une vraie courbe. */
+const inShom = (t) => shom?.hasCurve && t >= shom.from && t <= shom.to;
+/** Extrema officiels disponibles sur cet instant. */
+const hasOfficialExtrema = (t) => shom && shom.extrema.length > 0 && t >= shom.from - 12 * HOUR && t <= shom.to + 12 * HOUR;
 
 /** Interpolation linéaire dans la série SHOM (pas de 5 min : l'erreur est < 1 cm). */
 function shomHeight(t) {
@@ -117,15 +130,18 @@ export function extrema(fromT, toT) {
   if (!shom?.extrema?.length) return modelExt;
 
   const official = shom.extrema.filter((e) => e.t >= fromT && e.t <= toT);
-  const outside = modelExt.filter((e) => !inShom(e.t));
-  const merged = [...official, ...outside].sort((a, b) => a.t - b.t);
 
-  // Le raccord peut produire deux extrema du même type à moins de 3 h :
-  // on garde l'officiel.
-  return merged.filter((e, i) => {
-    const prev = merged[i - 1];
-    return !(prev && prev.kind === e.kind && e.t - prev.t < 3 * HOUR && !official.includes(e));
-  });
+  // L'officiel prime toujours. On écarte donc tout extremum du modèle qui a un
+  // homologue officiel du même type à moins de 3 h — dans un sens comme dans
+  // l'autre. Une déduplication qui ne regarde que le voisin précédent laisse
+  // passer le doublon quand le modèle tombe AVANT l'officiel, et l'app affiche
+  // alors deux pleines mers à quelques minutes d'intervalle.
+  const NEAR = 3 * HOUR;
+  const filler = modelExt.filter(
+    (m) => !official.some((o) => o.kind === m.kind && Math.abs(o.t - m.t) < NEAR),
+  );
+
+  return [...official, ...filler].sort((a, b) => a.t - b.t);
 }
 
 /** Coefficient de marée à l'instant t. */
@@ -169,7 +185,19 @@ export function info(t = Date.now()) {
     return {
       source: 'SHOM',
       label: 'SHOM',
-      detail: `Vignette officielle · maj ${new Date(shom.fetchedAt).toLocaleDateString('fr-FR')}`,
+      detail: `Courbe officielle · maj ${new Date(shom.fetchedAt).toLocaleDateString('fr-FR')}`,
+      trust: 'high',
+      provisional: false,
+    };
+  }
+  if (hasOfficialExtrema(t)) {
+    return {
+      source: 'SHOM_EXTREMA',
+      label: 'SHOM · PM/BM',
+      detail:
+        `Heures et coefficients officiels du SHOM ; hauteurs intermédiaires ` +
+        `calculées${model?.rmsM != null ? ` (écart ${(model.rmsM * 100).toFixed(0)} cm aux PM/BM)` : ''}. ` +
+        `Maj ${new Date(shom.fetchedAt).toLocaleDateString('fr-FR')}.`,
       trust: 'high',
       provisional: false,
     };

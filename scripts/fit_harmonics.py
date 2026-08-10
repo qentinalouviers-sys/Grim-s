@@ -147,8 +147,10 @@ def load_series() -> list[dict]:
             continue
         pts = [p for p in curve if isinstance(p.get("t"), (int, float))
                and isinstance(p.get("h"), (int, float))]
-        if len(pts) > 100:
-            print(f"  → source : {os.path.basename(path)} ({len(pts)} points)")
+        if len(pts) >= 50:
+            n_ext = sum(1 for p in pts if p.get("x"))
+            print(f"  → source : {os.path.basename(path)} ({len(pts)} points"
+                  f"{f', dont {n_ext} PM/BM' if n_ext else ''})")
             return sorted(pts, key=lambda p: p["t"])
     return []
 
@@ -277,10 +279,17 @@ def fit(points: list[dict], prior: dict[str, tuple[float, float]]) -> dict:
 def main() -> int:
     print("↻ Ajustement harmonique — Dieppe")
     points = load_series()
-    if len(points) < 200:
-        print("  ✗ Pas assez de données (lance d'abord scripts/refresh_tide.py).",
-              file=sys.stderr)
-        print("    Le fichier de constantes existant est conservé.", file=sys.stderr)
+    # Seuil pensé pour une série de PM/BM : la vignette SHOM ne publie pas de
+    # courbe, seulement quatre extrema par jour. Ce sont malgré tout les points
+    # les plus informatifs d'une marée, et la régularisation encaisse le faible
+    # effectif. On exige surtout une DURÉE : c'est elle, pas le nombre de
+    # points, qui décide de ce que l'ajustement peut séparer.
+    span_days = (points[-1]["t"] - points[0]["t"]) / 86_400_000 if len(points) > 1 else 0
+    if len(points) < 60 or span_days < 5:
+        print(f"  ✗ Pas assez de données : {len(points)} points sur "
+              f"{span_days:.1f} jours (minimum 60 points et 5 jours).", file=sys.stderr)
+        print("    L'archive s'allonge à chaque passage ; le fichier de "
+              "constantes existant est conservé.", file=sys.stderr)
         return 0
 
     previous = {}
