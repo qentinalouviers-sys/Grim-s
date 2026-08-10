@@ -102,9 +102,17 @@ export function setStreamNodes(nodes) {
   streamNodes = Array.isArray(nodes) ? nodes : [];
 }
 
+// Le profil de 24 h interroge 96 fois la MÊME position : on garde le dernier
+// résultat. La grille de vecteurs, elle, change de position à chaque point et
+// n'en profite pas — c'est sans importance, le calcul y est court.
+let lfCache = null;
+
 /** @returns {{factor:number, axisBias:number}} */
 export function localFactor(pos) {
   if (!pos || !streamNodes.length) return { factor: 1, axisBias: 0 };
+  if (lfCache && Math.abs(lfCache.lat - pos.lat) < 2e-4 && Math.abs(lfCache.lon - pos.lon) < 3e-4) {
+    return lfCache.val;
+  }
   let wSum = 0;
   let fSum = 0;
   let bSum = 0;
@@ -115,7 +123,9 @@ export function localFactor(pos) {
     fSum += w * (n.factor ?? 1);
     bSum += w * (n.axisBias ?? 0);
   }
-  return { factor: fSum / wSum, axisBias: bSum / wSum };
+  const val = { factor: fSum / wSum, axisBias: bSum / wSum };
+  lfCache = { lat: pos.lat, lon: pos.lon, val };
+  return val;
 }
 
 /* --------------------------------------------------------------------------

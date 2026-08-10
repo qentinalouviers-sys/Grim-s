@@ -44,8 +44,10 @@ let L = null;
 let map = null;
 let root;
 let unsub;
+let unsubHeading;
 let timer = 0;
 let layers = {};
+let boatMarker = null;
 let refs = {};
 let ui = {
   follow: true,
@@ -218,6 +220,10 @@ export async function mount(container) {
   });
 
   unsub = subscribe(['fix', 'weather', 'waypoint', 'mob', 'anchor'], onState);
+  // Le cap a son propre abonnement : redessiner tout le calque bateau à la
+  // cadence du magnétomètre serait absurde, alors qu'une rotation de l'icône
+  // suffit — et sans elle, l'étrave reste figée quand on pivote au mouillage.
+  unsubHeading = subscribe('heading', rotateBoat);
   timer = setInterval(() => {
     drawDrift();
     if (ui.vectors) drawVectors();
@@ -229,6 +235,8 @@ export async function mount(container) {
 
 export function unmount() {
   unsub?.();
+  unsubHeading?.();
+  boatMarker = null;
   clearInterval(timer);
   map?.remove();
   map = null;
@@ -388,9 +396,18 @@ function onState() {
   }
 }
 
+/** Rotation seule de l'étrave — quelques microsecondes, pas de redessin. */
+function rotateBoat() {
+  const svg = boatMarker?.getElement()?.firstElementChild;
+  if (!svg) return;
+  const hdg = state.heading?.deg ?? state.fix?.cogDeg ?? 0;
+  svg.style.transform = `rotate(${hdg.toFixed(1)}deg)`;
+}
+
 function drawBoat() {
   const g = layers.boat;
   g.clearLayers();
+  boatMarker = null;
   const fix = state.fix;
   if (!fix) return;
 
@@ -412,7 +429,7 @@ function drawBoat() {
     iconSize: [30, 30],
     iconAnchor: [15, 15],
   });
-  L.marker([fix.lat, fix.lon], { icon, interactive: false, zIndexOffset: 1000 }).addTo(g);
+  boatMarker = L.marker([fix.lat, fix.lon], { icon, interactive: false, zIndexOffset: 1000 }).addTo(g);
 
   if (ui.follow) {
     map._programmaticMove = true;

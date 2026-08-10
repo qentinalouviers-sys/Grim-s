@@ -26,12 +26,50 @@
  * ========================================================================== */
 
 import { set, state, emit } from '../core/store.js';
-import { norm360, angleDiff, meanAngle, magToTrue } from '../core/geo.js';
+import { norm360, angleDiff, magToTrue } from '../core/geo.js';
 
 let listening = false;
 let handler = null;
 const history = [];
-const HISTORY = 8;
+const HISTORY = 12;
+
+/* --------------------------------------------------------------------------
+ * Lissage
+ *
+ * Une moyenne glissante sur N mesures retarde l'affichage d'environ (N−1)/2
+ * mesures — un retard exprimé en ÉCHANTILLONS, pas en temps. C'est le piège :
+ * la cadence de `deviceorientation` n'est garantie nulle part. Sur un iPhone
+ * au repos elle approche 60 Hz et huit mesures ne coûtent que 60 ms ; sur un
+ * Android qui l'ajuste, ou sur n'importe quel téléphone dont le fil principal
+ * est chargé, elle tombe à 8 ou 10 Hz et les mêmes huit mesures deviennent
+ * quatre dixièmes de seconde de retard. Le lissage devient d'autant plus
+ * pénalisant que l'appareil rame.
+ *
+ * On raisonne donc en temps, avec un filtre du premier ordre dont la constante
+ * s'adapte : lente au repos pour absorber le bruit du magnétomètre, courte dès
+ * que l'écart dépasse ce que le bruit peut expliquer — un vrai changement de
+ * cap ne doit jamais attendre.
+ * ------------------------------------------------------------------------ */
+const TAU_STEADY = 180; // ms, cap tenu : on filtre franchement
+const TAU_SLEW = 40;    // ms, en giration : on suit
+const SLEW_FULL = 10;   // ° d'écart au-delà duquel c'est un virage, pas du bruit
+const GAP_RESET = 3000; // ms de silence après quoi on se recale sans transition
+
+let filtered = null;
+let lastSampleT = 0;
+
+function smooth(magnetic, now) {
+  if (filtered == null || now - lastSampleT > GAP_RESET) {
+    filtered = magnetic;
+    return magnetic;
+  }
+  const dt = Math.min(500, Math.max(1, now - lastSampleT));
+  const innovation = angleDiff(magnetic, filtered); // signé, plus court chemin
+  const w = Math.min(1, Math.abs(innovation) / SLEW_FULL);
+  const tau = TAU_STEADY + (TAU_SLEW - TAU_STEADY) * w;
+  filtered = norm360(filtered + innovation * (1 - Math.exp(-dt / tau)));
+  return filtered;
+}
 
 /** Le mode compas est-il seulement possible sur cet appareil ? */
 export const supported = () => typeof DeviceOrientationEvent !== 'undefined';
@@ -98,21 +136,24 @@ function onOrientation(e) {
   // signaler l'appareil « mal tenu » plutôt que d'afficher un cap faux.
   const tilted = Math.abs(e.beta ?? 0) > 60 || Math.abs(e.gamma ?? 0) > 60;
 
+  const now = Date.now();
+  const value = smooth(magnetic, now);
+  lastSampleT = now;
+
+  // Stabilité : dispersion des mesures BRUTES autour du cap filtré. C'est
+  // l'agitation du capteur qu'on veut mesurer, pas celle du filtre.
   history.push(magnetic);
   if (history.length > HISTORY) history.shift();
-  const smooth = meanAngle(history);
-
-  // Stabilité : dispersion des dernières mesures autour de la moyenne.
   const spread =
-    history.reduce((acc, h) => acc + Math.abs(angleDiff(h, smooth)), 0) / history.length;
+    history.reduce((acc, h) => acc + Math.abs(angleDiff(h, value)), 0) / history.length;
 
-  lastEventAt = Date.now();
-  const trueHeading = magToTrue(smooth);
+  lastEventAt = now;
+  const trueHeading = magToTrue(value);
 
   set({
     heading: {
       deg: trueHeading,
-      magnetic: smooth,
+      magnetic: value,
       source: 'compass',
       spread,
       tilted,

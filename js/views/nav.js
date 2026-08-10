@@ -27,10 +27,14 @@ import { sunTimes, moonPhase } from '../data/astro.js';
 const HOUR = 3600000;
 
 let root;
-let unsub;
+let unsubs = [];
 let widgets = {};
 let refs = {};
 let timer = 0;
+// Relèvements portés sur le cadran (waypoint, MOB, courant). Ils dépendent de
+// la position et de l'heure, pas du cap : on les recalcule au rythme du GPS et
+// le rendu du compas se contente de les réafficher.
+let marks = [];
 
 export function mount(container) {
   root = clear(container);
@@ -147,16 +151,27 @@ export function mount(container) {
 
   root.append(el('div', 'tiny', 'Les données affichées ne remplacent pas les documents nautiques officiels. Marée : SHOM. Météo : Open-Meteo.'));
 
-  unsub = subscribe(
-    ['fix', 'heading', 'tide', 'weather', 'trip', 'anchor', 'waypoint', 'advice', 'motion'],
+  /* ---- Abonnements : trois rythmes, pas un seul ------------------------
+   *
+   * Le compas parle jusqu'à 60 fois par seconde. Le brancher sur le rendu
+   * complet — c'était le cas — faisait redessiner six canvas et reconstruire
+   * quarante nœuds de DOM à chaque frémissement du magnétomètre : l'aiguille
+   * accusait alors un demi-tour de retard sur le bateau. Chaque donnée est
+   * désormais rendue au rythme auquel elle change réellement.
+   */
+  unsubs.push(subscribe('heading', renderHeading));           // ~60 Hz, très court
+  unsubs.push(subscribe('fix', renderKinetics));              // 1 Hz
+  unsubs.push(subscribe(
+    ['tide', 'weather', 'trip', 'anchor', 'waypoint', 'advice', 'motion'],
     render,
-  );
+  ));
   timer = setInterval(render, 5000);
   render();
 }
 
 export function unmount() {
-  unsub?.();
+  unsubs.forEach((fn) => fn());
+  unsubs = [];
   clearInterval(timer);
   Object.values(widgets).forEach((wgt) => wgt.destroy?.());
   widgets = {};
@@ -166,6 +181,92 @@ export function unmount() {
 /* ==========================================================================
  * Rendu
  * ========================================================================== */
+
+/**
+ * Rendu du compas seul. C'est le chemin chaud : il doit rester en dessous du
+ * budget d'une frame. Un dessin de cadran et trois nœuds de texte, rien
+ * d'autre — aucun calcul de marée, de courant ni de mise en page.
+ */
+function renderHeading() {
+  const hd = state.heading;
+  if (!refs.headVal) return;
+
+  if (!hd) {
+    refs.headVal.textContent = '—––°';
+    refs.headSrc.textContent = 'compas inactif';
+    refs.headExtra.textContent = '';
+    return;
+  }
+  widgets.compass.set(hd.deg, marks, hd.quality);
+
+  const txt = fmt.heading(hd.deg);
+  if (refs.headVal.textContent !== txt) refs.headVal.textContent = txt;
+
+  const src =
+    hd.source === 'compass' ? `compas · ${qualityLabel(hd.quality)}`
+    : hd.source === 'cog' ? 'route fond GPS'
+    : 'compas figé';
+  if (refs.headSrc.textContent !== src) refs.headSrc.textContent = src;
+
+  const extra = hd.deviation
+    ? `déviation ${hd.deviation > 0 ? '+' : ''}${hd.deviation}° / route`
+    : hd.tilted ? 'téléphone trop incliné'
+    : `mag ${fmt.heading(hd.magnetic ?? hd.deg)}`;
+  if (refs.headExtra.textContent !== extra) refs.headExtra.textContent = extra;
+}
+
+/** Recalcule les relèvements du cadran. Position et courant : rythme du GPS. */
+function computeMarks(now, fix, pos) {
+  const out = [];
+  if (state.waypoint && fix) {
+    out.push({ deg: bearing(fix, state.waypoint), color: '#a3e635', label: 'WPT' });
+  }
+  if (state.mob && fix) {
+    out.push({ deg: bearing(fix, state.mob), color: '#fb5a72', label: 'MOB' });
+  }
+  const st = stream.tidalStream(now, pos);
+  out.push({ deg: st.dir, color: st.sense === 'ebb' ? '#fb923c' : '#22d3ee', label: 'CRT' });
+  marks = out;
+}
+
+/**
+ * Ce qui bouge au rythme du GPS : vitesse fond, relèvements, veilles. Assez
+ * léger pour tourner à chaque fix, trop dépendant de la position pour attendre
+ * le rendu complet des 5 secondes.
+ */
+function renderKinetics() {
+  const now = Date.now();
+  const fix = state.fix;
+  if (!refs.speedLbl) return;
+
+  widgets.speed.set(fix?.speedKn ?? null);
+  refs.speedLbl.textContent = fix
+    ? `VITESSE FOND · ±${Math.round(fix.accuracy || 0)} m`
+    : 'VITESSE FOND · sans position';
+
+  computeMarks(now, fix, fix ? { lat: fix.lat, lon: fix.lon } : spots.getPort());
+  renderHeading();
+  renderWatches(now, fix);
+}
+
+/** Sortie en cours, veille de mouillage, route sur waypoint. */
+function renderWatches(now, fix) {
+  const parts = [];
+  if (state.trip) {
+    parts.push(`Sortie : ${fmt.dist(state.trip.distanceM)} · ${fmt.duration(now - state.trip.startedAt)} · max ${fmt.num(state.trip.maxSpeedKn, 1)} nd`);
+  }
+  if (state.anchor?.armed && fix) {
+    parts.push(`Mouillage : ${Math.round(distance(state.anchor, fix))} m du point / rayon ${state.anchor.radiusM} m`);
+  }
+  if (state.waypoint && fix) {
+    const d = distance(fix, state.waypoint);
+    const b = bearing(fix, state.waypoint);
+    const eta = fix.speedKn > 0.5 ? fmt.duration((d / 1852 / fix.speedKn) * HOUR) : '—';
+    parts.push(`→ ${state.waypoint.name} : ${fmt.dist(d)} au ${fmt.heading(b)} · ETA ${eta}`);
+  }
+  const txt = parts.join('\n') || 'Aucune veille active.';
+  if (refs.tripInfo.textContent !== txt) refs.tripInfo.textContent = txt;
+}
 
 function render() {
   const now = Date.now();
@@ -188,32 +289,9 @@ function render() {
 
   /* ---- Compas ---------------------------------------------------------- */
   const hd = state.heading;
-  const marks = [];
-  if (state.waypoint && fix) {
-    marks.push({ deg: bearing(fix, state.waypoint), color: '#a3e635', label: 'WPT' });
-  }
-  if (state.mob && fix) {
-    marks.push({ deg: bearing(fix, state.mob), color: '#fb5a72', label: 'MOB' });
-  }
   const st = stream.tidalStream(now, pos);
-  marks.push({ deg: st.dir, color: st.sense === 'ebb' ? '#fb923c' : '#22d3ee', label: 'CRT' });
-
-  if (hd) {
-    widgets.compass.set(hd.deg, marks, hd.quality);
-    refs.headVal.textContent = fmt.heading(hd.deg);
-    refs.headSrc.textContent =
-      hd.source === 'compass' ? `compas · ${qualityLabel(hd.quality)}`
-      : hd.source === 'cog' ? 'route fond GPS'
-      : 'compas figé';
-    refs.headExtra.textContent = hd.deviation
-      ? `déviation ${hd.deviation > 0 ? '+' : ''}${hd.deviation}° / route`
-      : hd.tilted ? 'téléphone trop incliné'
-      : `mag ${fmt.heading(hd.magnetic ?? hd.deg)}`;
-  } else {
-    refs.headVal.textContent = '—––°';
-    refs.headSrc.textContent = 'compas inactif';
-    refs.headExtra.textContent = '';
-  }
+  computeMarks(now, fix, pos);
+  renderHeading();
 
   /* ---- Bandeau --------------------------------------------------------- */
   const strip = clear(refs.strip);
@@ -290,20 +368,7 @@ function render() {
   refs.btnTrip.textContent = state.trip ? '⏹ Fin de sortie' : '▶︎ Sortie';
   refs.btnTrip.className = `btn ${state.trip ? 'btn-lime' : ''}`;
 
-  const parts = [];
-  if (state.trip) {
-    parts.push(`Sortie : ${fmt.dist(state.trip.distanceM)} · ${fmt.duration(now - state.trip.startedAt)} · max ${fmt.num(state.trip.maxSpeedKn, 1)} nd`);
-  }
-  if (state.anchor?.armed && fix) {
-    parts.push(`Mouillage : ${Math.round(distance(state.anchor, fix))} m du point / rayon ${state.anchor.radiusM} m`);
-  }
-  if (state.waypoint && fix) {
-    const d = distance(fix, state.waypoint);
-    const b = bearing(fix, state.waypoint);
-    const eta = fix.speedKn > 0.5 ? fmt.duration((d / 1852 / fix.speedKn) * HOUR) : '—';
-    parts.push(`→ ${state.waypoint.name} : ${fmt.dist(d)} au ${fmt.heading(b)} · ETA ${eta}`);
-  }
-  refs.tripInfo.textContent = parts.join('\n') || 'Aucune veille active.';
+  renderWatches(now, fix);
   refs.tripInfo.style.whiteSpace = 'pre-line';
 }
 

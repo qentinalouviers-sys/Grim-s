@@ -194,6 +194,10 @@ export class Gauge extends Canvas {
  * Le centre de rotation est SOUS la zone visible : on ne voit que l'arc
  * supérieur, soit ±90° autour du cap, ce qui est exactement le champ utile.
  * ========================================================================== */
+/** Constante de temps du cadran, en ms. Assez pour tuer le tremblement du
+ *  magnétomètre, assez court pour qu'un virage ne se lise pas en différé. */
+const TAU_DIAL = 60;
+
 export class Compass extends Canvas {
   constructor(parent, opts = {}) {
     super(parent, opts.height || 132);
@@ -201,6 +205,12 @@ export class Compass extends Canvas {
     this.display = 0;
     this.marks = []; // { deg, color, label }
     this.quality = 'good';
+    this.raf = 0;
+    this.last = 0;
+    // Liaison explicite plutôt qu'un champ de classe fléché : les champs de
+    // classe n'existent qu'à partir de Safari 14.1, et le téléphone qu'on
+    // laisse à demeure dans le bateau est rarement le plus récent.
+    this.step = this.step.bind(this);
     this.resize();
   }
 
@@ -213,24 +223,47 @@ export class Compass extends Canvas {
     this.heading = norm360(heading);
     this.marks = marks;
     this.quality = quality;
-    this.animate();
+    // On ne dessine PAS ici. Le capteur émet jusqu'à 60 fois par seconde et
+    // parfois davantage : dessiner dans le fil de l'événement, c'est peindre
+    // des images que l'écran ne montrera jamais. On se contente d'armer la
+    // boucle d'animation, qui elle est calée sur le rafraîchissement réel.
+    if (!this.raf) {
+      this.last = performance.now();
+      this.raf = requestAnimationFrame(this.step);
+    }
   }
 
-  animate() {
+  /**
+   * Suivi du cap à constante de temps, pas à coefficient par frame.
+   *
+   * Un lissage « display += écart × 0,25 à chaque frame » a l'air correct à
+   * 60 im/s et devient un piège dès que la machine peine : à 20 im/s le même
+   * coefficient triple le temps de rattrapage, si bien que l'aiguille traîne
+   * exactement au moment où l'appareil est le plus chargé. En passant par
+   * k = 1 − exp(−dt/τ), le temps de réponse est fixé en millisecondes et ne
+   * dépend plus de la cadence d'affichage.
+   */
+  step(now) {
+    this.raf = 0;
+    const dt = Math.min(120, Math.max(1, now - this.last));
+    this.last = now;
+
+    // Écart au plus court chemin : sans ça, passer de 359° à 1° ferait faire
+    // un tour complet au cadran.
+    const d = angleDiff(this.heading, this.display);
+    this.display = Math.abs(d) < 0.2
+      ? this.heading
+      : norm360(this.display + d * (1 - Math.exp(-dt / TAU_DIAL)));
+
+    this.draw();
+    if (Math.abs(angleDiff(this.heading, this.display)) > 0.2) {
+      this.raf = requestAnimationFrame(this.step);
+    }
+  }
+
+  destroy() {
     cancelAnimationFrame(this.raf);
-    const step = () => {
-      // Interpolation au plus court chemin : sans ça, passer de 359° à 1°
-      // fait faire un tour complet au cadran.
-      const d = angleDiff(this.heading, this.display);
-      this.display = norm360(this.display + d * 0.25);
-      this.draw();
-      if (Math.abs(d) > 0.15) this.raf = requestAnimationFrame(step);
-      else {
-        this.display = this.heading;
-        this.draw();
-      }
-    };
-    step();
+    super.destroy();
   }
 
   draw() {

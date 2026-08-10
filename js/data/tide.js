@@ -26,6 +26,7 @@ const HOUR = 3600000;
 let model = null;
 let shom = null; // { series, extrema, fetchedAt, from, to }
 let ready = null;
+let revision = 0; // incrémenté à chaque changement de modèle → vide le cache
 
 /** Charge constantes harmoniques + série SHOM. Idempotent. */
 export function init() {
@@ -73,6 +74,8 @@ export function init() {
       const ref = series.length > 10 ? series.filter((_, i) => i % 6 === 0) : officialExtrema;
       model.rmsM = model.rmsAgainst(ref);
     }
+    revision++;
+    extCache = null;
     return true;
   })();
   return ready;
@@ -121,11 +124,54 @@ export function series(fromT, toT, stepMs = 300000) {
   return out;
 }
 
+/* --------------------------------------------------------------------------
+ * Mémoïsation des extrema
+ *
+ * extrema() est une fonction pure du modèle et de la fenêtre demandée, mais
+ * elle coûte cher : balayage à la recherche des changements de signe de dh/dt,
+ * puis raffinement de Newton sur chacun. Et c'est l'appel le plus chaud de
+ * l'application — tidalStream() en fait un PAR POINT de courant calculé, soit
+ * 96 fois pour tracer le profil de 24 h de l'écran NAV et 49 fois pour le champ
+ * de vecteurs de la carte. Mesuré : 232 ms pour un seul profil journalier.
+ *
+ * On calcule donc une fenêtre large une fois, on y découpe les demandes
+ * suivantes, et on l'élargit par union quand une demande déborde — elle
+ * converge en deux ou trois appels vers la plus grande portée utilisée
+ * (~5 jours, le horizon du moteur de pêche). Plafond à 40 jours pour qu'une
+ * demande aberrante ne fasse pas exploser le calcul.
+ * ------------------------------------------------------------------------ */
+const EXT_PAD = 36 * HOUR;
+const EXT_MAX_SPAN = 40 * 24 * HOUR;
+let extCache = null; // { from, to, list, rev }
+
+function extremaWindow(fromT, toT) {
+  if (extCache && extCache.rev === revision && fromT >= extCache.from && toT <= extCache.to) {
+    return extCache.list;
+  }
+  let from = fromT - EXT_PAD;
+  let to = toT + EXT_PAD;
+  if (extCache && extCache.rev === revision) {
+    from = Math.min(from, extCache.from);
+    to = Math.max(to, extCache.to);
+  }
+  if (to - from > EXT_MAX_SPAN) {
+    const mid = (fromT + toT) / 2;
+    from = Math.min(fromT, mid - EXT_MAX_SPAN / 2);
+    to = Math.max(toT, mid + EXT_MAX_SPAN / 2);
+  }
+  extCache = { from, to, rev: revision, list: computeExtrema(from, to) };
+  return extCache.list;
+}
+
 /**
  * Pleines et basses mers sur la fenêtre. Les extrema SHOM (heures officielles,
  * coefficients officiels) priment ; le modèle complète au-delà.
  */
 export function extrema(fromT, toT) {
+  return extremaWindow(fromT, toT).filter((e) => e.t >= fromT && e.t <= toT);
+}
+
+function computeExtrema(fromT, toT) {
   const modelExt = model ? model.extrema(fromT, toT) : [];
   if (!shom?.extrema?.length) return modelExt;
 
