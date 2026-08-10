@@ -443,6 +443,8 @@ function onOrientation(e) {
  * magnétique du bord, on l'affiche au navigateur au lieu de la subir.
  */
 const devSamples = [];
+let deviationAt = 0;
+const DEVIATION_TTL = 10 * 60000; // ms sans mesure en route avant oubli
 
 export function tick() {
   const fix = state.fix;
@@ -458,7 +460,14 @@ export function tick() {
         devSamples.reduce((a, b) => a + (b - mean) ** 2, 0) / devSamples.length;
       // Écart cohérent (faible variance) et significatif : c'est une déviation.
       deviation = Math.sqrt(spread) < 12 && Math.abs(mean) > 6 ? Math.round(mean) : null;
+      deviationAt = Date.now();
     }
+  } else if (deviation != null && Date.now() - deviationAt > DEVIATION_TTL) {
+    // Une déviation se mesure en route et ne vaut que pour cette route-là.
+    // Affichée à l'arrêt ou en dérive, elle n'informe plus de rien et invite à
+    // corriger un cap juste. On la laisse expirer plutôt que de la figer.
+    deviation = null;
+    devSamples.length = 0;
   }
 
   if (!compassAlive) {

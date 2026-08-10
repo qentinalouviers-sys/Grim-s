@@ -358,6 +358,13 @@ function render() {
   if (drift.leeway && drift.leeway.spd > 0.05) {
     ci.append(kv('dont fardage', `${fmt.num(drift.leeway.spd, 1)} nd`));
   }
+  // Le résiduel océanique vient d'un modèle global à 8 km de maille, dont on ne
+  // sait pas s'il contient déjà la marée. Il est plafonné, et affiché à part :
+  // une composante qu'on ne peut pas vérifier n'a rien à faire fondue dans un
+  // total où plus personne ne la voit passer.
+  if (drift.residual && drift.residual.spd > 0.05) {
+    ci.append(kv('dont résiduel', `${fmt.num(drift.residual.spd, 1)} nd (modèle global)`));
+  }
   ci.append(kv('Étale', `${fmt.hhmm(st.slackT)} · ${fmt.countdown(st.slackT - now)}`));
   if (fix?.moving && Number.isFinite(fix.cogDeg) && hd?.source === 'compass') {
     const setDrift = Math.round(angleDiff(fix.cogDeg, hd.deg));

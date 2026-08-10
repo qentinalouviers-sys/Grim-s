@@ -30,6 +30,7 @@ import * as idb from '../core/idb.js';
 import { SPECIES_RULES, SPECIES_ORDER } from './species.js';
 import { setLearned } from './engine.js';
 import * as stream from '../data/stream.js';
+import * as spots from './spots.js';
 import { clamp01 } from './curves.js';
 
 const MIN_FOR_BIAS = 8;
@@ -229,7 +230,10 @@ export function explain() {
   if (bestSpots.length) {
     out.push({
       title: 'Postes les plus productifs',
-      text: bestSpots.map(([k, v]) => `${k} (${v})`).join(' · '),
+      // Les prises sont indexées par identifiant de poste. Afficher l'identifiant
+      // brut — « epaves-large » — donne un journal qui parle en base de données
+      // au lieu de parler en mer.
+      text: bestSpots.map(([k, v]) => `${spots.find(k)?.name || k} (${v})`).join(' · '),
     });
   }
   return out;

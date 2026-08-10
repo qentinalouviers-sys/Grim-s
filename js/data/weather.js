@@ -21,6 +21,9 @@
 import * as net from '../core/net.js';
 import { kmhToKn } from '../core/fmt.js';
 
+/** Plafond du courant résiduel non-marée retenu, en nœuds. Voir plus bas. */
+const RESIDUAL_MAX_KN = 0.5;
+
 const FORECAST = 'https://api.open-meteo.com/v1/forecast';
 const MARINE = 'https://marine-api.open-meteo.com/v1/marine';
 
@@ -135,8 +138,30 @@ export async function load(lat, lon, { days = 4, force = false } = {}) {
       swellPeriodS: pick(mh?.swell_wave_period, j),
       seaTempC: pick(mh?.sea_surface_temperature, j),
       // Courant résiduel non-marée : converti en nœuds, direction VERS.
+      //
+      // Open-Meteo publie CETTE vitesse en km/h, comme le vent quelques lignes
+      // plus haut. Elle était convertie avec le facteur des mètres par seconde
+      // (×1,94384) au lieu de celui des kilomètres par heure : 3,6 fois trop.
+      // Comme ce résiduel s'additionne au courant de marée dans driftVector(),
+      // il dominait la somme — dérive annoncée à 3,8 nd quand le courant de
+      // marée en donnait 1,2. Tout ce qui en découle était faux avec lui :
+      // trajectoire prévue, point de largage, cône d'incertitude, et la dérive
+      // d'un homme à la mer.
+      //
+      // Et il est PLAFONNÉ, pour une raison qu'il faut assumer plutôt que
+      // cacher : ce champ vient d'un modèle océanique global, et rien ne dit
+      // s'il inclut ou non la marée. S'il l'inclut, l'ajouter à notre propre
+      // courant de marée compte la marée deux fois. Le relevé du 10/08 au nord
+      // de Dieppe donnait 0,7 nd de « résiduel » là où le résiduel non-marée
+      // de la Manche orientale se tient entre 0,1 et 0,3 nd : la valeur sent le
+      // courant de marée déguisé. Faute de pouvoir trancher, on borne à ce que
+      // la physique du plateau autorise. Le plafond ne mord jamais sur un vrai
+      // résiduel, et limite les dégâts s'il s'agit d'un doublon — ce vecteur
+      // sert aussi à prédire la dérive d'un homme à la mer.
       residualCurrent:
-        curSpd != null && curDir != null ? { dir: curDir, spd: curSpd * 1.94384 } : null,
+        curSpd != null && curDir != null
+          ? { dir: curDir, spd: Math.min(RESIDUAL_MAX_KN, kmhToKn(curSpd)) }
+          : null,
     };
   });
 
