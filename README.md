@@ -15,7 +15,7 @@ l'architecture : **le réseau est une option, jamais une dépendance.**
 
 | Donnée | Hors ligne ? | Comment |
 |---|---|---|
-| Marée, coefficient, PM/BM | ✅ toujours | calculée à bord, 23 constituants harmoniques |
+| Marée, coefficient, PM/BM | ✅ toujours | PM/BM officielles SHOM sur 7 j, modèle harmonique 23 constituants au-delà |
 | Courant de marée, dérive | ✅ toujours | dérivé de la marée + calibration GPS du bateau |
 | Soleil, lune, crépuscules | ✅ toujours | éphémérides calculées à bord |
 | Scoring pêche, plan de sortie | ✅ toujours | moteur local, aucun appel distant |
@@ -137,23 +137,42 @@ zéro octet de réseau, quelques millisecondes pour 24 h de courbe.
 
 **Et les constantes s'ajustent toutes seules.** `scripts/refresh_tide.py`
 récupère la donnée SHOM et l'accumule dans une archive glissante ;
-`scripts/fit_harmonics.py` réajuste le modèle dessus par moindres carrés.
-Le workflow tourne deux fois par jour. Plus l'archive s'allonge, plus le modèle
-devient précis — pour toujours, et hors ligne.
+`scripts/fit_harmonics.py` réajuste le modèle dessus par moindres carrés
+régularisés. Le workflow tourne deux fois par jour.
 
-Erreur d'extrapolation mesurée sur série synthétique, 45 jours au-delà de la
-fenêtre d'ajustement :
+Ce que publie réellement le SHOM, mesuré et non supposé : la vignette donne les
+**pleines et basses mers**, avec leurs heures et leurs coefficients — pas de
+courbe échantillonnée. Soit environ quatre points par jour. Ce sont malgré tout
+les points les plus informatifs d'une marée, puisqu'ils en portent l'amplitude
+et la phase, et ils alimentent l'archive à leur horodatage exact.
 
-| Archive | Erreur moyenne |
-|---|---|
-| aucune (constantes de départ) | ~19 cm |
-| 7 jours | ~10 cm |
-| 20 jours | ~10 cm |
-| 1 an | ~0,5 cm |
+Cette parcimonie a une conséquence qu'il faut énoncer : avec quatre points par
+jour on ne peut pas ajuster les harmoniques d'eaux peu profondes — M4, M6, MS4
+ont des périodes de 4 à 6 heures, elles sont repliées par un échantillonnage à
+6 heures. Le fitter les maintient donc à leurs valeurs publiées, et seules les
+composantes astronomiques sont pilotées par les données. Erreur d'extrapolation
+mesurée sur série synthétique, 45 jours au-delà de la fenêtre d'ajustement :
+
+| Archive | Constituants pilotés | Erreur moyenne |
+|---|---|---|
+| aucune (constantes de départ) | 0 | ~16 cm |
+| 7 jours | 3 | ~14 cm |
+| 20 jours | 6 | ~11 cm |
+| 1 an | 16 | ~8 cm |
+
+Le plancher vers 8 cm vient précisément des harmoniques non ajustables. Il
+tomberait à moins d'un centimètre si une courbe échantillonnée devenait
+disponible — le fitter libère automatiquement les constituants dès que le pas
+d'échantillonnage le permet, aucune modification ne serait nécessaire.
+
+**Pour l'usage courant, ça n'est pas la limite qui compte** : sur les sept jours
+publiés par le SHOM, l'app utilise directement ses heures de PM/BM et ses
+coefficients officiels, et le modèle ne sert qu'à donner la hauteur entre deux
+extrema. Le modèle harmonique est la source au-delà de sept jours — planifier
+une sortie dans trois semaines, ou rouvrir l'app après quinze jours sans réseau.
 
 Tant que l'archive n'atteint pas 20 jours — durée en dessous de laquelle M2 et
 S2 ne se séparent pas — le modèle reste marqué **provisoire** dans l'interface.
-Dans cette période, l'app utilise directement la donnée SHOM là où elle existe.
 
 ### 2. Le courant a une direction, et une incertitude
 
@@ -349,7 +368,7 @@ au lieu de la subir.
 
 Toutes gratuites, sans clé ni inscription.
 
-- **SHOM** — vignette de marée officielle de Dieppe
+- **SHOM** — vignette de marée officielle de Dieppe (pleines et basses mers, heures légales, coefficients)
 - **Open-Meteo Forecast** — vent, rafales, pression, visibilité, nébulosité
 - **Open-Meteo Marine** — houle, mer du vent, température de surface, courant résiduel
 - **OpenStreetMap** — fond de carte

@@ -155,16 +155,41 @@ def load_series() -> list[dict]:
     return []
 
 
-def classify(names: list[str], span_hours: float) -> tuple[list[str], list[str]]:
+def classify(names: list[str], span_hours: float,
+             dt_hours: float) -> tuple[list[str], list[str]]:
     """
-    Sépare les constituants que la durée d'observation résout de ceux qu'elle
-    ne résout pas. Les gros d'abord : en cas de conflit, c'est le dominant qui
-    garde le droit d'être piloté par les données.
+    Sépare les constituants que les données peuvent réellement piloter.
+
+    Deux critères, et le second compte autant que le premier :
+
+    1. RAYLEIGH — deux constituants ne se séparent que si la DURÉE dépasse
+       1/|Δf|. Les gros d'abord : en cas de conflit c'est le dominant qui garde
+       le droit d'être piloté par les données.
+
+    2. ÉCHANTILLONNAGE — on ne peut pas ajuster une ondulation de 6 heures avec
+       des points espacés de 6 heures : elle est repliée, et l'ajustement la
+       laisse osciller librement entre les mesures. C'est exactement ce qui
+       s'est produit sur la première moisson SHOM : la vignette ne donne que
+       les PM/BM, soit ~4 points par jour, et M4/M6/MS4 ont fabriqué des
+       ondulations parasites — le modèle sortait 8 extrema par jour au lieu
+       de 4, et le niveau moyen dérivait de 4,9 à 6,1 m.
+
+       On exige donc, pour les harmoniques d'eaux peu profondes (quart-diurnes
+       et au-delà), un pas d'échantillonnage inférieur au quart de leur période.
+       Les semi-diurnes et diurnes, elles, restent éligibles : les extrema SONT
+       leurs crêtes et leurs creux, ils les contraignent directement.
     """
     resolved: list[str] = []
     held: list[str] = []
     for name in names:
         sp = speed(name)
+        period_h = 360.0 / sp if sp > 1e-9 else float("inf")
+        shallow = DOODSON[name][0][0] >= 4
+
+        if shallow and dt_hours > period_h / 4.0:
+            held.append(name)
+            continue
+
         ok = True
         for other in resolved:
             df = abs(sp - speed(other))
@@ -173,6 +198,36 @@ def classify(names: list[str], span_hours: float) -> tuple[list[str], list[str]]
                 break
         (resolved if ok else held).append(name)
     return resolved, held
+
+
+def median_dt_hours(points: list[dict]) -> float:
+    """Pas d'échantillonnage médian, en heures."""
+    if len(points) < 2:
+        return float("inf")
+    gaps = sorted((points[i + 1]["t"] - points[i]["t"]) / 3_600_000.0
+                  for i in range(len(points) - 1))
+    return gaps[len(gaps) // 2]
+
+
+def looks_like_a_tide(spec: dict, t0: float) -> tuple[bool, str]:
+    """
+    Contrôle de forme AVANT écriture : un modèle ajusté doit produire une marée.
+    Quatre extrema par jour en Manche, et un niveau moyen qui ne s'envole pas.
+    Un ajustement qui échoue ici serait attrapé plus loin par selftest.py, mais
+    autant ne pas écrire un fichier qu'on sait faux.
+    """
+    step = 6 * 60 * 1000
+    n = int(4 * 86_400_000 / step)
+    hs = [predict(spec, t0 + i * step) for i in range(n)]
+    ext = sum(1 for i in range(1, n - 1)
+              if (hs[i] > hs[i - 1] and hs[i] >= hs[i + 1])
+              or (hs[i] < hs[i - 1] and hs[i] <= hs[i + 1]))
+    per_day = ext / 4.0
+    if not (3.2 <= per_day <= 4.8):
+        return False, f"{per_day:.1f} extrema par jour (attendu ≈ 4)"
+    if not (2.0 <= spec["z0"] <= 8.0):
+        return False, f"niveau moyen {spec['z0']:.2f} m hors des bornes de Dieppe"
+    return True, ""
 
 
 def load_prior() -> dict[str, tuple[float, float]]:
@@ -198,8 +253,10 @@ def fit(points: list[dict], prior: dict[str, tuple[float, float]]) -> dict:
     priority = ["M2", "S2", "N2", "M4", "MS4", "M6", "K1", "O1", "MSF", "MM",
                 "L2", "K2", "NU2", "2N2", "MU2", "MN4", "2MS6", "P1", "Q1",
                 "T2", "S1", "LDA2", "MF"]
+    dt_h = median_dt_hours(points)
+    print(f"  → pas d'échantillonnage médian : {dt_h:.2f} h")
     names = [n for n in priority if n in DOODSON]
-    resolved, held = classify(names, span_hours)
+    resolved, held = classify(names, span_hours, dt_h)
     print(f"  → {len(resolved)} pilotés par les données : {', '.join(resolved)}")
     print(f"  → {len(held)} maintenus au prior : {', '.join(held)}")
 
@@ -309,6 +366,14 @@ def main() -> int:
         res = fit(points, load_prior())
     except ValueError as e:
         print(f"  ✗ Ajustement impossible : {e}", file=sys.stderr)
+        return 0
+
+    shape_ok, why = looks_like_a_tide(
+        {"z0": res["z0"], "constituents": res["constituents"]}, points[-1]["t"])
+    if not shape_ok:
+        print(f"  ✗ L'ajustement ne produit pas une marée crédible : {why}.",
+              file=sys.stderr)
+        print("    Fichier existant conservé.", file=sys.stderr)
         return 0
 
     if res["rmsM"] > 0.30:
