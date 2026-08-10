@@ -50,20 +50,60 @@ UA = {
 }
 
 
-def fetch(url: str, timeout: int = 25) -> str | None:
+def fetch(url: str, timeout: int = 25) -> tuple[str | None, dict]:
+    """@returns (texte, métadonnées) — les métadonnées servent au diagnostic."""
+    meta = {"url": url}
     try:
         req = urllib.request.Request(url, headers=UA)
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read()
+            meta["status"] = r.status
+            meta["contentType"] = r.headers.get("Content-Type", "?")
+            meta["finalUrl"] = r.url
+        meta["bytes"] = len(raw)
         for enc in ("utf-8", "latin-1"):
             try:
-                return raw.decode(enc)
+                return raw.decode(enc), meta
             except UnicodeDecodeError:
                 continue
-        return raw.decode("utf-8", "replace")
+        return raw.decode("utf-8", "replace"), meta
     except Exception as e:  # noqa: BLE001 — on veut vraiment tout attraper
-        print(f"  ✗ {url} → {e}", file=sys.stderr)
-        return None
+        meta["error"] = f"{type(e).__name__}: {e}"
+        print(f"  ✗ {url} → {meta['error']}", file=sys.stderr)
+        return None, meta
+
+
+def diagnose(text: str, meta: dict) -> None:
+    """
+    Quand le parsing échoue, on ne peut rien deviner d'un « aucune donnée » sec.
+    Le format de la vignette SHOM n'est pas un contrat d'API et peut changer :
+    on imprime de quoi le ré-adapter sans avoir à reproduire l'appel à la main.
+    Aucune donnée personnelle n'est en jeu — c'est une page publique.
+    """
+    print(f"  ── diagnostic {meta.get('url')}", file=sys.stderr)
+    print(f"     statut {meta.get('status')} · {meta.get('contentType')} · "
+          f"{meta.get('bytes')} octets", file=sys.stderr)
+    if meta.get("finalUrl") and meta["finalUrl"] != meta.get("url"):
+        print(f"     redirigé vers {meta['finalUrl']}", file=sys.stderr)
+    if not text:
+        return
+
+    # Marqueurs utiles : où se cache la donnée ?
+    for marker in ("iframe", "<script", "var ", "JSON", "hauteur", "coef",
+                   "pleine", "basse", "[[", "data-", "canvas", "svg"):
+        n = text.lower().count(marker.lower())
+        if n:
+            print(f"     « {marker} » × {n}", file=sys.stderr)
+
+    # Premiers nombres flottants groupés : la signature d'une courbe encodée.
+    runs = re.findall(r"(?:-?\d+\.\d+\s*,\s*){5,}-?\d+\.\d+", text)
+    print(f"     séries de flottants détectées : {len(runs)}", file=sys.stderr)
+    if runs:
+        print(f"     plus longue : {len(runs[0].split(','))} valeurs — "
+              f"{runs[0][:120]}…", file=sys.stderr)
+
+    clean = re.sub(r"\s+", " ", text[:1200])
+    print(f"     début : {clean}", file=sys.stderr)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -181,19 +221,25 @@ def main() -> int:
     extrema: list[dict] = []
     used = None
 
+    diagnostics = []
     for url in ENDPOINTS:
         print(f"  → {url}")
-        text = fetch(url)
+        text, meta = fetch(url)
         if not text:
+            diagnostics.append((None, meta))
             continue
         curve = parse_curve(text, now)
         extrema = parse_extrema(text)
+        print(f"    {len(curve)} points de courbe, {len(extrema)} extrema")
         if curve or extrema:
             used = url
             break
+        diagnostics.append((text, meta))
 
     if not curve and not extrema:
         print("  ✗ Aucune donnée exploitable.", file=sys.stderr)
+        for text, meta in diagnostics:
+            diagnose(text, meta)
         print("    L'application reste fonctionnelle sur son modèle harmonique embarqué.",
               file=sys.stderr)
         print("    Si le format SHOM a changé, adapter parse_curve()/parse_extrema().",

@@ -52,6 +52,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/configure-pages@v5
+        # enablement: active Pages et le bascule en source « GitHub Actions »
+        # si ce n'est pas déjà fait. Sans ça, le tout premier déploiement d'un
+        # dépôt neuf échoue sur « Get Pages site failed / Not Found » et il faut
+        # aller cliquer dans les réglages — un piège classique.
+        with:
+          enablement: true
 
       - name: Empaquetage
         uses: actions/upload-pages-artifact@v3
