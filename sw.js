@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.4.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -34,6 +34,7 @@ const SHELL_FILES = [
   'js/core/geo.js',
   'js/core/fmt.js',
   'js/core/store.js',
+  'js/core/build.js',
   'js/core/idb.js',
   'js/core/net.js',
   'js/data/astro.js',

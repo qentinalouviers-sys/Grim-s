@@ -5,14 +5,19 @@
  * les quatre problèmes réels, dans l'ordre où ils se posent :
  *
  * 1. PERMISSION — iOS 13+ exige DeviceOrientationEvent.requestPermission()
- *    appelé depuis un geste utilisateur. Chrome iOS expose l'API mais PAS
- *    requestPermission : on détecte et on bascule sur la route fond GPS
- *    plutôt que d'afficher un compas mort.
+ *    appelé depuis un geste utilisateur, ET À CHAQUE OUVERTURE : le navigateur
+ *    mémorise la réponse, pas l'abonnement. S'abonner sans avoir appelé ne
+ *    produit aucun événement et aucune erreur — un compas muet, silencieux
+ *    jusque dans sa panne. D'où le rattrapage sur premier toucher plus bas.
+ *    Chrome iOS expose l'API mais PAS requestPermission : on détecte et on
+ *    bascule sur la route fond GPS plutôt que d'afficher un compas mort.
  *
  * 2. RÉFÉRENTIEL — Safari donne webkitCompassHeading, déjà en cap magnétique
  *    horaire. Le standard donne `alpha`, en degrés ANTIhoraires depuis l'est
  *    magnétique ou depuis une origine arbitraire selon `absolute`. Les deux
- *    conventions sont incompatibles : cap = 360 − alpha côté standard.
+ *    conventions sont incompatibles : cap = 360 − alpha côté standard. Et les
+ *    deux événements arrivent souvent ensemble, en se contredisant : on n'en
+ *    retient qu'un, le mieux référencé.
  *
  * 3. DÉCLINAISON — tout ce qui précède est magnétique. Les caps de carte,
  *    les axes de courant et les relèvements sont VRAIS. On corrige (~0,8° E
@@ -84,26 +89,87 @@ export const needsPermission = () =>
  * @returns {Promise<'granted'|'denied'|'unsupported'|'implicit'>}
  */
 export async function requestPermission() {
-  if (!supported()) return 'unsupported';
+  if (!supported()) {
+    diag.permission = 'aucun compas';
+    return 'unsupported';
+  }
   if (!needsPermission()) {
     start();
+    diag.permission = 'implicite (sans dialogue)';
     return 'implicit';
   }
   try {
     const res = await DeviceOrientationEvent.requestPermission();
+    diag.permission = res === 'granted' ? 'accordée' : `refusée (${res})`;
     if (res === 'granted') start();
     return res;
-  } catch {
-    return 'denied';
+  } catch (err) {
+    // Rejet typique d'iOS : appel hors d'un geste utilisateur. Ce n'est PAS un
+    // refus — il faut simplement redemander depuis un vrai toucher.
+    diag.permission = 'à redemander (hors geste)';
+    return 'gesture-required';
   }
+}
+
+/** Le compas a-t-il livré ne serait-ce qu'une mesure ? */
+export const alive = () => diag.events > 0 && Date.now() - lastEventAt < 3000;
+export const everSpoke = () => diag.events > 0;
+
+/**
+ * Rattrapage d'autorisation iOS.
+ *
+ * Sur iPhone, écouter `deviceorientation` sans avoir appelé requestPermission()
+ * ne produit RIEN : pas d'erreur, pas d'événement, un compas simplement muet.
+ * Or l'appel n'est accepté que depuis un geste utilisateur — et au deuxième
+ * lancement de l'app, il n'y a plus de portail d'accueil pour en fournir un.
+ * Le compas restait donc mort à chaque ouverture suivante, et le cap retombait
+ * sur la route fond GPS : une valeur qui ne bouge qu'en mouvement et se met à
+ * jour une fois par seconde. Vu du pont, ça s'appelle « le compas rame ».
+ *
+ * On arme donc une demande sur le premier toucher venu. Elle se désarme d'elle
+ * même dès que les mesures arrivent, et ne coûte rien si tout allait bien.
+ */
+export function armGestureRetry(onResult) {
+  if (!needsPermission() || everSpoke()) return () => {};
+
+  const retry = async () => {
+    const res = await requestPermission();
+    if (res === 'granted' || everSpoke()) disarm();
+    onResult?.(res);
+  };
+  const disarm = () => {
+    for (const t of ['pointerdown', 'touchend', 'click']) {
+      window.removeEventListener(t, retry, true);
+    }
+  };
+  for (const t of ['pointerdown', 'touchend', 'click']) {
+    window.addEventListener(t, retry, true);
+  }
+  return disarm;
+}
+
+/** Instantané pour l'écran de diagnostic. Aucune donnée n'est inventée. */
+export function diagnostics() {
+  const now = Date.now();
+  return {
+    ...diag,
+    listening,
+    lockedType: lockedType || '—',
+    lockedRank,
+    filtered,
+    ageMs: lastEventAt ? now - lastEventAt : null,
+    uptimeMs: diag.firstAt ? now - diag.firstAt : 0,
+    needsPermission: needsPermission(),
+    supported: supported(),
+  };
 }
 
 export function start() {
   if (listening || !supported()) return;
   listening = true;
   handler = onOrientation;
-  // `deviceorientationabsolute` est le seul à garantir une référence Nord sur
-  // Android. On écoute les deux : le premier qui parle gagne.
+  // On écoute les deux événements parce qu'aucun n'est disponible partout,
+  // mais on n'en RETIENT qu'un — voir le verrouillage de source plus bas.
   window.addEventListener('deviceorientationabsolute', handler, true);
   window.addEventListener('deviceorientation', handler, true);
 }
@@ -118,18 +184,88 @@ export function stop() {
 let lastEventAt = 0;
 let deviation = null; // écart moyen compas − route fond
 
-function onOrientation(e) {
-  let magnetic = null;
-  let accuracy = null;
+/* --------------------------------------------------------------------------
+ * Verrouillage de source
+ *
+ * Les deux événements arrivent souvent EN MÊME TEMPS, et ils ne disent pas la
+ * même chose. `deviceorientationabsolute` porte une référence Nord ;
+ * `deviceorientation` porte, selon le navigateur, un cap magnétique (iOS, via
+ * webkitCompassHeading), un cap absolu, ou un azimut relatif à l'orientation
+ * qu'avait le téléphone au chargement de la page — c'est-à-dire n'importe quoi.
+ *
+ * Les brancher tous les deux sur le même filtre, c'est lui donner deux
+ * référentiels différents à concilier : il passe son temps à corriger l'un vers
+ * l'autre et le cap affiché rampe en permanence vers une cible qui recule. Un
+ * lissage, aussi bien réglé soit-il, ne peut rien contre une entrée
+ * contradictoire.
+ *
+ * On classe donc les sources et on ne garde que la meilleure rencontrée. Le
+ * classement peut monter (on découvre mieux) mais jamais redescendre.
+ * ------------------------------------------------------------------------ */
+const RANK_ARBITRARY = 0; // alpha sans référence : inutilisable
+const RANK_ABSOLUTE_ALPHA = 1; // alpha annoncé absolu
+const RANK_TRUE_COMPASS = 2; // cap magnétique livré par la plateforme
 
+let lockedRank = -1;
+let lockedType = null;
+
+/* Compteurs de diagnostic : sans eux, un compas muet et un compas lent se
+ * ressemblent, et on corrige à l'aveugle. */
+const diag = {
+  events: 0,
+  ignored: 0,
+  byType: Object.create(null),
+  firstAt: 0,
+  rateHz: 0,
+  field: null,
+  absolute: null,
+  raw: null,
+  accuracy: null,
+  beta: null,
+  gamma: null,
+  permission: 'inconnue',
+};
+const rateWindow = [];
+
+function classify(e) {
   if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-    magnetic = e.webkitCompassHeading; // iOS : déjà un cap magnétique
-    accuracy = e.webkitCompassAccuracy;
-  } else if (typeof e.alpha === 'number' && !Number.isNaN(e.alpha)) {
-    if (e.absolute === false) return; // référence arbitraire : inutilisable
-    magnetic = norm360(360 - e.alpha);
+    return { rank: RANK_TRUE_COMPASS, magnetic: e.webkitCompassHeading, field: 'webkitCompassHeading' };
   }
-  if (magnetic == null) return;
+  if (typeof e.alpha === 'number' && !Number.isNaN(e.alpha)) {
+    // `absolute` vaut true, false, ou rien du tout. L'absence d'information
+    // n'est pas une garantie : on ne fait confiance qu'à un true explicite,
+    // ou au nom de l'événement, qui lui ne ment pas.
+    const trusted = e.absolute === true || e.type === 'deviceorientationabsolute';
+    return {
+      rank: trusted ? RANK_ABSOLUTE_ALPHA : RANK_ARBITRARY,
+      magnetic: norm360(360 - e.alpha),
+      field: 'alpha',
+    };
+  }
+  return null;
+}
+
+function onOrientation(e) {
+  const c = classify(e);
+  if (!c || c.rank === RANK_ARBITRARY) {
+    diag.ignored++;
+    return;
+  }
+  if (c.rank < lockedRank) {
+    diag.ignored++; // une source moins fiable que celle déjà verrouillée
+    return;
+  }
+  if (c.rank > lockedRank || lockedType == null) {
+    lockedRank = c.rank;
+    lockedType = e.type;
+    filtered = null; // on change de référentiel : on repart du neuf
+  } else if (e.type !== lockedType) {
+    diag.ignored++; // même rang, autre flux : un seul suffit
+    return;
+  }
+
+  const magnetic = c.magnetic;
+  const accuracy = typeof e.webkitCompassAccuracy === 'number' ? e.webkitCompassAccuracy : null;
 
   // Compensation d'inclinaison : sur un téléphone tenu à plat, alpha suffit ;
   // couché à plus de 60° du plan horizontal, la mesure part. On préfère
@@ -137,6 +273,22 @@ function onOrientation(e) {
   const tilted = Math.abs(e.beta ?? 0) > 60 || Math.abs(e.gamma ?? 0) > 60;
 
   const now = Date.now();
+
+  diag.events++;
+  diag.byType[e.type] = (diag.byType[e.type] || 0) + 1;
+  if (!diag.firstAt) diag.firstAt = now;
+  rateWindow.push(now);
+  while (rateWindow.length && now - rateWindow[0] > 2000) rateWindow.shift();
+  diag.rateHz = rateWindow.length > 1
+    ? (rateWindow.length - 1) / ((now - rateWindow[0]) / 1000)
+    : 0;
+  diag.field = c.field;
+  diag.absolute = e.absolute ?? null;
+  diag.raw = magnetic;
+  diag.accuracy = accuracy;
+  diag.beta = e.beta ?? null;
+  diag.gamma = e.gamma ?? null;
+
   const value = smooth(magnetic, now);
   lastSampleT = now;
 

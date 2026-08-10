@@ -13,6 +13,7 @@
  * ========================================================================== */
 
 import { state, subscribe, set, emit } from '../core/store.js';
+import { APP_VERSION } from '../core/build.js';
 import { el, pill, button, toast, openSheet, clear } from '../ui/dom.js';
 import { Gauge, Compass, TideChart, StreamProfile, CurrentRose } from '../ui/widgets.js';
 import * as fmt from '../core/fmt.js';
@@ -21,6 +22,7 @@ import * as tide from '../data/tide.js';
 import * as stream from '../data/stream.js';
 import * as weather from '../data/weather.js';
 import * as gps from '../sensors/gps.js';
+import * as compass from '../sensors/heading.js';
 import * as spots from '../fishing/spots.js';
 import { sunTimes, moonPhase } from '../data/astro.js';
 
@@ -70,6 +72,11 @@ export function mount(container) {
   refs.headExtra = el('div', 'tiny');
   refs.headRow.append(refs.headExtra);
   compassCard.append(refs.headRow);
+  // Toucher le compas ouvre son diagnostic. Un cap qui traîne peut venir du
+  // capteur, de l'autorisation, du référentiel ou de la ferraille du bord :
+  // sans mesure affichée, on corrige au hasard.
+  compassCard.style.cursor = 'pointer';
+  compassCard.addEventListener('click', openCompassDiag);
   root.append(compassCard);
 
   /* ---- Bandeau d'infos ------------------------------------------------- */
@@ -396,6 +403,87 @@ function renderAdvice() {
   const go = button('Ouvrir le mode pêche →', 'btn-sm', () => emit('goto', 'fish'));
   go.style.marginTop = '10px';
   box.append(go);
+}
+
+/* ==========================================================================
+ * Diagnostic du compas
+ * ========================================================================== */
+
+/**
+ * Tout ce qui permet de dire POURQUOI le cap va mal, sans rien inventer.
+ * Rafraîchi en direct : c'est en tournant le téléphone pendant que l'écran est
+ * ouvert qu'on voit si le retard vient du capteur ou de l'affichage.
+ */
+function openCompassDiag() {
+  const body = el('div');
+  const grid = el('div');
+  body.append(grid);
+
+  const note = el('p', 'tiny',
+    'Tourne le téléphone lentement pendant que cet écran est ouvert. Si « brut » ' +
+    'suit ton geste et que « cadence » reste au-dessus de 20 Hz, le capteur va ' +
+    'bien. Si la cadence est basse ou nulle, c’est l’autorisation ou l’appareil.');
+  body.append(note);
+
+  const help = el('div', 'tiny');
+  help.style.marginTop = '8px';
+  body.append(help);
+
+  const btn = button('Redemander l’autorisation', 'btn-lg', async () => {
+    const res = await compass.requestPermission();
+    toast(`Autorisation : ${res}`, res === 'granted' ? 'good' : 'warn');
+  });
+  body.append(btn);
+
+  const line = (k, v) => {
+    const r = el('div', 'row');
+    r.style.justifyContent = 'space-between';
+    r.style.padding = '3px 0';
+    r.append(el('span', 'tiny', k), el('span', 'tnum', v));
+    r.lastChild.style.fontSize = '13px';
+    r.lastChild.style.fontWeight = '650';
+    return r;
+  };
+
+  const paint = () => {
+    const d = compass.diagnostics();
+    const hd = state.heading;
+    clear(grid);
+    grid.append(line('Version', APP_VERSION));
+    grid.append(line('Compas disponible', d.supported ? 'oui' : 'NON'));
+    grid.append(line('Autorisation', d.permission));
+    grid.append(line('Écoute active', d.listening ? 'oui' : 'NON'));
+    grid.append(line('Mesures reçues', String(d.events)));
+    grid.append(line('Cadence', d.events ? `${d.rateHz.toFixed(1)} Hz` : '—'));
+    grid.append(line('Âge dernière mesure', d.ageMs == null ? '—' : `${d.ageMs} ms`));
+    grid.append(line('Source retenue', d.lockedType));
+    grid.append(line('Champ utilisé', d.field || '—'));
+    grid.append(line('Référence absolue', d.absolute === null ? 'non annoncée' : String(d.absolute)));
+    grid.append(line('Flux ignorés', String(d.ignored)));
+    grid.append(line('Cap brut (mag)', d.raw == null ? '—' : `${d.raw.toFixed(1)}°`));
+    grid.append(line('Cap filtré (mag)', d.filtered == null ? '—' : `${d.filtered.toFixed(1)}°`));
+    grid.append(line('Retard du filtre', d.raw == null || d.filtered == null
+      ? '—' : `${Math.abs(angleDiff(d.raw, d.filtered)).toFixed(1)}°`));
+    grid.append(line('Cap affiché (vrai)', hd ? fmt.heading(hd.deg) : '—'));
+    grid.append(line('Origine du cap', hd?.source || '—'));
+    grid.append(line('Bruit du capteur', hd?.spread == null ? '—' : `${hd.spread.toFixed(1)}°`));
+    grid.append(line('Précision annoncée', d.accuracy == null ? 'non fournie' : `${d.accuracy}°`));
+    grid.append(line('Inclinaison', d.beta == null ? '—'
+      : `${Math.round(d.beta)}° / ${Math.round(d.gamma ?? 0)}°`));
+
+    help.textContent =
+      !d.supported ? 'Cet appareil n’expose pas d’orientation : le cap restera la route fond GPS.'
+      : d.events === 0 && d.needsPermission ? 'Aucune mesure et une autorisation à donner : appuie sur le bouton ci-dessous, c’est le cas le plus fréquent sur iPhone.'
+      : d.events === 0 ? 'Aucune mesure reçue alors que l’autorisation ne semble pas en cause. Le magnétomètre est peut-être désactivé dans les réglages du téléphone.'
+      : d.rateHz > 0 && d.rateHz < 8 ? 'Le capteur émet très peu souvent : le retard vient de lui, pas de l’affichage.'
+      : d.ignored > d.events ? 'Beaucoup de flux écartés : deux sources d’orientation se contredisent, seule la plus fiable est gardée.'
+      : 'Le capteur alimente correctement l’affichage.';
+    btn.hidden = !d.needsPermission;
+  };
+
+  paint();
+  const iv = setInterval(paint, 250);
+  openSheet('Diagnostic compas', body, () => clearInterval(iv));
 }
 
 /* ==========================================================================

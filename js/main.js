@@ -16,6 +16,7 @@
  * ========================================================================== */
 
 import { state, set, subscribe, on } from './core/store.js';
+import { APP_VERSION } from './core/build.js';
 import * as idb from './core/idb.js';
 import * as dom from './ui/dom.js';
 import * as fmt from './core/fmt.js';
@@ -76,8 +77,8 @@ async function boot() {
   fastTimer = setInterval(fastTick, 1000);
   slowTimer = setInterval(slowTick, 5 * 60_000);
 
-  // Le portail ne s'affiche qu'une fois : ensuite on relance les capteurs
-  // sans redemander, les permissions étant déjà accordées.
+  // Le portail ne s'affiche qu'une fois, mais les capteurs se redemandent à
+  // chaque ouverture : iOS retient la réponse, pas l'abonnement.
   const seen = await idb.get('kv', 'onboarded');
   if (seen) {
     document.getElementById('gate').hidden = true;
@@ -99,20 +100,60 @@ async function startSensors(interactive) {
     dom.banner('Position refusée ou indisponible. Marée, courant et pêche restent calculés sur Dieppe.', 'warn', { id: 'nogps' });
   }
 
-  if (interactive) {
-    const res = await compass.requestPermission();
-    if (res === 'denied') {
-      dom.banner('Compas refusé. Le cap sera la route fond GPS, valable seulement en mouvement.', 'warn', { id: 'nocompass' });
-    } else if (res === 'unsupported') {
-      dom.banner('Pas de compas sur cet appareil : le cap affiché est la route fond GPS.', 'info', { id: 'nocompass' });
-    }
-    await motion.requestPermission();
-  } else {
-    compass.start();
-    motion.start();
+  // L'autorisation d'orientation se redemande à CHAQUE ouverture sur iOS : le
+  // navigateur mémorise la réponse, pas l'écoute. On la demande donc toujours,
+  // que l'utilisateur passe par le portail d'accueil ou non.
+  const res = await compass.requestPermission();
+  if (res === 'denied') {
+    dom.banner('Compas refusé. Le cap sera la route fond GPS, valable seulement en mouvement.', 'warn', { id: 'nocompass' });
+  } else if (res === 'unsupported') {
+    dom.banner('Pas de compas sur cet appareil : le cap affiché est la route fond GPS.', 'info', { id: 'nocompass' });
   }
+  await motion.requestPermission();
+
+  // Au deuxième lancement il n'y a plus de portail, donc plus de geste
+  // utilisateur pour porter la demande — et iOS la rejette silencieusement.
+  // On la remet sur le premier toucher, et on le dit si le compas reste muet.
+  watchCompassWakeUp();
 
   requestWakeLock();
+}
+
+/**
+ * Filet de sécurité du compas. On laisse une seconde et demie au capteur ; s'il
+ * n'a toujours rien dit, on arme une nouvelle demande d'autorisation sur le
+ * prochain toucher et on explique pourquoi l'écran affiche une route et pas un
+ * cap. Le bandeau disparaît dès la première mesure.
+ */
+function watchCompassWakeUp() {
+  if (!compass.supported() || compass.everSpoke()) return;
+
+  setTimeout(() => {
+    if (compass.everSpoke()) return;
+    const disarm = compass.armGestureRetry(() => {
+      if (compass.everSpoke()) {
+        dom.dismissBanner?.('wakecompass');
+        dom.toast('Compas actif', 'good');
+      }
+    });
+    if (compass.needsPermission()) {
+      dom.banner(
+        'Compas en attente : touche l’écran une fois pour l’autoriser. iOS redemande cette permission à chaque ouverture.',
+        'warn',
+        { id: 'wakecompass' },
+      );
+    } else {
+      // Pas de dialogue à passer sur cette plateforme : si le capteur se tait,
+      // ce n'est pas une question d'autorisation. On le dit, et on ne laisse
+      // pas d'écouteur de geste tourner pour rien.
+      disarm();
+      dom.banner(
+        'Compas silencieux. Le cap affiché est la route fond GPS — juste seulement en mouvement. Touche le cadran pour voir le diagnostic.',
+        'warn',
+        { id: 'wakecompass' },
+      );
+    }
+  }, 1500);
 }
 
 /**
@@ -429,11 +470,23 @@ function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then((reg) => {
+      reg.update().catch(() => {});
       reg.addEventListener('updatefound', () => {
         const w = reg.installing;
         w?.addEventListener('statechange', () => {
           if (w.state === 'installed' && navigator.serviceWorker.controller) {
-            dom.banner('Nouvelle version disponible — relance l’app pour l’appliquer.', 'info', { id: 'update' });
+            // La coque est servie depuis le cache : le code déjà chargé reste
+            // l'ancien jusqu'au rechargement. Proposer un bouton plutôt qu'une
+            // consigne — « relance l'app » est une manœuvre ambiguë sur une PWA
+            // installée, et une correction qu'on n'exécute pas n'existe pas.
+            const b = dom.banner(
+              `Version ${APP_VERSION} téléchargée.`,
+              'info',
+              { id: 'update' },
+            );
+            b?.querySelector('span')?.after(
+              dom.button('Appliquer', 'btn-sm', () => location.reload()),
+            );
           }
         });
       });

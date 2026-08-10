@@ -71,18 +71,35 @@ export function button(label, cls = '', onClick) {
  * ------------------------------------------------------------------------ */
 const backdrop = () => document.getElementById('sheet-backdrop');
 
-export function openSheet(title, content) {
+/**
+ * @param {() => void} [onClose] Appelé à la fermeture, quelle qu'en soit la
+ *   voie — bouton, glissé, Échap, clic sur le fond. Une feuille qui rafraîchit
+ *   en direct doit pouvoir arrêter sa boucle, sinon elle tourne pour rien
+ *   jusqu'à la fin de la sortie.
+ */
+export function openSheet(title, content, onClose = null) {
   const bd = backdrop();
+  closeSheet(); // une feuille déjà ouverte doit d'abord rendre ses ressources
   document.getElementById('sheet-title').textContent = title;
   const body = clear(document.getElementById('sheet-body'));
   body.append(content);
   body.scrollTop = 0;
+  sheetOnClose = onClose;
   bd.hidden = false;
   return { close: closeSheet, body };
 }
 
+let sheetOnClose = null;
+
 export function closeSheet() {
   backdrop().hidden = true;
+  const fn = sheetOnClose;
+  sheetOnClose = null;
+  try {
+    fn?.();
+  } catch (e) {
+    console.error('[sheet] fermeture', e);
+  }
 }
 
 export function initSheet() {
@@ -151,6 +168,7 @@ export function toast(text, kind = '', ms = 2600, action = null) {
  * Bandeaux
  * ------------------------------------------------------------------------ */
 const shownBanners = new Set();
+const bannerById = new Map();
 
 /**
  * Les bandeaux sont en position fixe au-dessus du contenu : on répercute leur
@@ -185,9 +203,23 @@ export function banner(text, level = 'info', { id = null, dismissible = true } =
     });
     b.append(x);
   }
+  if (id) bannerById.set(id, b);
   host.append(b);
   measureBanners();
   return b;
+}
+
+/**
+ * Retire un bandeau devenu faux. Un avertissement qui survit à sa cause coûte
+ * plus cher qu'il ne rapporte : l'équipage cesse de lire les suivants.
+ */
+export function dismissBanner(id) {
+  const b = bannerById.get(id);
+  if (!b) return;
+  b.remove();
+  bannerById.delete(id);
+  shownBanners.delete(id);
+  measureBanners();
 }
 
 export function clearBanners() {
