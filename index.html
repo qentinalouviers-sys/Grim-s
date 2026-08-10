@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Grim's Compagnon — navigation &amp; pêche · Dieppe</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="description" content="Copilote de navigation et de pêche en mer pour le secteur de Dieppe. Marée, courant, dérive prédictive, scoring espèces. Fonctionne hors réseau.">
+<meta name="theme-color" content="#050b14">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grim's">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ═══ Barre d'état ═══════════════════════════════════════════════════ -->
+<header class="topbar" id="topbar">
+  <div class="topbar-row">
+    <button class="chip chip-btn" id="chip-gps" type="button" aria-label="État GPS">
+      <span class="dot" id="gps-dot"></span><span id="gps-text">GPS…</span>
+    </button>
+    <div class="brand" aria-hidden="true">GRIM'S</div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-night" type="button" aria-label="Mode nuit" title="Mode nuit">🌙</button>
+      <button class="icon-btn danger" id="btn-mob" type="button" aria-label="Homme à la mer" title="Homme à la mer">MOB</button>
+    </div>
+  </div>
+  <div class="topbar-row secondary" id="status-chips"></div>
+</header>
+
+<!-- ═══ Bandeau d'alerte ═══════════════════════════════════════════════ -->
+<div class="banner-host" id="banner-host" aria-live="polite"></div>
+
+<!-- ═══ Vues ═══════════════════════════════════════════════════════════ -->
+<main id="main">
+  <section class="view" id="view-nav" data-view="nav"></section>
+  <section class="view" id="view-map" data-view="map" hidden></section>
+  <section class="view" id="view-fish" data-view="fish" hidden></section>
+  <section class="view" id="view-log" data-view="log" hidden></section>
+</main>
+
+<!-- ═══ Navigation principale ══════════════════════════════════════════ -->
+<nav class="tabbar" id="tabbar" role="tablist" aria-label="Modes">
+  <button class="tab active" data-goto="nav" role="tab" aria-selected="true">
+    <span class="tab-ico">🧭</span><span class="tab-lbl">NAV</span>
+  </button>
+  <button class="tab" data-goto="map" role="tab" aria-selected="false">
+    <span class="tab-ico">🗺️</span><span class="tab-lbl">CARTE</span>
+  </button>
+  <button class="tab" data-goto="fish" role="tab" aria-selected="false">
+    <span class="tab-ico">🐟</span><span class="tab-lbl">PÊCHE</span>
+  </button>
+  <button class="tab" data-goto="log" role="tab" aria-selected="false">
+    <span class="tab-ico">📓</span><span class="tab-lbl">JOURNAL</span>
+  </button>
+</nav>
+
+<!-- ═══ Feuille modale générique ═══════════════════════════════════════ -->
+<div class="sheet-backdrop" id="sheet-backdrop" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-grip" id="sheet-grip"></div>
+    <div class="sheet-head">
+      <h2 id="sheet-title"></h2>
+      <button class="icon-btn" id="sheet-close" type="button" aria-label="Fermer">✕</button>
+    </div>
+    <div class="sheet-body" id="sheet-body"></div>
+  </div>
+</div>
+
+<!-- ═══ Écran d'accueil / permissions ══════════════════════════════════ -->
+<div class="gate" id="gate">
+  <div class="gate-inner">
+    <div class="gate-logo">⚓</div>
+    <h1>Grim's Compagnon</h1>
+    <p class="gate-sub">Navigation &amp; pêche — secteur de Dieppe</p>
+    <ul class="gate-list">
+      <li><b>Position &amp; vitesse</b> — route fond, dérive, veille de mouillage</li>
+      <li><b>Compas</b> — cap magnétique, contrôle croisé avec la route GPS</li>
+      <li><b>Centrale inertielle</b> — état de la mer ressenti sous la coque</li>
+    </ul>
+    <p class="gate-note">
+      Tout reste sur ton téléphone. Aucun compte, aucun serveur, aucune donnée envoyée.
+      Marée, soleil, lune et courant sont calculés à bord et fonctionnent sans réseau.
+    </p>
+    <button class="btn btn-primary btn-lg" id="gate-go" type="button">Activer les capteurs</button>
+    <button class="btn btn-ghost" id="gate-skip" type="button">Continuer sans capteurs</button>
+  </div>
+</div>
+
+<div class="toast-host" id="toast-host" aria-live="assertive"></div>
+
+<script type="module" src="js/main.js"></script>
+<noscript><p style="padding:2rem;color:#e2e8f0;background:#050b14">Cette application nécessite JavaScript.</p></noscript>
+</body>
+</html>

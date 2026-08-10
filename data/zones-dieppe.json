@@ -1,0 +1,137 @@
+{
+  "_comment": [
+    "Secteurs types de la zone de Dieppe.",
+    "",
+    "IMPORTANT — ce ne sont PAS des marques de pêche relevées au GPS. Ce sont des",
+    "ARCHÉTYPES D'HABITAT positionnés approximativement : chaque entrée décrit un",
+    "type de fond, une gamme de profondeur, une exposition et une logique de pêche.",
+    "Le moteur s'en sert pour raisonner (quel habitat pour quelle espèce, dans",
+    "quelles conditions de courant et de vent), pas pour t'envoyer sur un point.",
+    "",
+    "Tous portent seed=true et sont affichés en pointillés dans l'app, avec la",
+    "mention « à recaler ». Le vrai carnet de marques, c'est celui que tu construis :",
+    "bouton « Marquer ici » en mer, import GPX, ou appui long sur la carte. Tes",
+    "marques sont prioritaires sur ces secteurs dans toutes les recommandations.",
+    "",
+    "depthM : sonde approximative sous le zéro des cartes (la hauteur d'eau réelle",
+    "est calculée en ajoutant la marée).",
+    "exposedFrom : secteurs de vent qui rendent le coin intenable [de, à] en degrés.",
+    "",
+    "streamNodes : multiplicateurs locaux du courant de marée. 1.0 = valeur de",
+    "référence du modèle. Ils sont GROSSIERS et destinés à être affinés par la",
+    "calibration GPS (Réglages → Calibrer la dérive)."
+  ],
+  "port": {
+    "name": "Dieppe",
+    "lat": 49.9319,
+    "lon": 1.0847,
+    "entrance": { "lat": 49.9375, "lon": 1.0842 },
+    "coastNormalDeg": 340,
+    "vhfChannel": 12
+  },
+  "streamNodes": [
+    { "name": "Abri de la jetée", "lat": 49.936, "lon": 1.084, "factor": 0.55, "axisBias": 0 },
+    { "name": "Large 3 NM", "lat": 49.985, "lon": 1.075, "factor": 1.0, "axisBias": 0 },
+    { "name": "Large 8 NM", "lat": 50.06, "lon": 1.06, "factor": 1.15, "axisBias": -4 },
+    { "name": "Secteur ouest / Ailly", "lat": 49.93, "lon": 0.92, "factor": 1.2, "axisBias": 8 },
+    { "name": "Secteur est / Le Tréport", "lat": 50.03, "lon": 1.24, "factor": 1.05, "axisBias": -6 }
+  ],
+  "zones": [
+    {
+      "id": "avant-port",
+      "name": "Avant-port et chenal",
+      "lat": 49.9385,
+      "lon": 1.0845,
+      "radiusM": 700,
+      "depthM": [4, 11],
+      "habitat": ["chenal", "roche"],
+      "exposedFrom": [300, 40],
+      "seed": true,
+      "note": "Le coin de repli quand ça forcit. Bar au crépuscule sur le courant de sortie, dorade en été. Attention au trafic : chenal commercial actif, VHF 12."
+    },
+    {
+      "id": "ridens",
+      "name": "Les Ridens — bancs de sable du large",
+      "lat": 49.982,
+      "lon": 1.048,
+      "radiusM": 2500,
+      "depthM": [10, 22],
+      "habitat": ["ridin", "banc-de-sable", "sable"],
+      "exposedFrom": [280, 60],
+      "seed": true,
+      "note": "L'habitat à lançon du secteur : têtes de ridin et bordures de banc. Turbot et bar en dérive contrôlée. Le courant y accélère sur les hauts-fonds — c'est ce qui fait le poste."
+    },
+    {
+      "id": "ouest-varengeville",
+      "name": "Ouest — Pourville / Varengeville",
+      "lat": 49.928,
+      "lon": 0.985,
+      "radiusM": 2200,
+      "depthM": [8, 25],
+      "habitat": ["roche", "tombant", "sable"],
+      "exposedFrom": [290, 50],
+      "seed": true,
+      "note": "Platiers rocheux et petits tombants sous la falaise. Bar sur la veine, lieu jaune sur les têtes de roche à l'étale. Abrité par vent de sud à sud-ouest."
+    },
+    {
+      "id": "ailly",
+      "name": "Secteur Pointe d'Ailly",
+      "lat": 49.925,
+      "lon": 0.915,
+      "radiusM": 2500,
+      "depthM": [12, 35],
+      "habitat": ["roche", "tombant", "veine"],
+      "exposedFrom": [270, 60],
+      "seed": true,
+      "note": "Accélération de courant sur la pointe : la meilleure veine à bar du secteur, et la plus exigeante. Ne s'aborde pas dans un vent contre courant."
+    },
+    {
+      "id": "est-treport",
+      "name": "Est — vers Le Tréport",
+      "lat": 50.005,
+      "lon": 1.205,
+      "radiusM": 3000,
+      "depthM": [10, 26],
+      "habitat": ["sable", "sable-coquillier", "vase", "chenal"],
+      "exposedFrom": [300, 70],
+      "seed": true,
+      "note": "Grands fonds de sable et sable coquillier. Le domaine de la raie bouclée à la tombée du jour, et des plies. Mouillage sur appât gras."
+    },
+    {
+      "id": "epaves-large",
+      "name": "Secteur des épaves du large",
+      "lat": 50.045,
+      "lon": 1.11,
+      "radiusM": 5000,
+      "depthM": [25, 45],
+      "habitat": ["epave", "roche"],
+      "exposedFrom": [250, 90],
+      "seed": true,
+      "note": "La Manche orientale est un cimetière de navires : le secteur en compte beaucoup. Lieu jaune et bar sur les structures, à l'étale impérativement. Recale les positions avec ton sondeur — c'est le type de poste où 30 m d'écart changent tout."
+    },
+    {
+      "id": "pleine-eau",
+      "name": "Pleine eau du large",
+      "lat": 50.08,
+      "lon": 1.05,
+      "radiusM": 6000,
+      "depthM": [20, 40],
+      "habitat": ["pleine-eau", "chenal"],
+      "exposedFrom": [230, 110],
+      "seed": true,
+      "note": "Maquereau et chasses en été. Se cherche aux oiseaux, pas au GPS : le banc bouge tous les jours."
+    },
+    {
+      "id": "fosse-lancon",
+      "name": "Fosses à lançon",
+      "lat": 49.962,
+      "lon": 1.005,
+      "radiusM": 2000,
+      "depthM": [12, 20],
+      "habitat": ["sable", "banc-de-sable"],
+      "exposedFrom": [290, 50],
+      "seed": true,
+      "note": "Là où on fait le vif. Sable propre, courant modéré. Un stock de lançons vivants change une journée de turbot ou de saint-pierre."
+    }
+  ]
+}

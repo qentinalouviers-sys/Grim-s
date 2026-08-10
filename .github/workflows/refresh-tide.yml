@@ -1,0 +1,65 @@
+name: Rafraîchissement marée
+
+on:
+  schedule:
+    # 02h et 14h UTC. Le SHOM publie une fenêtre glissante ; deux passages par
+    # jour suffisent, et allongent régulièrement l'archive qui sert à ajuster
+    # le modèle harmonique embarqué.
+    - cron: '17 2 * * *'
+    - cron: '17 14 * * *'
+  push:
+    branches: [main, claude/grims-compagnon-fishing-app-f3qa6n]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/refresh-tide.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tide-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Récupération SHOM
+        # Volontairement non bloquant : si le SHOM change son format ou tombe,
+        # l'application continue de tourner sur son modèle harmonique. Faire
+        # échouer le dépôt parce qu'un site tiers a bougé une balise serait absurde.
+        continue-on-error: true
+        run: python scripts/refresh_tide.py
+
+      - name: Ajustement harmonique
+        continue-on-error: true
+        run: python scripts/fit_harmonics.py
+
+      - name: Contrôle de cohérence
+        run: python scripts/selftest.py
+
+      - name: Commit si changement
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/; then
+            echo "Aucun changement de données."
+            exit 0
+          fi
+          git add data/
+          span=$(python - <<'PY'
+          import json, os
+          p = 'data/harmonics-dieppe.json'
+          d = json.load(open(p)) if os.path.exists(p) else {}
+          print(f"{d.get('spanDays', 0)} j, RMS {round((d.get('rmsM') or 0)*100, 1)} cm")
+          PY
+          )
+          git commit -m "data: rafraîchissement marée Dieppe (${span})"
+          git push

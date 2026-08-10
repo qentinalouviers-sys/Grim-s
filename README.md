@@ -1,0 +1,324 @@
+# Grim's Compagnon
+
+Copilote de navigation et de pêche en mer pour le secteur de **Dieppe**.
+Application web mobile, installable, **qui fonctionne sans réseau**.
+
+Vanilla JS, modules ES natifs. Zéro dépendance, zéro build step, zéro compte,
+zéro serveur. Les données restent sur le téléphone.
+
+---
+
+## Le principe
+
+En mer, on perd le réseau. C'est la contrainte qui a dicté toute
+l'architecture : **le réseau est une option, jamais une dépendance.**
+
+| Donnée | Hors ligne ? | Comment |
+|---|---|---|
+| Marée, coefficient, PM/BM | ✅ toujours | calculée à bord, 23 constituants harmoniques |
+| Courant de marée, dérive | ✅ toujours | dérivé de la marée + calibration GPS du bateau |
+| Soleil, lune, crépuscules | ✅ toujours | éphémérides calculées à bord |
+| Scoring pêche, plan de sortie | ✅ toujours | moteur local, aucun appel distant |
+| Position, cap, état de la mer | ✅ toujours | capteurs du téléphone |
+| Carte | ✅ si préchargée | tuiles en IndexedDB, bouton « ⤓ » |
+| Vent, houle, pression, T° eau | ⚠️ dernière valeur connue | Open-Meteo, avec l'âge affiché |
+
+Une seule donnée se dégrade hors ligne, et l'app dit toujours de quand elle
+date. Elle ne fait jamais semblant.
+
+---
+
+## Les quatre modes
+
+Accessibles en un geste par la barre du bas — pensée pour le pouce, à une main,
+sur un bateau qui bouge.
+
+### 🧭 NAV
+Vitesse fond et vent en jauges, compas demi-cercle à ligne de foi fixe (le
+cadran tourne, comme un compas de route), bandeau température d'eau / pression
+/ mer / lune / soleil, courbe de marée 24 h, rose de courant et profil flot-
+jusant sur la journée, conseil du guide en une ligne.
+
+Actions : veille de mouillage avec alarme de dérapage, enregistrement de
+sortie, retour au port, relevé de dérive. Bouton **MOB** en permanence dans la
+barre d'état — un seul appui, sans confirmation, position figée et alarme.
+
+### 🗺️ CARTE
+OpenStreetMap + **balisage maritime OpenSeaMap**, tuiles mises en cache
+localement et préchargeables par zone.
+
+La **dérive prédictive**, dans les deux sens :
+
+- **Dérive prévue** — « si je coupe le moteur ici, je passe où dans 40 min ? »
+- **Point de largage** — « je veux dériver SUR ce point à 07 h 30, où est-ce
+  que je me mets à l'eau ? » C'est le vrai geste de pêche, et il est calculé
+  par intégration inverse de la trajectoire.
+
+Le tracé est encadré d'un **cône d'incertitude** qui s'élargit avec le temps.
+Un modèle de courant affiché comme un trait fin est un mensonge graphique.
+
+Aussi : champ de vecteurs de courant, marques personnelles, import/export GPX,
+waypoints, cercle de mouillage.
+
+### 🐟 PÊCHE
+Trois niveaux de lecture, dans l'ordre des questions qu'on se pose :
+
+1. **Le plan** — quoi faire maintenant et dans deux heures : espèce, créneau,
+   poste, technique, ce qui porte, ce qui freine, ce que dit la loi.
+2. **La grille** espèces × heures, colorée en continu.
+3. **Le détail** — fenêtres, barres de facteurs, postes classés, leurres,
+   réglementation complète.
+
+Sept espèces de la Manche orientale : bar, lieu jaune, turbot/barbue,
+saint-pierre, raie bouclée, dorade grise, maquereau.
+
+### 📓 JOURNAL
+Prises, marques, et surtout **ce que le modèle a appris** — avec les chiffres.
+Calibration du modèle de dérive, export/import des données, sources et limites.
+
+---
+
+## Ce qui distingue ce projet
+
+### 1. La marée est calculée, pas téléchargée
+
+L'approche courante — « on télécharge la courbe SHOM tous les jours » — a deux
+défauts rédhibitoires : elle ne marche que si on a du réseau avant de partir,
+et elle plafonne à sept jours d'horizon. Or on planifie une sortie trois
+semaines à l'avance, et on part parfois sans avoir rouvert l'app depuis quinze
+jours.
+
+Ici la marée est un **modèle harmonique embarqué** :
+
+```
+h(t) = Z₀ + Σ f_i(t) · A_i · cos( V_i(t) + u_i(t) − g_i )
+```
+
+23 constituants, corrections nodales de Schureman incluses. Horizon illimité,
+zéro octet de réseau, quelques millisecondes pour 24 h de courbe.
+
+**Et les constantes s'ajustent toutes seules.** `scripts/refresh_tide.py`
+récupère la donnée SHOM et l'accumule dans une archive glissante ;
+`scripts/fit_harmonics.py` réajuste le modèle dessus par moindres carrés.
+Le workflow tourne deux fois par jour. Plus l'archive s'allonge, plus le modèle
+devient précis — pour toujours, et hors ligne.
+
+Erreur d'extrapolation mesurée sur série synthétique, 45 jours au-delà de la
+fenêtre d'ajustement :
+
+| Archive | Erreur moyenne |
+|---|---|
+| aucune (constantes de départ) | ~19 cm |
+| 7 jours | ~10 cm |
+| 20 jours | ~10 cm |
+| 1 an | ~0,5 cm |
+
+Tant que l'archive n'atteint pas 20 jours — durée en dessous de laquelle M2 et
+S2 ne se séparent pas — le modèle reste marqué **provisoire** dans l'interface.
+Dans cette période, l'app utilise directement la donnée SHOM là où elle existe.
+
+### 2. Le courant a une direction, et une incertitude
+
+Le courant de marée n'est pas téléchargeable en côtier : Copernicus et
+Open-Meteo tournent à ~8 km de maille, là où le courant réel atteint 3 nœuds
+quand leur résiduelle en donne 0,2.
+
+Le modèle local écrit directement :
+
+```
+vitesse (nœuds) = k · |dh/dt| · facteurLocal(position)
+```
+
+avec `dh/dt` **brut** — il porte déjà l'amplitude vive-eau / morte-eau. (Le
+normaliser sur la fenêtre *puis* multiplier par un rapport de coefficient, comme
+on le voit souvent, applique deux fois la même correction et surestime les
+vives-eaux d'environ 40 %.)
+
+La direction vient de l'axe flot/jusant du secteur, qui tourne progressivement
+autour de l'étale — un renverse réel prend une vingtaine de minutes.
+
+Trois paramètres sont incertains : `k`, l'axe, et le déphasage entre l'étale de
+hauteur et l'étale de courant. **Les trois s'ajustent sur les relevés GPS de
+l'utilisateur** (`⏱ Relever`, moteur coupé). Moindres carrés fermé pour
+l'échelle, moyenne circulaire pour les axes, balayage pour le déphasage — après
+une vingtaine de relevés, le modèle n'est plus générique : il est celui de ce
+bateau sur ces spots.
+
+### 3. Le score dit pourquoi
+
+```
+score = clamp01( Σ(poids × facteur) / Σ(poids) ) × poidsSaisonnier × 100
+```
+
+Deux décisions de conception :
+
+- La **saison multiplie** au lieu de se moyenner. Sinon un maquereau en janvier
+  remonte à 55/100 parce que le vent est bon. Là il tombe à 4.
+- Un facteur sans donnée est **retiré** de la moyenne au lieu de compter zéro.
+  Pas de température d'eau → le score reste juste, il est seulement moins
+  informé, et l'app affiche son taux de couverture.
+
+Le **facteur limitant** — `argmax (1 − valeur) × poids` — est ce qui rend le
+score actionnable : l'app dit s'il faut décaler de deux heures, changer de
+poste ou rentrer.
+
+### 4. Le vent contre le courant
+
+Vingt nœuds dans le sens du courant, c'est roulant. Vingt nœuds contre 2,5
+nœuds de jusant, c'est une mer courte et cassante à 1,5 m. Aucun modèle de
+houle global ne le voit — la maille est trop grosse. Ici c'est calculé, et
+c'est une alerte.
+
+### 5. Le téléphone comme houlographe
+
+L'accéléromètre, intégré deux fois, mesure le pilonnement réel sous la coque.
+Le modèle donne la houle d'une maille de 8 km ; ça, c'est la mer sous le bateau,
+maintenant. Affiché comme « ressenti bord », jamais comme une hauteur
+significative certifiée.
+
+### 6. L'app rend des comptes
+
+Source de marée affichée en permanence (SHOM / harmonique / provisoire), âge de
+la météo, état de calibration du modèle de dérive, taux de couverture des
+scores, nombre de prises ayant servi à l'apprentissage, écart RMS du modèle.
+Un outil de mer qui cache son incertitude fabrique de la fausse confiance.
+
+---
+
+## Et l'IA ?
+
+L'intelligence est **embarquée et déterministe** — un système expert qui
+transforme les valeurs calculées en décisions formulées. C'est un choix, pas un
+renoncement :
+
+1. Ça doit marcher **sans réseau**, or c'est justement quand on ne capte plus
+   qu'on a besoin d'un conseil.
+2. Ça doit être **gratuit et sans inscription**, la contrainte posée.
+3. Un modèle de langage **inventerait** des heures de marée plausibles. Ici
+   chaque phrase est adossée à une valeur calculée et traçable.
+
+S'y ajoute un **apprentissage local réel** (`js/fishing/learning.js`) : biais
+d'abondance par espèce, poids saisonniers réajustés, calibration du modèle de
+dérive, productivité par poste. Seuils volontairement prudents (8, 20 et 5
+observations) et mélange progressif : avec trois captures on ne surajuste pas.
+
+La frontière pour une v2 est nette : brancher un LLM ne remplacerait que la
+fonction `narrate()` de `advisor.js`, à partir des mêmes faits structurés. Le
+raisonnement, lui, resterait local.
+
+---
+
+## Structure
+
+```
+index.html                  coque SPA
+manifest.webmanifest        PWA
+sw.js                       service worker — coque, données, Leaflet
+css/app.css                 thème sombre maritime + mode nuit rouge
+js/
+  core/       geo, formatage marin, store réactif, IndexedDB, réseau tolérant
+  data/       astro, harmoniques, marée, météo, courant & dérive
+  sensors/    GPS, compas, centrale inertielle
+  fishing/    courbes, espèces & réglementation, moteur, postes, guide, apprentissage
+  ui/         fabrique DOM, instruments canvas
+  views/      nav, map, fish, log
+data/
+  harmonics-dieppe.json     constantes de marée (ajustées automatiquement)
+  zones-dieppe.json         secteurs types et nœuds de courant
+  tide-dieppe.json          fenêtre SHOM courante (généré)
+  tide-history.json         archive glissante pour l'ajustement (généré)
+scripts/
+  tidal.py                  arguments astronomiques — miroir de js/data/harmonics.js
+  refresh_tide.py           récupération SHOM + archive
+  fit_harmonics.py          ajustement par moindres carrés régularisés
+  selftest.py               contrôles de cohérence, dont JS ↔ Python
+```
+
+### Une invariante à ne pas casser
+
+`scripts/tidal.py` et `js/data/harmonics.js` doivent produire **exactement** la
+même hauteur. C'est ce qui rend l'ajustement auto-cohérent : les phases écrites
+par le fitter sont relues par le moteur dans la même convention.
+
+`scripts/selftest.py` exécute les deux moteurs sur les mêmes instants et
+compare — écart constaté : 6 × 10⁻¹⁵ m. Toute divergence fait échouer la CI.
+
+---
+
+## Déploiement
+
+GitHub Pages, automatique.
+
+1. **Settings → Pages → Source : GitHub Actions**
+2. Pousser sur la branche. `deploy.yml` vérifie (syntaxe JS, syntaxe Python,
+   cohérence des données) puis publie.
+3. `refresh-tide.yml` récupère le SHOM et réajuste le modèle, deux fois par
+   jour. Les deux étapes réseau sont `continue-on-error` : si le SHOM change son
+   format, l'app continue de tourner sur son modèle embarqué.
+
+### En local
+
+```bash
+python3 -m http.server 8080     # les modules ES exigent http://, pas file://
+python3 scripts/selftest.py     # contrôles de cohérence
+```
+
+### Sur iPhone
+
+Safari → Partager → **Sur l'écran d'accueil**. Indispensable : c'est le seul
+mode où iOS accorde le plein écran, le maintien d'écran allumé et une
+persistance durable d'IndexedDB.
+
+---
+
+## Capteurs et permissions
+
+| Capteur | API | Particularité |
+|---|---|---|
+| Position | Geolocation | `getCurrentPosition` d'abord — sinon iOS reste muet 30 s |
+| Compas | DeviceOrientation | `requestPermission()` sur Safari ; **absent sur Chrome iOS** → repli route fond |
+| Mer | DeviceMotion | `requestPermission()` sur iOS 13+ |
+| Écran allumé | Wake Lock | réacquis à chaque retour au premier plan |
+
+Le compas est en **contrôle croisé permanent** avec la route fond GPS : un écart
+stable et significatif est une déviation magnétique du bord, et l'app l'affiche
+au lieu de la subir.
+
+---
+
+## Limites — à lire
+
+- **Ce n'est pas un instrument de navigation homologué.** Aide à la décision.
+  Ne remplace ni les cartes officielles, ni les bulletins météo marine, ni le
+  jugement du chef de bord.
+- Les **secteurs livrés** (`data/zones-dieppe.json`) sont des **archétypes
+  d'habitat positionnés approximativement**, pas des marques relevées au GPS.
+  Ils portent le raisonnement de zone, pas des coordonnées de pêche. Ils sont
+  affichés en pointillés avec la mention « à recaler ». Le vrai carnet est
+  celui que construit l'utilisateur.
+- Le **modèle de courant** n'est pas hydrodynamique. C'est un modèle de premier
+  ordre calibrable, avec son incertitude affichée.
+- Les **poids du scoring** viennent de la littérature halieutique Manche. Ce
+  sont des opinions bien rangées, pas un modèle validé — d'où le journal de
+  captures qui les réajuste.
+- La **réglementation** est datée (`lastCheckedISO`) et périmera. À revérifier
+  chaque année auprès de la **DIRM Manche Est – Mer du Nord**.
+
+---
+
+## Sources
+
+Toutes gratuites, sans clé ni inscription.
+
+- **SHOM** — vignette de marée officielle de Dieppe
+- **Open-Meteo Forecast** — vent, rafales, pression, visibilité, nébulosité
+- **Open-Meteo Marine** — houle, mer du vent, température de surface, courant résiduel
+- **OpenStreetMap** — fond de carte
+- **OpenSeaMap** — balisage maritime
+- Soleil et lune : calculés localement (NOAA / série lunaire tronquée)
+
+## Vie privée
+
+Aucun compte, aucun serveur applicatif, aucune télémétrie, aucun traceur.
+Positions, marques et captures ne quittent jamais l'appareil. Export manuel en
+JSON ou GPX à la demande.

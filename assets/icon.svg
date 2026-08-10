@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#13314d"/>
+      <stop offset="100%" stop-color="#050b14"/>
+    </radialGradient>
+    <linearGradient id="needle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#67e8f9"/>
+      <stop offset="100%" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- houle -->
+  <path d="M40 372 q54 -34 108 0 t108 0 t108 0 t108 0" fill="none" stroke="#164e63" stroke-width="14" stroke-linecap="round"/>
+  <path d="M40 416 q54 -34 108 0 t108 0 t108 0 t108 0" fill="none" stroke="#0e3a4a" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- rose des vents -->
+  <circle cx="256" cy="218" r="132" fill="none" stroke="#1c2f47" stroke-width="10"/>
+  <circle cx="256" cy="218" r="132" fill="none" stroke="#22d3ee" stroke-width="10"
+          stroke-dasharray="150 680" stroke-linecap="round" transform="rotate(-90 256 218)" opacity=".9"/>
+
+  <g stroke="#3c5a7d" stroke-width="7" stroke-linecap="round">
+    <line x1="256" y1="104" x2="256" y2="128"/>
+    <line x1="256" y1="308" x2="256" y2="332"/>
+    <line x1="142" y1="218" x2="166" y2="218"/>
+    <line x1="346" y1="218" x2="370" y2="218"/>
+  </g>
+
+  <!-- aiguille -->
+  <path d="M256 106 L294 250 L256 226 L218 250 Z" fill="url(#needle)"/>
+  <path d="M256 330 L218 250 L256 274 L294 250 Z" fill="#1e415e"/>
+  <circle cx="256" cy="250" r="15" fill="#050b14" stroke="#22d3ee" stroke-width="7"/>
+</svg>

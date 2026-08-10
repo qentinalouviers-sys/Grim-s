@@ -1,0 +1,63 @@
+name: Déploiement GitHub Pages
+
+on:
+  push:
+    branches: [main, claude/grims-compagnon-fishing-app-f3qa6n]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Vérifications
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Syntaxe JavaScript
+        run: |
+          # Zéro build step, donc zéro bundler pour attraper une faute de frappe.
+          # Node en mode --check sur chaque module ES fait le travail.
+          fail=0
+          while IFS= read -r f; do
+            node --check "$f" || fail=1
+          done < <(find js sw.js -name '*.js')
+          exit $fail
+
+      - name: Syntaxe Python
+        run: python -m compileall -q scripts
+
+      - name: Cohérence des données embarquées
+        run: python scripts/selftest.py
+
+  deploy:
+    name: Publication
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - name: Empaquetage
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Déploiement
+        id: deployment
+        uses: actions/deploy-pages@v4
