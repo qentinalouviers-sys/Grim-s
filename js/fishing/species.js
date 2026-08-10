@@ -138,7 +138,15 @@ const inPeriod = (md, from, to) =>
   from <= to ? md >= from && md <= to : md >= from || md <= to;
 
 export function getRegulationStatus(speciesId, date) {
+  // Une espèce libre saisie au moment de la prise n'a pas de fiche : on ne
+  // prétend rien à son sujet plutôt que de planter.
   const regulation = REGULATIONS[speciesId];
+  if (!regulation) {
+    return {
+      mode: 'unknown',
+      regulation: { closedPeriods: [], notes: [], zone: ZONE, sourceYear: REG_YEAR, lastCheckedISO: REG_CHECKED },
+    };
+  }
   const md = monthDay(typeof date === 'number' ? new Date(date) : date);
   const hit = regulation.closedPeriods.find((p) => inPeriod(md, p.from, p.to));
   if (!hit) return { mode: 'open', regulation };
@@ -243,6 +251,7 @@ export const SPECIES_RULES = {
     name: 'Bar',
     scientificName: 'Dicentrarchus labrax',
     emoji: '🐟',
+    color: '#22d3ee',
     //             J     F    M    A     M    J    J     A    S  O  N    D
     monthWeights: [0.25, 0.3, 0.4, 0.75, 0.9, 0.9, 0.85, 0.9, 1, 1, 0.9, 0.4],
     comfortableDriftKn: [0.8, 3.0],
@@ -284,6 +293,7 @@ export const SPECIES_RULES = {
     name: 'Lieu jaune',
     scientificName: 'Pollachius pollachius',
     emoji: '🐠',
+    color: '#fbbf24',
     monthWeights: [1, 1, 1, 0.9, 0.6, 0.5, 0.45, 0.45, 0.8, 0.85, 0.7, 0.8],
     comfortableDriftKn: [0.2, 1.8],
     habitat: ['epave', 'roche', 'tombant'],
@@ -314,6 +324,7 @@ export const SPECIES_RULES = {
     name: 'Saint-Pierre',
     scientificName: 'Zeus faber',
     emoji: '🐡',
+    color: '#f472b6',
     monthWeights: [0.1, 0.1, 0.15, 0.5, 0.8, 0.9, 0.9, 1, 0.85, 0.5, 0.2, 0.1],
     comfortableDriftKn: [0.2, 1.2],
     habitat: ['sable', 'sablo-vaseux', 'roche'],
@@ -342,6 +353,7 @@ export const SPECIES_RULES = {
     name: 'Turbot / barbue',
     scientificName: 'Scophthalmus maximus',
     emoji: '🍥',
+    color: '#a3e635',
     monthWeights: [0.8, 0.7, 0.6, 0.5, 0.4, 0.4, 0.5, 0.6, 0.8, 0.95, 1, 0.9],
     comfortableDriftKn: [0.4, 1.5],
     habitat: ['ridin', 'banc-de-sable', 'sable'],
@@ -369,6 +381,7 @@ export const SPECIES_RULES = {
     name: 'Raie bouclée',
     scientificName: 'Raja clavata',
     emoji: '🪁',
+    color: '#a78bfa',
     monthWeights: [0.55, 0.5, 0.6, 0.8, 0.9, 0.95, 0.95, 0.95, 0.9, 0.8, 0.7, 0.6],
     comfortableDriftKn: [0.1, 1.2],
     habitat: ['sable', 'vase', 'sable-coquillier'],
@@ -401,6 +414,7 @@ export const SPECIES_RULES = {
     name: 'Dorade grise',
     scientificName: 'Spondyliosoma cantharus',
     emoji: '🐚',
+    color: '#94a3b8',
     monthWeights: [0.2, 0.15, 0.2, 0.4, 0.65, 0.85, 0.95, 1, 1, 0.9, 0.6, 0.35],
     comfortableDriftKn: [0.2, 2.0],
     habitat: ['chenal', 'sable', 'roche', 'epave'],
@@ -433,6 +447,7 @@ export const SPECIES_RULES = {
     name: 'Maquereau',
     scientificName: 'Scomber scombrus',
     emoji: '🐋',
+    color: '#38bdf8',
     monthWeights: [0.05, 0.05, 0.1, 0.35, 0.8, 1, 1, 0.95, 0.8, 0.45, 0.15, 0.05],
     comfortableDriftKn: [0.2, 2.5],
     habitat: ['pleine-eau', 'chenal', 'ridin'],
@@ -465,5 +480,27 @@ export const SPECIES_RULES = {
 export const SPECIES_ORDER = [
   'bar', 'lieu-jaune', 'turbot', 'saint-pierre', 'raie-bouclee', 'dorade-grise', 'maquereau',
 ];
+
+/** Espèce libre saisie par l'utilisateur : pas de règles, mais traçable. */
+export const OTHER_SPECIES = {
+  id: 'autre',
+  name: 'Autre',
+  emoji: '🎣',
+  color: '#e8f1fa',
+  monthWeights: new Array(12).fill(0.5),
+  comfortableDriftKn: [0, 4],
+  habitat: [],
+  depthRangeM: [0, 60],
+  playbook: '',
+  technique: { clear: '', murky: '', lures: [] },
+  factors: [],
+  regulation: {
+    markingRequired: false, closedPeriods: [], notes: [],
+    zone: ZONE, sourceYear: REG_YEAR, lastCheckedISO: REG_CHECKED,
+  },
+};
+
+/** Règles d'une espèce, connue ou libre. Ne renvoie jamais undefined. */
+export const ruleOf = (id) => SPECIES_RULES[id] || OTHER_SPECIES;
 
 export const seasonWeight = (rule, t) => rule.monthWeights[new Date(t).getMonth()];

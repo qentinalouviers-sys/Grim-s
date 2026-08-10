@@ -15,8 +15,7 @@ import * as spots from '../fishing/spots.js';
 import * as stream from '../data/stream.js';
 import * as tide from '../data/tide.js';
 import * as idb from '../core/idb.js';
-import { SPECIES_RULES } from '../fishing/species.js';
-import { catchForm } from './fish.js';
+import * as record from '../fishing/record.js';
 
 let root;
 let refs = {};
@@ -57,7 +56,7 @@ async function render() {
   const ch = el('div', 'card-head');
   ch.style.padding = '12px 12px 0';
   ch.append(el('h3', null, `PRISES (${list.length})`), el('div', 'spacer'));
-  const add = button('＋', 'btn-sm', () => catchForm());
+  const add = button('🎣 Prise', 'btn-sm', () => record.openQuickRecord());
   ch.append(add);
   catchCard.append(ch);
 
@@ -69,14 +68,18 @@ async function render() {
       const item = el('button', 'list-item');
       item.type = 'button';
       const main = el('div', 'list-main');
-      const rule = SPECIES_RULES[c.speciesId];
-      main.append(el('div', 'list-title',
-        `${rule?.emoji || '🐟'} ${rule?.name || 'Autre'}${c.lengthCm ? ` · ${c.lengthCm} cm` : ''}${c.count > 1 ? ` ×${c.count}` : ''}`));
+      const info = record.speciesInfo(c.speciesId, c.speciesName);
+      const title = el('div', 'list-title',
+        `${info.emoji} ${info.name}${c.lengthCm ? ` · ${c.lengthCm} cm` : ''}${c.count > 1 ? ` ×${c.count}` : ''}`);
+      title.style.borderLeft = `3px solid ${info.color}`;
+      title.style.paddingLeft = '7px';
+      main.append(title);
       main.append(el('div', 'list-sub', [
         new Date(c.t).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
         c.released ? 'relâché' : null,
-        c.snapshot ? `coef ${c.snapshot.coefficient}` : null,
-        c.snapshot ? `dérive ${fmt.num(c.snapshot.driftKn, 1)} nd` : null,
+        c.snapshot?.coefficient != null ? `coef ${c.snapshot.coefficient}` : null,
+        c.snapshot?.nearestSpot ? c.snapshot.nearestSpot.name : null,
+        Number.isFinite(c.lat) ? '📍' : 'sans point',
         c.note || null,
       ].filter(Boolean).join(' · ')));
       item.append(main);
@@ -323,43 +326,49 @@ function importGPX() {
  * Détail d'une prise
  * ========================================================================== */
 function showCatch(c) {
-  const rule = SPECIES_RULES[c.speciesId];
+  const info = record.speciesInfo(c.speciesId, c.speciesName);
   const body = el('div');
-  body.append(el('p', 'muted', new Date(c.t).toLocaleString('fr-FR')));
-  if (c.note) body.append(el('p', null, c.note));
 
-  if (c.snapshot) {
-    const strip = el('div', 'strip');
-    const p = (v, l) => {
-      const n = el('div', 'pill');
-      n.append(el('div', 'pill-val', v), el('div', 'pill-lbl', l));
-      return n;
-    };
-    const s = c.snapshot;
-    strip.append(p(String(s.coefficient), 'COEF'));
-    strip.append(p(`${fmt.num(s.heightM, 1)} m`, 'HAUTEUR'));
-    strip.append(p(`${fmt.num(s.driftKn, 1)} nd`, 'DÉRIVE'));
-    strip.append(p(s.tideSense === 'flood' ? 'Montant' : s.tideSense === 'ebb' ? 'Descendant' : 'Étale', 'MARÉE'));
-    strip.append(p(`${s.hoursFromHW > 0 ? '+' : ''}${fmt.num(s.hoursFromHW, 1)} h`, 'DE LA PM'));
-    if (s.seaTempC != null) strip.append(p(`${fmt.num(s.seaTempC, 1)}°`, 'EAU'));
-    if (s.windSpeedKn != null) strip.append(p(`${Math.round(s.windSpeedKn)} nd`, 'VENT'));
-    body.append(strip);
-  }
+  const head = el('div', 'row');
+  const badge = el('div', 'score-badge');
+  badge.style.background = info.color;
+  badge.style.color = '#050b14';
+  badge.textContent = info.emoji;
+  const main = el('div', 'list-main');
+  main.append(el('div', 'list-title',
+    `${info.name}${c.lengthCm ? ` · ${c.lengthCm} cm` : ''}${(c.count || 1) > 1 ? ` ×${c.count}` : ''}`));
+  main.append(el('div', 'list-sub',
+    `${new Date(c.t).toLocaleString('fr-FR')}${c.released ? ' · relâché' : ' · gardé'}`));
+  head.append(badge, main);
+  body.append(head);
 
-  if (Number.isFinite(c.predictedScore)) {
-    body.append(el('div', 'hr'));
-    body.append(el('p', 'muted', `Le modèle donnait ${c.predictedScore}/100 pour ${rule?.name || 'cette espèce'} à ce moment-là.`));
-  }
-
+  if (c.note) body.append(el('p', 'muted', c.note));
   body.append(el('div', 'hr'));
-  body.append(button('Supprimer cette prise', 'btn-ghost btn-lg', async () => {
+
+  if (!c.snapshot) {
+    body.append(el('p', 'tiny', 'Prise enregistrée sans contexte (version antérieure de l’app).'));
+  } else {
+    body.append(record.renderSnapshot(c.snapshot));
+  }
+
+  const acts = el('div', 'btn-row');
+  if (Number.isFinite(c.lat)) {
+    acts.append(button('🗺️ Voir sur la carte', 'btn-primary', () => {
+      set({ waypoint: { lat: c.lat, lon: c.lon, name: info.name } });
+      closeSheet();
+      emit('goto', 'map');
+    }));
+  }
+  acts.append(button('Supprimer', 'btn-ghost', async () => {
     await learning.removeCatch(c.id);
     closeSheet();
+    emit('catches:changed');
     render();
     toast('Prise supprimée');
   }));
+  body.append(acts);
 
-  openSheet(rule?.name || 'Prise', body);
+  openSheet(info.name, body);
 }
 
 /* ==========================================================================

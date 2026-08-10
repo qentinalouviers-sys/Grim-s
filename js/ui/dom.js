@@ -119,9 +119,25 @@ export function initSheet() {
 /* --------------------------------------------------------------------------
  * Toasts
  * ------------------------------------------------------------------------ */
-export function toast(text, kind = '', ms = 2600) {
+/**
+ * @param {{label:string, onClick:Function}} [action] bouton d'action inline.
+ *   Sert surtout à l'annulation : dès qu'un seul tap suffit à écrire dans le
+ *   journal, il faut pouvoir revenir en arrière aussi vite.
+ */
+export function toast(text, kind = '', ms = 2600, action = null) {
   const host = document.getElementById('toast-host');
-  const t = el('div', `toast ${kind}`, text);
+  const t = el('div', `toast ${kind}`);
+  t.append(el('span', null, text));
+  if (action) {
+    const b = el('button', 'toast-action', action.label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      t.remove();
+      action.onClick();
+    });
+    t.append(b);
+    t.style.pointerEvents = 'auto';
+  }
   host.append(t);
   setTimeout(() => {
     t.style.opacity = '0';

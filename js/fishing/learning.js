@@ -54,7 +54,9 @@ export async function logCatch(entry) {
     ...entry,
   };
   await idb.put('catches', null, rec);
-  await recompute();
+  // L'écriture est acquittée immédiatement ; le réapprentissage suit sans
+  // faire attendre l'utilisateur, qui a un poisson dans les mains.
+  recompute().catch((e) => console.warn('[learning]', e));
   return rec;
 }
 
@@ -92,11 +94,14 @@ export async function recompute() {
 
   const bySpecies = new Map();
   for (const c of list) {
+    // Les espèces libres comptent dans les totaux et la productivité des
+    // postes, mais pas dans l'apprentissage des poids : elles n'ont pas de
+    // règles à réajuster.
+    const k = c.spotId || 'hors-marque';
+    spotStats[k] = (spotStats[k] || 0) + (c.count || 1);
     if (!SPECIES_RULES[c.speciesId]) continue;
     if (!bySpecies.has(c.speciesId)) bySpecies.set(c.speciesId, []);
     bySpecies.get(c.speciesId).push(c);
-    const k = c.spotId || 'hors-marque';
-    spotStats[k] = (spotStats[k] || 0) + (c.count || 1);
   }
 
   const total = list.reduce((a, c) => a + (c.count || 1), 0);

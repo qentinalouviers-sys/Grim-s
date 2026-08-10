@@ -29,6 +29,7 @@ import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
 import * as idb from '../core/idb.js';
 import * as learning from '../fishing/learning.js';
+import * as record from '../fishing/record.js';
 
 const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
@@ -44,6 +45,7 @@ let ui = {
   follow: true,
   seamarks: true,
   vectors: false,
+  catches: true,
   driftMin: 40,
   target: null,   // cible de dérive inverse
   mode: 'forward',
@@ -159,10 +161,12 @@ export async function mount(container) {
   layers.drift = L.layerGroup().addTo(map);
   layers.vectors = L.layerGroup();
   layers.spots = L.layerGroup().addTo(map);
+  layers.catches = L.layerGroup().addTo(map);
   layers.boat = L.layerGroup().addTo(map);
 
   buildOverlay();
   drawSpots();
+  drawCatches();
 
   map.on('movestart', () => {
     if (ui.follow && !map._programmaticMove) setFollow(false);
@@ -263,10 +267,19 @@ function buildOverlay() {
     } else map.removeLayer(layers.vectors);
     refs.btnVec.classList.toggle('on', ui.vectors);
   }, 'Champ de courant');
+  refs.btnCatch = mapBtn('🐟', () => {
+    ui.catches = !ui.catches;
+    if (ui.catches) {
+      layers.catches.addTo(map);
+      drawCatches();
+    } else map.removeLayer(layers.catches);
+    refs.btnCatch.classList.toggle('on', ui.catches);
+  }, 'Mes prises');
   refs.btnMark = mapBtn('📍', markHere, 'Marquer la position');
   refs.btnDl = mapBtn('⤓', downloadZone, 'Précharger la zone');
-  right.append(refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnMark, refs.btnDl);
+  right.append(refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch, refs.btnMark, refs.btnDl);
   refs.btnSea.classList.add('on');
+  refs.btnCatch.classList.add('on');
   refs.btnFollow.classList.add('on');
   root.append(right);
 
@@ -746,6 +759,30 @@ async function recordDrift() {
 
 function exportGPX() {
   const wpts = spots.personalSpots().map((s) => ({ lat: s.lat, lon: s.lon, name: s.name, desc: s.note }));
+
+  // Les prises partent aussi en waypoints, avec leur contexte en description :
+  // un GPX doit pouvoir se relire dans OpenCPN ou Navionics sans cette app.
+  for (const c of catchCache) {
+    const info = record.speciesInfo(c.speciesId, c.speciesName);
+    const s = c.snapshot || {};
+    wpts.push({
+      lat: c.lat,
+      lon: c.lon,
+      name: `${info.name}${c.lengthCm ? ` ${c.lengthCm}cm` : ''} ${fmt.hhmm(c.t)}`,
+      desc: [
+        new Date(c.t).toLocaleString('fr-FR'),
+        c.released ? 'relâché' : 'gardé',
+        s.coefficient != null ? `coef ${s.coefficient}` : null,
+        s.heightM != null ? `hauteur ${s.heightM} m` : null,
+        s.tideSense ? `marée ${s.tideSense}` : null,
+        s.driftKn != null ? `dérive ${s.driftKn} nd` : null,
+        s.seaTempC != null ? `eau ${s.seaTempC} °C` : null,
+        s.windSpeedKn != null ? `vent ${Math.round(s.windSpeedKn)} nd` : null,
+        c.note || null,
+      ].filter(Boolean).join(' · '),
+    });
+  }
+
   const tracks = gps.track.length > 1 ? [{ name: `Sortie ${new Date().toLocaleDateString('fr-FR')}`, points: gps.track }] : [];
   if (!wpts.length && !tracks.length) return void toast('Rien à exporter');
   const blob = new Blob([toGPX(tracks, wpts)], { type: 'application/gpx+xml' });
@@ -835,6 +872,107 @@ function deg2tile(lat, lon, z) {
   const y = Math.floor(((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2) * n);
   return { x: Math.max(0, Math.min(n - 1, x)), y: Math.max(0, Math.min(n - 1, y)) };
 }
+
+/* ==========================================================================
+ * Prises
+ * --------------------------------------------------------------------------
+ * Une prise, c'est d'abord un POINT. Un carnet qui ne les montre pas sur l'eau
+ * n'apprend rien à personne : c'est en voyant les marqueurs se grouper sur une
+ * tête de ridin qu'on comprend son spot. Chaque espèce a sa couleur, la taille
+ * du marqueur suit le nombre de poissons, et les prises relâchées sont
+ * distinguées — on veut voir où ça mord, pas seulement où on a rempli la glacière.
+ * ========================================================================== */
+let catchCache = [];
+
+export async function drawCatches() {
+  if (!map || !layers.catches) return;
+  catchCache = (await learning.catches()).filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lon));
+  const g = layers.catches;
+  g.clearLayers();
+  if (!ui.catches) return;
+
+  // Les prises du jour ressortent : c'est la sortie en cours qui intéresse.
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+
+  for (const c of catchCache) {
+    const info = record.speciesInfo(c.speciesId, c.speciesName);
+    const today = c.t >= dayStart.valueOf();
+    const size = 24 + Math.min(10, ((c.count || 1) - 1) * 3);
+
+    const marker = L.marker([c.lat, c.lon], {
+      zIndexOffset: today ? 600 : 400,
+      icon: L.divIcon({
+        className: '',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size],
+        html: `<div class="catch-marker" style="width:${size}px;height:${size}px;`
+          + `background:${info.color};opacity:${today ? 1 : 0.62};`
+          + `${c.released ? 'border-style:dashed;' : ''}">`
+          + `<span>${info.emoji}</span></div>`,
+      }),
+    }).addTo(g);
+
+    marker.bindTooltip(
+      `${info.name}${c.lengthCm ? ` ${c.lengthCm} cm` : ''}${(c.count || 1) > 1 ? ` ×${c.count}` : ''}`,
+      { className: 'spot-label', direction: 'top', offset: [0, -size] },
+    );
+    marker.on('click', (e) => {
+      L.DomEvent.stop(e);
+      showCatch(c, info);
+    });
+  }
+}
+
+function showCatch(c, info) {
+  const body = el('div');
+  const head = el('div', 'row');
+  const badge = el('div', 'score-badge');
+  badge.style.background = info.color;
+  badge.style.color = '#050b14';
+  badge.textContent = info.emoji;
+  head.append(badge);
+  const main = el('div', 'list-main');
+  main.append(el('div', 'list-title',
+    `${info.name}${c.lengthCm ? ` · ${c.lengthCm} cm` : ''}${(c.count || 1) > 1 ? ` ×${c.count}` : ''}`));
+  main.append(el('div', 'list-sub',
+    `${new Date(c.t).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+    + `${c.released ? ' · relâché' : ''}`));
+  head.append(main);
+  body.append(head);
+
+  if (c.note) body.append(el('p', 'muted', c.note));
+  body.append(el('div', 'hr'));
+  body.append(record.renderSnapshot(c.snapshot));
+
+  const acts = el('div', 'btn-row');
+  acts.append(
+    button('🎯 Dérive vers ici', 'btn-primary', () => {
+      ui.target = { lat: c.lat, lon: c.lon };
+      ui.mode = 'reverse';
+      closeSheet();
+      drawDrift();
+    }),
+    button('📍 En faire une marque', '', async () => {
+      await spots.addSpot({
+        name: `${info.name} ${new Date(c.t).toLocaleDateString('fr-FR')}`,
+        lat: c.lat,
+        lon: c.lon,
+        note: `Prise enregistrée le ${new Date(c.t).toLocaleString('fr-FR')}.`,
+        habitat: c.snapshot?.nearestSpot ? [] : [],
+      });
+      closeSheet();
+      drawSpots();
+      toast('Marque créée sur la prise', 'good');
+    }),
+  );
+  body.append(acts);
+
+  openSheet('Prise', body);
+}
+
+/* Rafraîchit les prises quand on en enregistre une, depuis n'importe quel écran. */
+on('catches:changed', () => map && drawCatches());
 
 /* Rafraîchit les marques quand elles changent ailleurs (import GPX, journal). */
 on('spots:changed', () => map && drawSpots());

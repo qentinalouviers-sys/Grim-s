@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.1.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -50,6 +50,7 @@ const SHELL_FILES = [
   'js/fishing/spots.js',
   'js/fishing/advisor.js',
   'js/fishing/learning.js',
+  'js/fishing/record.js',
   'js/ui/dom.js',
   'js/ui/widgets.js',
   'js/views/nav.js',

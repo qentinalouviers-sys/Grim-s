@@ -488,7 +488,11 @@ canvas { display: block; max-width: 100%; }
 /* ══ Toasts ════════════════════════════════════════════════════════════ */
 .toast-host {
   position: fixed; z-index: 90;
-  left: 0; right: 0; bottom: calc(var(--tabbar-h) + var(--safe-b) + 10px);
+  left: 0; right: 0;
+  /* Au-dessus du bouton de prise : c'est lui qui vient de déclencher le toast,
+     le masquer par la confirmation serait absurde — et le bouton « Annuler »
+     doit rester atteignable sans recouvrir la cible du geste suivant. */
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 86px);
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   pointer-events: none;
   padding: 0 16px;
@@ -504,6 +508,16 @@ canvas { display: block; max-width: 100%; }
   max-width: 100%;
 }
 .toast.danger { border-color: var(--red); color: #ffb1bd; }
+.toast span { min-width: 0; }
+.toast-action {
+  margin-left: 4px; padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.1);
+  font-size: 12px; font-weight: 750;
+  color: inherit;
+  flex: 0 0 auto;
+}
+.toast { display: flex; align-items: center; gap: 10px; }
 .toast.good { border-color: var(--lime); color: var(--lime); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
 
@@ -549,3 +563,64 @@ canvas { display: block; max-width: 100%; }
   .metric-val.xl { font-size: 38px; }
   .card { padding: 10px; margin-bottom: 6px; }
 }
+
+/* ══ Bouton de prise ═══════════════════════════════════════════════════
+   Le geste le plus fréquent de la sortie doit être le plus accessible :
+   pouce droit, au-dessus de la barre d'onglets, jamais recouvert. Un tap
+   ouvre la grille d'espèces, un appui long rejoue la dernière — le banc de
+   maquereaux ne laisse pas le temps de choisir dix fois. */
+.fab {
+  position: fixed;
+  right: calc(var(--safe-r) + 14px);
+  bottom: calc(var(--tabbar-h) + var(--safe-b) + 14px);
+  z-index: 45;
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(160deg, #a3e635, #65a30d);
+  box-shadow: 0 6px 20px rgba(0,0,0,.5), 0 0 0 1px rgba(163,230,53,.5), 0 0 24px rgba(163,230,53,.25);
+  transition: transform .12s ease;
+}
+.fab[hidden] { display: none; }
+.fab:active { transform: scale(.9); }
+.fab-ico { font-size: 27px; line-height: 1; filter: saturate(1.2); }
+
+/* ══ Grille d'espèces ══════════════════════════════════════════════════ */
+.species-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.species-tile {
+  --sp: var(--cyan);
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px;
+  min-height: 92px;
+  padding: 10px 6px;
+  border-radius: var(--r);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--sp);
+  text-align: center;
+  transition: transform .1s ease, background .1s ease;
+}
+.species-tile:active { transform: scale(.95); background: var(--line); }
+.species-tile[disabled] { opacity: .5; }
+.species-emoji { font-size: 25px; line-height: 1; }
+.species-name { font-size: 12px; font-weight: 650; line-height: 1.2; color: var(--txt); }
+.species-tile .tag { position: absolute; top: 5px; right: 5px; }
+.species-tile--add { border-left-color: var(--line); border-style: dashed; }
+.species-tile--add .species-emoji { color: var(--txt-3); }
+
+/* ══ Marqueur de prise sur la carte ════════════════════════════════════ */
+.catch-marker {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(45deg);
+  border: 2px solid #050b14;
+  box-shadow: 0 2px 6px rgba(0,0,0,.6);
+}
+.catch-marker span { transform: rotate(-45deg); font-size: 13px; line-height: 1; }

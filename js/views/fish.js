@@ -21,6 +21,7 @@ import * as spots from '../fishing/spots.js';
 import * as weather from '../data/weather.js';
 import * as learning from '../fishing/learning.js';
 import * as tide from '../data/tide.js';
+import * as record from '../fishing/record.js';
 
 let root;
 let unsub;
@@ -139,7 +140,7 @@ function render() {
     foot.append(el('div', null, `Modèle ajusté sur ${m.totalCatches} prises enregistrées sur cet appareil.`));
   }
 
-  const logBtn = button('＋ Enregistrer une prise', 'btn-lime btn-lg', () => catchForm());
+  const logBtn = button('🎣 Enregistrer une prise', 'btn-lime btn-lg', () => record.openQuickRecord());
   logBtn.style.marginTop = '10px';
   foot.append(logBtn);
 }
@@ -321,9 +322,9 @@ function showSpecies(id) {
   rl.append(el('li', null, `${R.zone} · source ${R.sourceYear} · vérifié le ${R.lastCheckedISO}`));
   body.append(rl);
 
-  const logBtn = button(`＋ J’ai pris un ${rule.name.toLowerCase()}`, 'btn-lime btn-lg', () => {
+  const logBtn = button(`🎣 J’ai pris un ${rule.name.toLowerCase()}`, 'btn-lime btn-lg', async () => {
     closeSheet();
-    catchForm(id);
+    await record.record(id);
   });
   logBtn.style.marginTop = '12px';
   body.append(logBtn);
@@ -378,120 +379,6 @@ function showMoment(id, score, sample) {
   }));
 
   openSheet(`${rule.emoji} ${rule.name} — ${fmt.hhmm(sample.t)}`, body);
-}
-
-/* ==========================================================================
- * Saisie d'une prise
- * --------------------------------------------------------------------------
- * On stocke le score PRÉDIT au moment de la prise. C'est cette valeur qui
- * permet ensuite de savoir si le modèle avait raison — sans elle, le journal
- * n'est qu'un carnet, pas une boucle d'apprentissage.
- * ========================================================================== */
-export function catchForm(preselect = null) {
-  const body = el('div');
-  const now = Date.now();
-
-  const mk = (label, node) => {
-    const f = el('div', 'field');
-    f.append(el('label', null, label), node);
-    body.append(f);
-    return node;
-  };
-
-  const sel = document.createElement('select');
-  for (const id of SPECIES_ORDER) {
-    const o = document.createElement('option');
-    o.value = id;
-    o.textContent = SPECIES_RULES[id].name;
-    if (id === preselect) o.selected = true;
-    sel.append(o);
-  }
-  const other = document.createElement('option');
-  other.value = '';
-  other.textContent = 'Autre / non listée';
-  sel.append(other);
-  mk('Espèce', sel);
-
-  const len = document.createElement('input');
-  len.type = 'number';
-  len.inputMode = 'decimal';
-  len.placeholder = 'cm';
-  mk('Taille', len);
-
-  const cnt = document.createElement('input');
-  cnt.type = 'number';
-  cnt.inputMode = 'numeric';
-  cnt.value = '1';
-  mk('Nombre', cnt);
-
-  const rel = el('div', 'seg');
-  let released = false;
-  const bKeep = el('button', 'on', 'Gardé');
-  const bRel = el('button', '', 'Relâché');
-  bKeep.type = bRel.type = 'button';
-  bKeep.addEventListener('click', () => { released = false; bKeep.classList.add('on'); bRel.classList.remove('on'); });
-  bRel.addEventListener('click', () => { released = true; bRel.classList.add('on'); bKeep.classList.remove('on'); });
-  rel.append(bKeep, bRel);
-  mk('Devenir', rel);
-
-  const spotSel = document.createElement('select');
-  const none = document.createElement('option');
-  none.value = '';
-  none.textContent = 'Position actuelle';
-  spotSel.append(none);
-  for (const s of spots.all()) {
-    const o = document.createElement('option');
-    o.value = s.id;
-    o.textContent = s.name;
-    spotSel.append(o);
-  }
-  mk('Poste', spotSel);
-
-  const note = document.createElement('textarea');
-  note.rows = 2;
-  note.placeholder = 'Leurre, profondeur, comportement…';
-  mk('Note', note);
-
-  // Contexte capturé automatiquement — la partie utile du journal.
-  const ctx = el('div', 'tiny');
-  const sample = (state.samples || []).reduce(
-    (a, b) => (a && Math.abs(a.t - now) < Math.abs(b.t - now) ? a : b), null,
-  );
-  if (sample) {
-    ctx.textContent =
-      `Contexte enregistré : coef ${sample.coefficient} · ${senseLabel(sample.tideSense)} · ` +
-      `dérive ${fmt.num(sample.driftKn, 1)} nd · ${lightLabel(sample.lightPhase)}` +
-      (sample.seaTempC != null ? ` · eau ${fmt.num(sample.seaTempC, 1)}°` : '');
-  }
-  body.append(ctx);
-
-  body.append(button('Enregistrer', 'btn-lime btn-lg', async () => {
-    const speciesId = sel.value;
-    const predicted = speciesId && state.scores?.[speciesId]
-      ? state.scores[speciesId].reduce((a, b) => (Math.abs(b.t - now) < Math.abs(a.t - now) ? b : a)).score
-      : null;
-    await learning.logCatch({
-      speciesId: speciesId || 'autre',
-      lengthCm: len.value ? Number(len.value) : null,
-      count: Math.max(1, Number(cnt.value) || 1),
-      released,
-      spotId: spotSel.value || null,
-      lat: state.fix?.lat,
-      lon: state.fix?.lon,
-      note: note.value.trim(),
-      predictedScore: predicted,
-      snapshot: sample ? {
-        coefficient: sample.coefficient, driftKn: sample.driftKn, tideSense: sample.tideSense,
-        lightPhase: sample.lightPhase, seaTempC: sample.seaTempC, windSpeedKn: sample.windSpeedKn,
-        heightM: sample.heightM, hoursFromHW: sample.hoursFromHW,
-      } : null,
-    });
-    closeSheet();
-    toast('Prise enregistrée', 'good');
-    emit('catches:changed');
-  }));
-
-  openSheet('Enregistrer une prise', body);
 }
 
 const senseLabel = (s) => (s === 'flood' ? 'montant' : s === 'ebb' ? 'descendant' : 'étale');

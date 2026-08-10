@@ -34,6 +34,7 @@ import * as spots from './fishing/spots.js';
 import * as engine from './fishing/engine.js';
 import * as advisor from './fishing/advisor.js';
 import * as learning from './fishing/learning.js';
+import * as record from './fishing/record.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
 import * as navView from './views/nav.js';
@@ -63,12 +64,13 @@ async function boot() {
   idb.requestPersistence();
 
   // Rien de tout ceci ne dépend du réseau : ça ne peut pas échouer longtemps.
-  await Promise.all([tide.init(), spots.init(), learning.init()]);
+  await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord()]);
 
   const settings = (await idb.get('kv', 'settings')) || {};
   set({ settings, nightMode: !!settings.nightMode });
   document.body.classList.toggle('night', !!settings.nightMode);
 
+  record.mountFab();
   showView(location.hash.replace('#', '') || 'nav');
   slowTick();
   fastTimer = setInterval(fastTick, 1000);
@@ -279,6 +281,7 @@ function showView(name) {
     tab.classList.toggle('active', on);
     tab.setAttribute('aria-selected', String(on));
   }
+  record.setFabVisible(name !== 'log');
   history.replaceState(null, '', `#${name}`);
   set({ view: name });
 }

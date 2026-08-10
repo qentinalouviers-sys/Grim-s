@@ -60,6 +60,43 @@ Un modèle de courant affiché comme un trait fin est un mensonge graphique.
 Aussi : champ de vecteurs de courant, marques personnelles, import/export GPX,
 waypoints, cercle de mouillage.
 
+### 🎣 ENREGISTRER UNE PRISE — en un geste
+
+Bouton flottant, présent sur NAV, CARTE et PÊCHE. **Un tap ouvre la grille
+d'espèces, un deuxième tap enregistre.** C'est tout. Un appui long sur le
+bouton rejoue directement la dernière espèce — le banc de maquereaux ne laisse
+pas le temps de choisir dix fois.
+
+Les espèces hors des sept suivies se saisissent au clavier une seule fois :
+elles rejoignent ensuite la grille et se notent à un tap comme les autres.
+
+Le reste est capturé **automatiquement**, sans rien demander :
+
+| | |
+|---|---|
+| Position | latitude, longitude, précision GPS, poste le plus proche et son relèvement |
+| Marée | hauteur, coefficient, sens, temps avant/après PM et BM, étale de courant, hauteur d'eau sur le poste |
+| Courant | courant de marée, dérive réelle du bateau, direction de chacun, état de calibration |
+| Météo & mer | vent et rafales, pression et tendance 6 h, température de l'eau, houle, visibilité, clarté estimée |
+| Ressenti bord | état de mer mesuré à l'accéléromètre — la mer sous la coque, pas celle d'une maille de 8 km |
+| Lumière | phase, hauteur du soleil, minutes depuis le lever ou le coucher, lune |
+| Modèle | le score que l'app prédisait à cet instant, avec le facteur porteur et le facteur limitant |
+| Traçabilité | provenance de la marée (SHOM / harmonique / provisoire) et âge de la météo |
+
+Ce dernier point est ce qui transforme un carnet en boucle d'apprentissage :
+sans le score prédit au moment de la prise, on ne peut jamais savoir si le
+modèle avait raison. Et sans la provenance de la marée, on ne sait pas ce que
+vaut la prise trois mois plus tard.
+
+Chaque prise apparaît **sur la carte**, marqueur coloré par espèce, taille
+proportionnelle au nombre, contour pointillé si relâchée, prises du jour en
+avant. Un clic ouvre le contexte complet ; on peut router dessus, relancer une
+dérive vers le point, ou en faire une marque permanente. L'export GPX les
+emporte avec leur contexte en description, lisible dans OpenCPN ou Navionics.
+
+Une prise s'écrivant en un tap, elle s'annule en un tap : la confirmation
+porte un bouton **Annuler**.
+
 ### 🐟 PÊCHE
 Trois niveaux de lecture, dans l'ordre des questions qu'on se pose :
 
@@ -73,8 +110,9 @@ Sept espèces de la Manche orientale : bar, lieu jaune, turbot/barbue,
 saint-pierre, raie bouclée, dorade grise, maquereau.
 
 ### 📓 JOURNAL
-Prises, marques, et surtout **ce que le modèle a appris** — avec les chiffres.
-Calibration du modèle de dérive, export/import des données, sources et limites.
+Prises avec leur contexte complet, marques, et surtout **ce que le modèle a
+appris** — avec les chiffres. Calibration du modèle de dérive, export/import
+des données, sources et limites.
 
 ---
 
@@ -219,7 +257,8 @@ js/
   core/       geo, formatage marin, store réactif, IndexedDB, réseau tolérant
   data/       astro, harmoniques, marée, météo, courant & dérive
   sensors/    GPS, compas, centrale inertielle
-  fishing/    courbes, espèces & réglementation, moteur, postes, guide, apprentissage
+  fishing/    courbes, espèces & réglementation, moteur, postes, guide,
+              enregistrement des prises, apprentissage
   ui/         fabrique DOM, instruments canvas
   views/      nav, map, fish, log
 data/
