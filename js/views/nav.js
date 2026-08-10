@@ -217,7 +217,7 @@ function renderHeading() {
 
   const extra = hd.deviation
     ? `déviation ${hd.deviation > 0 ? '+' : ''}${hd.deviation}° / route`
-    : hd.tilted ? 'téléphone trop incliné'
+    : hd.tilted ? 'pose ambiguë — redresse ou pose à plat'
     : `mag ${fmt.heading(hd.magnetic ?? hd.deg)}`;
   if (refs.headExtra.textContent !== extra) refs.headExtra.textContent = extra;
 }
@@ -435,6 +435,35 @@ function openCompassDiag() {
   });
   body.append(btn);
 
+  // Rapporter un compas qui déraille ne doit pas obliger à recopier vingt
+  // lignes à la main ni à cadrer une capture d'écran d'une main sur un pont
+  // qui bouge.
+  body.append(button('📋 Copier le diagnostic', 'btn-sm', async () => {
+    const d = compass.diagnostics();
+    const txt = [
+      `Grim's Compagnon ${APP_VERSION} — diagnostic compas`,
+      new Date().toISOString(),
+      navigator.userAgent,
+      '',
+      ...Object.entries({
+        supporté: d.supported, autorisation: d.permission, écoute: d.listening,
+        mesures: d.events, ignorés: d.ignored, cadence_Hz: d.rateHz.toFixed(1),
+        âge_ms: d.ageMs, source: d.lockedType, champ: d.field, absolu: d.absolute,
+        alpha: d.alpha, beta: d.beta, gamma: d.gamma,
+        correction_assiette: d.tiltFix, accord_axes: d.axisQuality,
+        brut: d.raw, filtré: d.filtered,
+        cap_affiché: state.heading?.deg, origine: state.heading?.source,
+        bruit: state.heading?.spread,
+      }).map(([k, v]) => `${k}: ${v}`),
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(txt);
+      toast('Diagnostic copié — colle-le dans un message', 'good');
+    } catch {
+      toast('Copie refusée par le navigateur');
+    }
+  }));
+
   const line = (k, v) => {
     const r = el('div', 'row');
     r.style.justifyContent = 'space-between';
@@ -468,8 +497,10 @@ function openCompassDiag() {
     grid.append(line('Origine du cap', hd?.source || '—'));
     grid.append(line('Bruit du capteur', hd?.spread == null ? '—' : `${hd.spread.toFixed(1)}°`));
     grid.append(line('Précision annoncée', d.accuracy == null ? 'non fournie' : `${d.accuracy}°`));
-    grid.append(line('Inclinaison', d.beta == null ? '—'
+    grid.append(line('Assiette (β / γ)', d.beta == null ? '—'
       : `${Math.round(d.beta)}° / ${Math.round(d.gamma ?? 0)}°`));
+    grid.append(line('Correction d’assiette', `${d.tiltFix > 0 ? '+' : ''}${(d.tiltFix ?? 0).toFixed(1)}°`));
+    grid.append(line('Accord des axes', `${Math.round((d.axisQuality ?? 1) * 100)} %`));
 
     help.textContent =
       !d.supported ? 'Cet appareil n’expose pas d’orientation : le cap restera la route fond GPS.'
@@ -546,7 +577,7 @@ function kv(label, value) {
 const senseLabel = (s) => (s === 'flood' ? 'Montant (flot)' : s === 'ebb' ? 'Descendant (jusant)' : 'Étale');
 
 const qualityLabel = (q) =>
-  ({ good: 'stable', fair: 'moyen', poor: 'bruité', bad: 'à plat !', stale: 'figé' }[q] || q);
+  ({ good: 'stable', fair: 'moyen', poor: 'bruité', bad: 'pose ambiguë', stale: 'figé' }[q] || q);
 
 function coefClass(c) {
   if (c >= 95) return 'c-red';

@@ -39,6 +39,86 @@ const history = [];
 const HISTORY = 12;
 
 /* --------------------------------------------------------------------------
+ * Compensation d'inclinaison
+ *
+ * `alpha` n'est un cap que si le téléphone est POSÉ À PLAT. Dès qu'on le
+ * redresse — c'est-à-dire dès qu'on le tient pour le lire — la décomposition
+ * d'Euler du W3C (Z-X'-Y'') se dégrade, et à la verticale elle se bloque :
+ * alpha et gamma décrivent alors la même rotation. Le cap réel dépend de leur
+ * SOMME, pas d'alpha seul. Conséquence mesurée : téléphone redressé et roulé
+ * de 20° au poignet, « 360 − alpha » se trompe de 20°, et le moindre
+ * mouvement de main fait sauter la valeur d'un bloc.
+ *
+ * Un compas de bord ne peut pas exiger qu'on pose le téléphone à plat sur le
+ * banc pour lire un cap. On repasse donc par la matrice de rotation complète,
+ * et on lit la direction sur l'axe le mieux placé :
+ *
+ *   téléphone à plat      l'axe utile est le HAUT de l'appareil
+ *   téléphone redressé    l'axe utile est le DOS — la direction du regard
+ *
+ * Les deux coïncident quand le téléphone n'est pas roulé ; entre les deux on
+ * fond progressivement, pondéré par cos²β, sans discontinuité. Aucun des deux
+ * axes n'est jamais dégénéré en même temps que l'autre : leur somme des carrés
+ * de projection horizontale vaut au minimum 1.
+ * ------------------------------------------------------------------------ */
+const DEG = Math.PI / 180;
+
+/**
+ * Cap tenu par l'appareil, compensé de l'inclinaison, exprimé dans le
+ * référentiel angulaire d'`alpha` (absolu si alpha l'est, relatif sinon).
+ *
+ * @returns {{deg:number, quality:number}|null} quality ∈ [0,1] : accord entre
+ *   les deux axes. Bas = pose ambiguë, la valeur reste utilisable mais floue.
+ */
+export function headingFromEuler(alpha, beta, gamma) {
+  if (![alpha, beta, gamma].every(Number.isFinite)) return null;
+  const a = alpha * DEG;
+  const b = beta * DEG;
+  const g = gamma * DEG;
+  const ca = Math.cos(a);
+  const sa = Math.sin(a);
+  const cb = Math.cos(b);
+  const sb = Math.sin(b);
+  const cg = Math.cos(g);
+  const sg = Math.sin(g);
+
+  // Colonnes de R = Rz(α)·Rx(β)·Ry(γ), repère terrestre X=Est, Y=Nord, Z=Haut.
+  const topX = -sa * cb; // axe +Y appareil : le haut de l'écran
+  const topY = ca * cb;
+  const backX = -(ca * sg + sa * sb * cg); // axe −Z appareil : le dos
+  const backY = -(sa * sg - ca * sb * cg);
+
+  const nTop = Math.hypot(topX, topY); // vaut exactement |cos β|
+  const nBack = Math.hypot(backX, backY);
+
+  // Bascule d'axe : c'est l'ÉCRAN qui décide, pas l'inclinaison.
+  //
+  // Pondérer par l'assiette du téléphone (cos²β) semble naturel et se trompe
+  // deux fois. Trop tôt, on injecte l'axe du dos dans une pose à plat qui était
+  // exacte — 13° d'erreur gagnés sur le tableau de bord, la pose de référence.
+  // Et le critère lui-même est faux : une torsion du poignet fait chuter β sans
+  // que le téléphone cesse d'être tenu debout devant les yeux.
+  //
+  // La bonne question n'est pas « à quel point est-il penché » mais « l'écran
+  // regarde-t-il le ciel ou l'utilisateur ». C'est la composante verticale de
+  // l'axe perpendiculaire à l'écran, soit cos β · cos γ : elle vaut 1 quand
+  // l'appareil est posé à plat, 0 quand il est tenu droit — quelle que soit la
+  // torsion. Fondu lissé entre les deux, dérivée nulle aux bornes : pas de saut
+  // d'aiguille au passage.
+  const screenUp = Math.abs(cb * cg);
+  const t = Math.max(0, Math.min(1, (screenUp - 0.26) / (0.55 - 0.26)));
+  const w = t * t * (3 - 2 * t);
+
+  const x = (nTop > 1e-6 ? (w * topX) / nTop : 0) + (nBack > 1e-6 ? ((1 - w) * backX) / nBack : 0);
+  const y = (nTop > 1e-6 ? (w * topY) / nTop : 0) + (nBack > 1e-6 ? ((1 - w) * backY) / nBack : 0);
+
+  const norm = Math.hypot(x, y);
+  if (norm < 1e-6) return null;
+  // Cap horaire depuis le Nord : atan2(Est, Nord).
+  return { deg: norm360(Math.atan2(x, y) / DEG), quality: norm };
+}
+
+/* --------------------------------------------------------------------------
  * Lissage
  *
  * Une moyenne glissante sur N mesures retarde l'affichage d'environ (N−1)/2
@@ -223,13 +303,32 @@ const diag = {
   accuracy: null,
   beta: null,
   gamma: null,
+  alpha: null,
+  tiltFix: 0,
+  axisQuality: 1,
   permission: 'inconnue',
 };
 const rateWindow = [];
 
 function classify(e) {
+  const tilt = headingFromEuler(e.alpha, e.beta, e.gamma);
+
   if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-    return { rank: RANK_TRUE_COMPASS, magnetic: e.webkitCompassHeading, field: 'webkitCompassHeading' };
+    // iOS livre un cap magnétique déjà calibré, mais rapporté au haut de
+    // l'appareil : il souffre du même blocage de cardan dès qu'on redresse le
+    // téléphone. On lui applique la correction d'assiette — la DIFFÉRENCE
+    // entre l'axe mixte et l'axe du haut, mesurée dans le référentiel d'alpha.
+    // Comme c'est une différence, l'origine arbitraire d'alpha sur iOS
+    // s'annule, et à plat la correction est nulle : rien ne change pour qui
+    // pose son téléphone sur le banc.
+    const fix = tilt ? angleDiff(tilt.deg, norm360(-e.alpha)) : 0;
+    return {
+      rank: RANK_TRUE_COMPASS,
+      magnetic: norm360(e.webkitCompassHeading + fix),
+      field: fix ? 'webkitCompassHeading + assiette' : 'webkitCompassHeading',
+      tiltFix: fix,
+      quality: tilt?.quality ?? 1,
+    };
   }
   if (typeof e.alpha === 'number' && !Number.isNaN(e.alpha)) {
     // `absolute` vaut true, false, ou rien du tout. L'absence d'information
@@ -238,8 +337,10 @@ function classify(e) {
     const trusted = e.absolute === true || e.type === 'deviceorientationabsolute';
     return {
       rank: trusted ? RANK_ABSOLUTE_ALPHA : RANK_ARBITRARY,
-      magnetic: norm360(360 - e.alpha),
-      field: 'alpha',
+      magnetic: tilt ? tilt.deg : norm360(360 - e.alpha),
+      field: tilt ? 'alpha + assiette' : 'alpha',
+      tiltFix: tilt ? angleDiff(tilt.deg, norm360(-e.alpha)) : 0,
+      quality: tilt?.quality ?? 1,
     };
   }
   return null;
@@ -267,10 +368,12 @@ function onOrientation(e) {
   const magnetic = c.magnetic;
   const accuracy = typeof e.webkitCompassAccuracy === 'number' ? e.webkitCompassAccuracy : null;
 
-  // Compensation d'inclinaison : sur un téléphone tenu à plat, alpha suffit ;
-  // couché à plus de 60° du plan horizontal, la mesure part. On préfère
-  // signaler l'appareil « mal tenu » plutôt que d'afficher un cap faux.
-  const tilted = Math.abs(e.beta ?? 0) > 60 || Math.abs(e.gamma ?? 0) > 60;
+  // L'inclinaison étant désormais corrigée, la tenir en main n'est plus une
+  // faute : on ne signale que les poses où les deux axes de référence se
+  // contredisent vraiment — écran retourné, appareil sur la tranche à la
+  // verticale. Réclamer un téléphone posé à plat pour lire un cap était une
+  // exigence qu'aucun compas de bord ne peut poser.
+  const tilted = c.quality < 0.6;
 
   const now = Date.now();
 
@@ -288,6 +391,9 @@ function onOrientation(e) {
   diag.accuracy = accuracy;
   diag.beta = e.beta ?? null;
   diag.gamma = e.gamma ?? null;
+  diag.alpha = e.alpha ?? null;
+  diag.tiltFix = c.tiltFix ?? 0;
+  diag.axisQuality = c.quality ?? 1;
 
   const value = smooth(magnetic, now);
   lastSampleT = now;
