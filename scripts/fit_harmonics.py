@@ -147,7 +147,7 @@ def load_series() -> list[dict]:
             continue
         pts = [p for p in curve if isinstance(p.get("t"), (int, float))
                and isinstance(p.get("h"), (int, float))]
-        if len(pts) >= 50:
+        if len(pts) >= 20:
             n_ext = sum(1 for p in pts if p.get("x"))
             print(f"  → source : {os.path.basename(path)} ({len(pts)} points"
                   f"{f', dont {n_ext} PM/BM' if n_ext else ''})")
@@ -285,9 +285,14 @@ def main() -> int:
     # effectif. On exige surtout une DURÉE : c'est elle, pas le nombre de
     # points, qui décide de ce que l'ajustement peut séparer.
     span_days = (points[-1]["t"] - points[0]["t"]) / 86_400_000 if len(points) > 1 else 0
-    if len(points) < 60 or span_days < 5:
+    # Une première moisson de vignette, c'est ~27 PM/BM sur 7 jours. C'est peu
+    # pour 47 inconnues, mais c'est précisément ce que la régularisation de
+    # Tikhonov encaisse : sur 7 jours seule une poignée de constituants est
+    # résolue, les autres restent au prior. Et `trusted` reste faux sous
+    # 20 jours, donc l'app continue d'annoncer un modèle provisoire.
+    if len(points) < 20 or span_days < 3:
         print(f"  ✗ Pas assez de données : {len(points)} points sur "
-              f"{span_days:.1f} jours (minimum 60 points et 5 jours).", file=sys.stderr)
+              f"{span_days:.1f} jours (minimum 20 points et 3 jours).", file=sys.stderr)
         print("    L'archive s'allonge à chaque passage ; le fichier de "
               "constantes existant est conservé.", file=sys.stderr)
         return 0

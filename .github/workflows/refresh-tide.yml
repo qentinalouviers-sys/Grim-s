@@ -49,11 +49,16 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git diff --quiet -- data/; then
+          # `git diff` ne voit que les fichiers SUIVIS : au tout premier
+          # passage, data/tide-dieppe.json et data/tide-history.json viennent
+          # d'être créés et sont donc invisibles pour lui. On indexe d'abord,
+          # on compare ensuite — sinon la toute première moisson de marée
+          # n'est jamais committée, et le dépôt reste éternellement vide.
+          git add -A data/
+          if git diff --cached --quiet -- data/; then
             echo "Aucun changement de données."
             exit 0
           fi
-          git add data/
           span=$(python - <<'PY'
           import json, os
           p = 'data/harmonics-dieppe.json'
