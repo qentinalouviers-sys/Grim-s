@@ -92,17 +92,17 @@ async function boot() {
 async function startSensors(interactive) {
   dom.primeAudio();
 
-  // getCurrentPosition d'abord : sur iOS, attaquer directement par
-  // watchPosition laisse parfois trente secondes sans dialogue système.
-  const ok = await gps.prime();
-  gps.start();
-  if (!ok && interactive) {
-    dom.banner('Position refusée ou indisponible. Marée, courant et pêche restent calculés sur Dieppe.', 'warn', { id: 'nogps' });
-  }
-
-  // L'autorisation d'orientation se redemande à CHAQUE ouverture sur iOS : le
-  // navigateur mémorise la réponse, pas l'écoute. On la demande donc toujours,
-  // que l'utilisateur passe par le portail d'accueil ou non.
+  /* L'ORDRE EST CRITIQUE, et il était inversé.
+   *
+   * iOS n'accepte DeviceOrientationEvent.requestPermission() que dans la
+   * fenêtre ouverte par un geste utilisateur. Or on attendait d'abord une
+   * position GPS — jusqu'à douze secondes de délai, davantage sur un départ à
+   * froid au fond d'un bassin. Quand la demande d'orientation arrivait enfin,
+   * la fenêtre du geste était close depuis longtemps : iOS la rejetait sans un
+   * mot, et le compas restait mort tout le reste de la session.
+   *
+   * Les deux capteurs n'ont d'ailleurs rien à voir l'un avec l'autre. Les
+   * enchaîner ne servait à rien et coûtait le compas. */
   const res = await compass.requestPermission();
   if (res === 'denied') {
     dom.banner('Compas refusé. Le cap sera la route fond GPS, valable seulement en mouvement.', 'warn', { id: 'nocompass' });
@@ -115,6 +115,17 @@ async function startSensors(interactive) {
   // utilisateur pour porter la demande — et iOS la rejette silencieusement.
   // On la remet sur le premier toucher, et on le dit si le compas reste muet.
   watchCompassWakeUp();
+
+  // Position ensuite, et sans bloquer personne. getCurrentPosition avant
+  // watchPosition reste nécessaire — sur iOS, attaquer directement par
+  // watchPosition laisse parfois trente secondes sans dialogue système — mais
+  // cette attente n'a plus à retarder quoi que ce soit.
+  gps.prime().then((ok) => {
+    gps.start();
+    if (!ok && interactive) {
+      dom.banner('Position refusée ou indisponible. Marée, courant et pêche restent calculés sur Dieppe.', 'warn', { id: 'nogps' });
+    }
+  });
 
   requestWakeLock();
 }

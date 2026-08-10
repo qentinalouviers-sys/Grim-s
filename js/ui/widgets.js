@@ -91,6 +91,18 @@ export class Gauge extends Canvas {
   set(value, subtitle) {
     this.value = Number.isFinite(value) ? value : null;
     this.subtitle = subtitle;
+
+    // Échelle adaptative. Un cadran calé sur 12 nœuds convient à un bateau de
+    // pêche, et affiche une aiguille collée en butée dès que le téléphone
+    // voyage autrement — en voiture sur la route du port, par exemple. Le
+    // chiffre reste juste, mais le cadran ne veut plus rien dire. On monte
+    // d'un cran, jamais on ne redescend pendant la session : une échelle qui
+    // respire à chaque accélération est illisible.
+    if (this.value != null && this.opts.autoRange !== false) {
+      const steps = [this.opts.max, 30, 60, 120];
+      const need = steps.find((s) => this.value <= s * 0.98);
+      if (need && need > this.opts.max) this.opts.max = need;
+    }
     this.animate();
   }
 

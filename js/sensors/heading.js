@@ -12,11 +12,13 @@
  *    Chrome iOS expose l'API mais PAS requestPermission : on détecte et on
  *    bascule sur la route fond GPS plutôt que d'afficher un compas mort.
  *
- * 2. RÉFÉRENTIEL — Safari donne webkitCompassHeading, déjà en cap magnétique
- *    horaire. Le standard donne `alpha`, en degrés ANTIhoraires depuis l'est
- *    magnétique ou depuis une origine arbitraire selon `absolute`. Les deux
- *    conventions sont incompatibles : cap = 360 − alpha côté standard. Et les
- *    deux événements arrivent souvent ensemble, en se contredisant : on n'en
+ * 2. RÉFÉRENTIEL — Safari donne webkitCompassHeading : un cap magnétique déjà
+ *    calibré et déjà compensé de l'inclinaison par CoreLocation, identique à
+ *    celui de la Boussole d'Apple. On le prend tel quel, sans le retoucher.
+ *    Le standard donne `alpha`, premier angle d'une décomposition d'Euler qui
+ *    n'est un cap que si l'appareil est posé à plat : là, et là seulement, il
+ *    faut refaire le travail que la plateforme ne fait pas. Et les deux
+ *    événements arrivent souvent ensemble, en se contredisant : on n'en
  *    retient qu'un, le mieux référencé.
  *
  * 3. DÉCLINAISON — tout ce qui précède est magnétique. Les caps de carte,
@@ -314,20 +316,29 @@ function classify(e) {
   const tilt = headingFromEuler(e.alpha, e.beta, e.gamma);
 
   if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-    // iOS livre un cap magnétique déjà calibré, mais rapporté au haut de
-    // l'appareil : il souffre du même blocage de cardan dès qu'on redresse le
-    // téléphone. On lui applique la correction d'assiette — la DIFFÉRENCE
-    // entre l'axe mixte et l'axe du haut, mesurée dans le référentiel d'alpha.
-    // Comme c'est une différence, l'origine arbitraire d'alpha sur iOS
-    // s'annule, et à plat la correction est nulle : rien ne change pour qui
-    // pose son téléphone sur le banc.
-    const fix = tilt ? angleDiff(tilt.deg, norm360(-e.alpha)) : 0;
+    // ON N'Y TOUCHE PAS.
+    //
+    // `webkitCompassHeading` n'est pas un angle d'Euler : c'est la sortie de
+    // CoreLocation, calculée par iOS à partir du magnétomètre ET de l'attitude
+    // complète de l'appareil, déjà compensée de l'inclinaison et déjà
+    // calibrée. C'est exactement le nombre qu'affiche la Boussole d'Apple.
+    //
+    // J'ai cru qu'il souffrait du blocage de cardan du couple alpha/gamma et je
+    // lui ai appliqué ma propre correction d'assiette. Erreur : elle retranchait
+    // le roulis d'un cap qui en tenait déjà compte. Mesuré côte à côte —
+    // Boussole d'Apple 32°, l'app 018° — soit 14° d'écart, entièrement
+    // fabriqués par cette correction.
+    //
+    // La compensation d'assiette reste nécessaire là où la plateforme ne fait
+    // rien : la voie `alpha` d'Android, plus bas. Ici, la meilleure chose à
+    // faire est de faire confiance au système, qui a le magnétomètre brut et
+    // la centrale inertielle que nous n'avons pas.
     return {
       rank: RANK_TRUE_COMPASS,
-      magnetic: norm360(e.webkitCompassHeading + fix),
-      field: fix ? 'webkitCompassHeading + assiette' : 'webkitCompassHeading',
-      tiltFix: fix,
-      quality: tilt?.quality ?? 1,
+      magnetic: e.webkitCompassHeading,
+      field: 'webkitCompassHeading (iOS)',
+      tiltFix: 0,
+      quality: 1,
     };
   }
   if (typeof e.alpha === 'number' && !Number.isNaN(e.alpha)) {
