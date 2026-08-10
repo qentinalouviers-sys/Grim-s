@@ -394,8 +394,22 @@ canvas { display: block; max-width: 100%; }
 }
 .map-overlay > * { pointer-events: auto; }
 .map-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
-.map-bottom { bottom: 8px; left: 8px; right: 8px; }
-.map-right { top: 54px; right: 8px; display: flex; flex-direction: column; gap: 6px; }
+.map-bottom {
+  bottom: 8px; left: 8px;
+  /* Dégagement pour le bouton de prise, qui vit dans le coin bas-droit :
+     sans ça il recouvrait les actions du panneau. */
+  right: 84px;
+}
+.map-right {
+  top: 54px; right: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  /* La colonne peut devenir plus haute que l'écran sur un petit téléphone :
+     elle défile plutôt que de disparaître sous le panneau. */
+  max-height: calc(100% - 210px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.map-right::-webkit-scrollbar { display: none; }
 .map-btn {
   width: 44px; height: 44px;
   display: grid; place-items: center;
@@ -410,9 +424,20 @@ canvas { display: block; max-width: 100%; }
   background: rgba(8,16,27,.94);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 10px 12px;
+  padding: 9px 11px;
   backdrop-filter: blur(12px);
 }
+/* Relevé de dérive : deux lignes maximum. Le panneau flotte au-dessus de la
+   carte, et c'est la carte qu'on est venu voir — il ne doit jamais en manger
+   plus du quart. */
+.map-readout {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  max-height: 2.7em;
+  overflow: hidden;
+}
+.map-bottom .seg button { padding: 6px 4px; font-size: 12px; }
 .leaflet-container { background: #0a1421 !important; font-family: var(--font) !important; }
 .leaflet-control-attribution {
   background: rgba(5,11,20,.75) !important;

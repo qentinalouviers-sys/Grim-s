@@ -31,8 +31,14 @@ import * as idb from '../core/idb.js';
 import * as learning from '../fishing/learning.js';
 import * as record from '../fishing/record.js';
 
-const LEAFLET_CSS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-const LEAFLET_JS = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+// Leaflet est EMBARQUÉ, pas en CDN. Le CDN condamnait ce mode au premier
+// lancement hors ligne : tant que le moteur n'avait pas été téléchargé une
+// fois, l'écran affichait « carte indisponible ». Pour une app dont la règle
+// est « le réseau est une option, jamais une dépendance », c'était le seul
+// écran qui trahissait le principe. 42 ko gzippés, et la carte s'ouvre dès la
+// première fois, en mode avion.
+const LEAFLET_CSS = 'vendor/leaflet/leaflet.css';
+const LEAFLET_JS = 'vendor/leaflet/leaflet.js';
 
 let L = null;
 let map = null;
@@ -54,9 +60,9 @@ let ui = {
 /* ==========================================================================
  * Chargement de Leaflet
  * --------------------------------------------------------------------------
- * En CDN, mais précaché par le service worker : au deuxième lancement il ne
- * part plus sur le réseau. Si le tout premier chargement se fait hors ligne,
- * on le dit clairement au lieu d'afficher un cadre vide.
+ * Fichier local, précaché par le service worker avec le reste de la coque.
+ * L'échec ne devrait plus survenir ; le repli reste en place au cas où le
+ * cache serait purgé pendant que l'appareil est hors ligne.
  * ========================================================================== */
 function loadLeaflet() {
   if (window.L) return Promise.resolve(window.L);
@@ -164,6 +170,10 @@ export async function mount(container) {
   layers.catches = L.layerGroup().addTo(map);
   layers.boat = L.layerGroup().addTo(map);
 
+  // Référence de débogage : permet d'inspecter les couches depuis la console
+  // ou un test de bout en bout. Aucun code applicatif ne l'utilise.
+  window.__map = map;
+
   buildOverlay();
   drawSpots();
   drawCatches();
@@ -234,7 +244,7 @@ function offlineNotice() {
   const box = el('div', 'card');
   box.style.margin = '16px';
   box.append(el('h3', 'list-title', 'Carte indisponible hors ligne'));
-  box.append(el('p', 'muted', "Le moteur de carte n'a pas encore été téléchargé. Connecte-toi une fois — même deux secondes — et il sera ensuite gardé en cache avec les tuiles."));
+  box.append(el('p', 'muted', "Le moteur de carte n'a pas pu être chargé depuis le cache de l'application. Recharge la page ; si le problème persiste, réinstalle l'app depuis l'écran d'accueil."));
   box.append(button('Réessayer', 'btn-primary', () => mount(root)));
   return box;
 }
@@ -277,7 +287,10 @@ function buildOverlay() {
   }, 'Mes prises');
   refs.btnMark = mapBtn('📍', markHere, 'Marquer la position');
   refs.btnDl = mapBtn('⤓', downloadZone, 'Précharger la zone');
-  right.append(refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch, refs.btnMark, refs.btnDl);
+  refs.btnDrift = mapBtn('⏱', recordDrift, 'Relever une dérive');
+  refs.btnGpx = mapBtn('📤', exportGPX, 'Exporter en GPX');
+  right.append(refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch,
+               refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
   refs.btnSea.classList.add('on');
   refs.btnCatch.classList.add('on');
   refs.btnFollow.classList.add('on');
@@ -318,18 +331,17 @@ function buildOverlay() {
   row.append(el('span', 'tiny', 'Durée'), slider, refs.durLbl);
   panel.append(row);
 
-  refs.driftInfo = el('div', 'tiny');
-  refs.driftInfo.style.marginTop = '6px';
+  // Le panneau est volontairement bas : il flotte AU-DESSUS de la carte, et
+  // c'est la carte qu'on est venu voir. Le relevé tient en deux lignes, les
+  // actions sont montées dans la colonne d'icônes, et l'avertissement de
+  // calibration devient une pastille au lieu de deux lignes de texte.
+  refs.driftInfo = el('div', 'tiny map-readout');
   refs.driftInfo.style.whiteSpace = 'pre-line';
   panel.append(refs.driftInfo);
 
-  const acts = el('div', 'btn-row');
-  acts.style.marginTop = '8px';
-  acts.append(
-    button('⏱ Relever', 'btn-sm', recordDrift),
-    button('📤 GPX', 'btn-sm', exportGPX),
-  );
-  panel.append(acts);
+  refs.driftWarn = el('span', 'chip warn');
+  refs.driftWarn.style.marginTop = '5px';
+  panel.append(refs.driftWarn);
 
   bottom.append(panel);
   root.append(bottom);
@@ -481,9 +493,11 @@ function drawDrift() {
     track = res.track;
     const d = distance(origin, res.drop);
     const b = bearing(origin, res.drop);
+    // Deux lignes, pas trois : le relevé est plafonné en hauteur pour ne pas
+    // manger la carte, et une phrase coupée au milieu ne sert à personne.
     head =
-      `Largage à ${fmt.hhmm(res.startT)} sur ${fmt.latDDM(res.drop.lat)} ${fmt.lonDDM(res.drop.lon)}\n` +
-      `${fmt.dist(d)} au ${fmt.heading(b)} depuis ta position · survol de la cible à ${fmt.hhmm(arriveT)}`;
+      `Largage ${fmt.hhmm(res.startT)} · ${fmt.dist(d)} au ${fmt.heading(b)}\n` +
+      `${fmt.latDDM(res.drop.lat)} ${fmt.lonDDM(res.drop.lon)} · cible à ${fmt.hhmm(arriveT)}`;
 
     L.marker([res.drop.lat, res.drop.lon], {
       icon: L.divIcon({ className: '', html: '<div style="font-size:20px">⤵️</div>', iconSize: [20, 20] }),
@@ -497,8 +511,8 @@ function drawDrift() {
     const end = track.points.at(-1);
     head =
       `Dérive ${fmt.num(track.meanVec.spd, 1)} nd au ${fmt.heading(track.meanVec.dir)} (${fmt.cardinal(track.meanVec.dir)})\n` +
-      `${fmt.dist(track.distanceM)} en ${ui.driftMin} min · incertitude ±${Math.round(track.spreadM)} m` +
-      (end ? `\nArrivée ${fmt.hhmm(end.t)}` : '');
+      `${fmt.dist(track.distanceM)} en ${ui.driftMin} min · ±${Math.round(track.spreadM)} m` +
+      (end ? ` · arrivée ${fmt.hhmm(end.t)}` : '');
   }
 
   // Cône d'incertitude
@@ -523,8 +537,11 @@ function drawDrift() {
   });
 
   const cfg = stream.config();
-  refs.driftInfo.textContent =
-    head + (cfg.calibrated ? '' : '\n⚠︎ Modèle non calibré : relève des dérives moteur coupé pour l’ajuster.');
+  refs.driftInfo.textContent = head;
+  refs.driftWarn.textContent = cfg.calibrated
+    ? `modèle calibré · ${cfg.observations} relevés`
+    : '⚠︎ modèle non calibré — bouton ⏱';
+  refs.driftWarn.className = `chip ${cfg.calibrated ? 'good' : 'warn'}`;
   updateReadout();
 }
 

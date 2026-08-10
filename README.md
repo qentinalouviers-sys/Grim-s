@@ -20,7 +20,7 @@ l'architecture : **le réseau est une option, jamais une dépendance.**
 | Soleil, lune, crépuscules | ✅ toujours | éphémérides calculées à bord |
 | Scoring pêche, plan de sortie | ✅ toujours | moteur local, aucun appel distant |
 | Position, cap, état de la mer | ✅ toujours | capteurs du téléphone |
-| Carte | ✅ si préchargée | tuiles en IndexedDB, bouton « ⤓ » |
+| Carte | ✅ moteur toujours, tuiles si préchargées | Leaflet embarqué dans le dépôt, tuiles en IndexedDB (bouton « ⤓ ») |
 | Vent, houle, pression, T° eau | ⚠️ dernière valeur connue | Open-Meteo, avec l'âge affiché |
 
 Une seule donnée se dégrade hors ligne, et l'app dit toujours de quand elle
@@ -46,6 +46,12 @@ barre d'état — un seul appui, sans confirmation, position figée et alarme.
 ### 🗺️ CARTE
 OpenStreetMap + **balisage maritime OpenSeaMap**, tuiles mises en cache
 localement et préchargeables par zone.
+
+Leaflet est **embarqué dans le dépôt** (`vendor/leaflet/`, 42 ko gzippés), pas
+chargé depuis un CDN. C'était le dernier écran qui trahissait la règle « le
+réseau est une option » : tant que le moteur n'avait pas été téléchargé une
+fois, le mode CARTE affichait « indisponible hors ligne ». Il s'ouvre
+maintenant dès la première fois, en mode avion.
 
 La **dérive prédictive**, dans les deux sens :
 
@@ -272,6 +278,8 @@ index.html                  coque SPA
 manifest.webmanifest        PWA
 sw.js                       service worker — coque, données, Leaflet
 css/app.css                 thème sombre maritime + mode nuit rouge
+vendor/
+  leaflet/    Leaflet 1.9.4, embarqué (BSD-2-Clause) — pas de CDN
 js/
   core/       geo, formatage marin, store réactif, IndexedDB, réseau tolérant
   data/       astro, harmoniques, marée, météo, courant & dérive
@@ -371,7 +379,7 @@ Toutes gratuites, sans clé ni inscription.
 - **SHOM** — vignette de marée officielle de Dieppe (pleines et basses mers, heures légales, coefficients)
 - **Open-Meteo Forecast** — vent, rafales, pression, visibilité, nébulosité
 - **Open-Meteo Marine** — houle, mer du vent, température de surface, courant résiduel
-- **OpenStreetMap** — fond de carte
+- **OpenStreetMap** — fond de carte (moteur Leaflet embarqué, BSD-2-Clause)
 - **OpenSeaMap** — balisage maritime
 - Soleil et lune : calculés localement (NOAA / série lunaire tronquée)
 

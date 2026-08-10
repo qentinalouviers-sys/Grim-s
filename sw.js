@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.1.0';
+const VERSION = 'v1.2.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -57,6 +57,13 @@ const SHELL_FILES = [
   'js/views/map.js',
   'js/views/fish.js',
   'js/views/log.js',
+  'vendor/leaflet/leaflet.js',
+  'vendor/leaflet/leaflet.css',
+  'vendor/leaflet/images/marker-icon.png',
+  'vendor/leaflet/images/marker-icon-2x.png',
+  'vendor/leaflet/images/marker-shadow.png',
+  'vendor/leaflet/images/layers.png',
+  'vendor/leaflet/images/layers-2x.png',
   'assets/icon.svg',
   'assets/icon-180.png',
   'assets/icon-192.png',
@@ -65,10 +72,10 @@ const SHELL_FILES = [
 
 const DATA_FILES = ['data/harmonics-dieppe.json', 'data/zones-dieppe.json', 'data/tide-dieppe.json'];
 
-const VENDOR_FILES = [
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-];
+// Leaflet est désormais dans le dépôt : il fait partie de la coque, précaché
+// avec elle. Plus de dépendance CDN, donc plus de mode CARTE inutilisable au
+// premier lancement hors ligne.
+const VENDOR_FILES = [];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
