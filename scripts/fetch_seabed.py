@@ -67,12 +67,22 @@ ENDPOINTS = [
 ]
 
 # Mots qui trahissent une couche de substrat, et leur poids.
+#
+# EUSeaMap passe devant « substrate » : le premier essai est tombé sur
+# `biogenic_substrate_poly`, qui cartographie les récifs biogéniques — quatre
+# polygones de Sabellaires — et non le sédiment. Le mot « substrat » ne suffit
+# donc pas à désigner ce qu'on cherche.
 LAYER_HINTS = [
-    ("seabed_substrate", 10), ("substrate", 8), ("folk", 7),
-    ("euseamap", 6), ("sediment", 5), ("habitat", 2),
+    ("seabed_substrate", 12), ("eusm", 11), ("euseamap", 11),
+    ("folk", 9), ("substrate", 6), ("sediment", 6), ("habitat", 2),
 ]
-# Une couche à l'échelle du 1:1 000 000 existe aussi : on préfère la plus fine.
-SCALE_BONUS = [("250", 4), ("100k", 3), ("1m", -3), ("1000k", -3)]
+# Une couche au 1:1 000 000 existe aussi : on préfère la plus fine. Et tout ce
+# qui est ponctuel, échantillonné ou biogénique n'est pas une carte de fond.
+SCALE_BONUS = [
+    ("250", 4), ("100k", 3), ("1m", -3), ("1000k", -3),
+    ("biogenic", -12), ("point", -10), ("bbox", -10), ("sample", -8),
+    ("survey", -6), ("boundar", -6), ("model_confidence", -8), ("uk", -2),
+]
 
 # Attributs candidats portant la classe de substrat.
 ATTR_HINTS = ["folk_5cl", "folk_5", "substrate", "seabed_sub", "folk", "eunis", "classific", "descript"]
@@ -305,38 +315,46 @@ def main() -> int:
     used_endpoint = used_layer = None
     seen: dict[str, list[str]] = {}
 
+    attribute = None
     for endpoint in ENDPOINTS:
         log(f"→ {endpoint}")
         layers = list_layers(endpoint)
         if not layers:
             continue
-        seen[endpoint] = layers[:40]
+        seen[endpoint] = layers
         ranked = sorted(((score_layer(n), n) for n in layers), reverse=True)
-        log(f"{len(layers)} couches, meilleures : {[n for s, n in ranked[:5] if s > 0]}")
-        for score, name in ranked[:5]:
+        log(f"{len(layers)} couches, meilleures : {[n for s, n in ranked[:6] if s > 0]}")
+
+        # Une couche qui répond mais ne porte pas d'attribut de substrat n'est
+        # pas la bonne : on passe à la suivante au lieu d'abandonner. C'est ce
+        # qui manquait au premier passage — il s'est arrêté sur des récifs
+        # biogéniques et n'a jamais regardé EUSeaMap.
+        for score, name in ranked[:12]:
             if score <= 0:
                 break
             log(f"essai « {name} » (score {score})")
             data = get_features(endpoint, name)
-            if data and data.get("features"):
-                features = data["features"]
-                used_endpoint, used_layer = endpoint, name
-                break
+            feats = (data or {}).get("features") or []
+            if not feats:
+                continue
+            attr = pick_attribute(feats)
+            if not attr:
+                log(f"  → pas d'attribut de substrat : {list((feats[0].get('properties') or {}).keys())}")
+                continue
+            features, attribute = feats, attr
+            used_endpoint, used_layer = endpoint, name
+            break
         if features:
             break
 
-    if not features:
+    if not features or not attribute:
         log("aucune couche exploitable — l'app continue sans nature des fonds.")
         log("couches vues, pour affiner le script :")
         for ep, names in seen.items():
-            log(f"  {ep} : {names}")
+            for n in names:
+                log(f"  {ep} :: {n}")
         return 0
 
-    attribute = pick_attribute(features)
-    if not attribute:
-        sample = list((features[0].get("properties") or {}).keys())
-        log(f"aucun attribut de substrat reconnu. Attributs disponibles : {sample}")
-        return 0
     log(f"attribut retenu : {attribute}")
 
     grid, labels, rows, cols = rasterise(features, attribute)
