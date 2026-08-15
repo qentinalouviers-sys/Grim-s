@@ -76,6 +76,16 @@ function decode(spec) {
 export const ready = () => !!model;
 export const meta = () => model?.meta || null;
 
+/**
+ * La grille décodée, pour qui doit la DESSINER.
+ *
+ * at() répond point par point, ce qui est parfait pour scorer un poste et
+ * catastrophique pour peindre un écran : la couche de rendu parcourt les
+ * cases, pas les pixels. On expose donc le modèle en lecture — les champs
+ * sont les mêmes qu'en interne, et personne d'autre n'a à les connaître.
+ */
+export const grid = () => model;
+
 /** Toutes les natures de fond connues du secteur, pour une légende. */
 export const classes = () => (model ? model.classes.slice(1) : []);
 

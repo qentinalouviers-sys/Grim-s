@@ -34,6 +34,7 @@ import * as gps from '../sensors/gps.js';
 import * as idb from '../core/idb.js';
 import * as learning from '../fishing/learning.js';
 import * as seabed from '../data/seabed.js';
+import * as seabedLayer from '../ui/seabedlayer.js';
 import * as record from '../fishing/record.js';
 
 // Leaflet est EMBARQUÉ, pas en CDN. Le CDN condamnait ce mode au premier
@@ -59,6 +60,9 @@ let ui = {
   seamarks: true,
   vectors: false,
   catches: true,
+  // Éteinte au départ : la nature des fonds est une couche de TRAVAIL, on
+  // l'allume quand on cherche un poste, pas quand on rentre au port de nuit.
+  seabed: false,
   driftMin: 40,
   target: null,   // cible de dérive inverse
   mode: 'forward',
@@ -290,6 +294,10 @@ function buildOverlay() {
      que le serveur ne connaît pas la route. */
   refs.fleetChip = el('div');
   top.append(refs.fleetChip);
+  /* Légende des fonds, sous le relevé : une couche de couleurs sans légende
+     est une couche décorative. Elle n'apparaît qu'avec la couche. */
+  refs.groundLegend = el('div');
+  top.append(refs.groundLegend);
   root.append(top);
   paintFleetChip();
 
@@ -302,6 +310,19 @@ function buildOverlay() {
     ui.seamarks ? layers.sea.addTo(map) : map.removeLayer(layers.sea);
     refs.btnSea.classList.toggle('on', ui.seamarks);
   }, 'Balisage maritime');
+  refs.btnGround = mapBtn('🪨', () => {
+    ui.seabed = !ui.seabed;
+    if (ui.seabed) {
+      if (!layers.seabed) layers.seabed = seabedLayer.create(L);
+      layers.seabed.addTo(map);
+      if (!seabed.ready()) toast('Carte des fonds non chargée', 'warn');
+      else if (map.getZoom() < 10) toast('Zoome pour voir les fonds', 'warn');
+    } else if (layers.seabed) {
+      map.removeLayer(layers.seabed);
+    }
+    refs.btnGround.classList.toggle('on', ui.seabed);
+    paintGroundLegend();
+  }, 'Nature des fonds');
   refs.btnVec = mapBtn('↗', () => {
     ui.vectors = !ui.vectors;
     if (ui.vectors) {
@@ -322,8 +343,8 @@ function buildOverlay() {
   refs.btnDl = mapBtn('⤓', downloadZone, 'Précharger la zone');
   refs.btnDrift = mapBtn('⏱', recordDrift, 'Relever une dérive');
   refs.btnGpx = mapBtn('📤', exportGPX, 'Exporter en GPX');
-  right.append(refs.btnNav, refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch,
-               refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
+  right.append(refs.btnNav, refs.btnFollow, refs.btnSea, refs.btnGround, refs.btnVec,
+               refs.btnCatch, refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
   refs.btnNav.classList.toggle('on', !!state.nav);
   refs.btnSea.classList.add('on');
   refs.btnCatch.classList.add('on');
@@ -1296,6 +1317,15 @@ function paintFleetChip() {
   if (!presence.serverAvailable()) return;   // pas de serveur, pas de pastille
   const chip = fleet.statusChip();
   if (chip) refs.fleetChip.append(chip);
+}
+
+function paintGroundLegend() {
+  if (!refs.groundLegend) return;
+  clear(refs.groundLegend);
+  if (!ui.seabed || !seabed.ready()) return;
+  const card = el('div', 'map-panel');
+  card.append(seabedLayer.legend());
+  refs.groundLegend.append(card);
 }
 
 /* Rafraîchit les marques quand elles changent ailleurs (import GPX, journal). */
