@@ -218,25 +218,35 @@ def rings_of(geom: dict) -> list[list[list[float]]]:
     return []
 
 
-def point_in_rings(x: float, y: float, rings: list) -> bool:
-    """Lancer de rayon, règle pair-impair : un point dans un trou est dehors,
-    ce qui est exactement la sémantique GeoJSON."""
-    inside = False
+def edges_of(rings: list) -> list[tuple[float, float, float, float]]:
+    """Arêtes non horizontales, sous forme (y_bas, y_haut, x_au_y_bas, pente)."""
+    out = []
     for ring in rings:
         n = len(ring)
-        j = n - 1
         for i in range(n):
-            xi, yi = ring[i][0], ring[i][1]
-            xj, yj = ring[j][0], ring[j][1]
-            if (yi > y) != (yj > y):
-                denom = yj - yi
-                if denom and x < xi + (y - yi) * (xj - xi) / denom:
-                    inside = not inside
-            j = i
-    return inside
+            x1, y1 = ring[i][0], ring[i][1]
+            x2, y2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+            if y1 == y2:
+                continue          # une arête horizontale ne coupe aucune ligne
+            if y1 < y2:
+                out.append((y1, y2, x1, (x2 - x1) / (y2 - y1)))
+            else:
+                out.append((y2, y1, x2, (x1 - x2) / (y1 - y2)))
+    return out
 
 
 def rasterise(features: list[dict], attribute: str) -> tuple[list[int], list[str], int, int]:
+    """
+    Balayage par lignes, et c'est le seul choix tenable.
+
+    La version naïve — tester chaque cellule contre chaque contour — coûte
+    « cellules × sommets ». Les polygones d'EUSeaMap comptent des milliers de
+    sommets chacun : le premier passage réel tournait encore au bout de dix
+    minutes. Ici, pour chaque ligne de la grille on calcule UNE fois les
+    intersections des arêtes, on les trie, et on remplit les intervalles entre
+    elles deux à deux (règle pair-impair, qui rend les trous du GeoJSON
+    gratuitement). Le coût retombe à « lignes × sommets ».
+    """
     rows = int(round((NORTH - SOUTH) / DLAT))
     cols = int(round((EAST - WEST) / DLON))
     grid = [0] * (rows * cols)          # 0 = inconnu
@@ -253,27 +263,31 @@ def rasterise(features: list[dict], attribute: str) -> tuple[list[int], list[str
             index[label] = len(labels)   # 1-based, 0 reste « inconnu »
         cls = index[label]
 
-        geom = f.get("geometry") or {}
-        rings = rings_of(geom)
+        rings = rings_of(f.get("geometry") or {})
         if not rings:
             continue
-        xs = [p[0] for ring in rings for p in ring]
-        ys = [p[1] for ring in rings for p in ring]
-        # On ne teste que les cellules de l'emprise du polygone : sans ça le
-        # coût serait le produit du nombre de polygones par celui des cellules.
-        i0 = max(0, int((min(ys) - SOUTH) / DLAT))
-        i1 = min(rows - 1, int((max(ys) - SOUTH) / DLAT) + 1)
-        j0 = max(0, int((min(xs) - WEST) / DLON))
-        j1 = min(cols - 1, int((max(xs) - WEST) / DLON) + 1)
+        edges = edges_of(rings)
+        if not edges:
+            continue
+
+        ymin = min(e[0] for e in edges)
+        ymax = max(e[1] for e in edges)
+        i0 = max(0, int((ymin - SOUTH) / DLAT))
+        i1 = min(rows - 1, int((ymax - SOUTH) / DLAT) + 1)
+
         for i in range(i0, i1 + 1):
             y = SOUTH + (i + 0.5) * DLAT
+            xs = [x0 + (y - y0) * slope for y0, y1, x0, slope in edges if y0 <= y < y1]
+            if len(xs) < 2:
+                continue
+            xs.sort()
             base = i * cols
-            for j in range(j0, j1 + 1):
-                if grid[base + j]:
-                    continue
-                x = WEST + (j + 0.5) * DLON
-                if point_in_rings(x, y, rings):
-                    grid[base + j] = cls
+            for k in range(0, len(xs) - 1, 2):
+                ja = max(0, int(-(-((xs[k] - WEST) / DLON - 0.5) // 1)))      # ceil
+                jb = min(cols - 1, int((xs[k + 1] - WEST) / DLON - 0.5))      # floor
+                for j in range(ja, jb + 1):
+                    if not grid[base + j]:
+                        grid[base + j] = cls
     return grid, labels, rows, cols
 
 
