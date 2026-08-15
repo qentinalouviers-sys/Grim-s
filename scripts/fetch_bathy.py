@@ -152,19 +152,36 @@ def supported_formats(endpoint: str, coverage: str) -> list[str]:
 TILE_MAX = 320
 
 
-def one_request(endpoint: str, coverage: str, fmt: str, box, w: int, h: int):
-    params = {
-        "service": "WCS",
-        "version": "1.0.0",
-        "request": "GetCoverage",
-        "coverage": coverage,
-        "crs": "EPSG:4326",
-        "bbox": f"{box[0]},{box[1]},{box[2]},{box[3]}",
-        "width": str(w),
-        "height": str(h),
-        "format": fmt,
-    }
-    raw = get(f"{endpoint}?{urllib.parse.urlencode(params)}")
+def one_request(endpoint: str, coverage: str, fmt: str, box, w: int, h: int,
+                version: str = "1.0.0"):
+    if version.startswith("2"):
+        # En WCS 2.0 le découpage se déclare par sous-ensembles nommés, et
+        # GeoServer y sert la donnée brute là où la 1.0.0 applique volontiers
+        # le style d'affichage de la couche.
+        params = {
+            "service": "WCS",
+            "version": "2.0.1",
+            "request": "GetCoverage",
+            "coverageId": coverage,
+            "format": fmt,
+            "subset": f"Lat({box[1]},{box[3]})",
+        }
+        qs = urllib.parse.urlencode(params) + "&" + urllib.parse.urlencode(
+            {"subset": f"Long({box[0]},{box[2]})"})
+        raw = get(f"{endpoint}?{qs}")
+    else:
+        params = {
+            "service": "WCS",
+            "version": "1.0.0",
+            "request": "GetCoverage",
+            "coverage": coverage,
+            "crs": "EPSG:4326",
+            "bbox": f"{box[0]},{box[1]},{box[2]},{box[3]}",
+            "width": str(w),
+            "height": str(h),
+            "format": fmt,
+        }
+        raw = get(f"{endpoint}?{urllib.parse.urlencode(params)}")
     if raw[:2] in (b"II", b"MM"):
         return "tiff", raw
     txt = raw.decode("utf-8", "replace")
@@ -196,10 +213,11 @@ def fetch_grid(endpoint: str, coverage: str):
     nx = (cols + TILE_MAX - 1) // TILE_MAX
     ny = (rows + TILE_MAX - 1) // TILE_MAX
 
-    for fmt in order:
+    attempts = [(f, v) for f in order for v in ("1.0.0", "2.0.1")]
+    for fmt, version in attempts:
         grid: list[list[float | None]] = [[None] * cols for _ in range(rows)]
         ok = True
-        log(f"    {cols}×{rows} en {fmt}, {nx}×{ny} tuiles …")
+        log(f"    {cols}×{rows} en {fmt} (WCS {version}), {nx}×{ny} tuiles …")
         for ty in range(ny):
             for tx in range(nx):
                 # Les bornes sont calculées EN CASES puis converties, jamais
@@ -216,7 +234,7 @@ def fetch_grid(endpoint: str, coverage: str):
                 south = NORTH - r1 * FINE
                 try:
                     kind, payload = one_request(endpoint, coverage, fmt,
-                                                (west, south, east, north), w, h)
+                                                (west, south, east, north), w, h, version)
                 except Exception as e:                          # noqa: BLE001
                     log(f"      ✗ tuile {tx},{ty} : {e}")
                     ok = False
@@ -230,9 +248,17 @@ def fetch_grid(endpoint: str, coverage: str):
                 else:
                     sw, sh, sub = read_tiff(payload)
                     if (sw, sh) != (w, h):
-                        log(f"      ✗ tuile {tx},{ty} : {sw}×{sh} au lieu de {w}×{h}")
-                        ok = False
-                        break
+                        # En WCS 2.0 c'est le service qui décide de la taille :
+                        # tant que l'écart reste marginal on recadre, au-delà
+                        # c'est que le découpage n'a pas été compris.
+                        if abs(sw - w) > 2 or abs(sh - h) > 2:
+                            log(f"      ✗ tuile {tx},{ty} : {sw}×{sh} au lieu de {w}×{h}")
+                            ok = False
+                            break
+                        sub = [row[:w] for row in sub[:h]]
+                        while len(sub) < h:
+                            sub.append([None] * w)
+                        sub = [(r + [None] * w)[:w] for r in sub]
                 for r in range(h):
                     grid[r0 + r][c0:c1] = sub[r][:w]
             if not ok:
@@ -351,8 +377,16 @@ def read_tiff(raw: bytes) -> tuple[int, int, list[list[float | None]]]:
     if comp not in (1, 8, 32946):
         raise ValueError(f"compression {comp} non gérée")
 
+    # Un modèle numérique de terrain n'est JAMAIS sur huit bits. Quand le
+    # service renvoie une bande de 0 à 255, il a servi un RENDU — une image
+    # coloriée — et pas des mètres. Le premier passage a livré une grille
+    # « 1 à 253 m » avec un mode vers 120 m, dans une Manche orientale qui fait
+    # 10 à 65 m : parfaitement plausible à l'œil, entièrement fausse. C'est
+    # exactement le genre de donnée qu'il vaut mieux ne pas avoir.
+    if bits <= 8:
+        raise ValueError(f"bande {bits} bits — rendu colorié, pas un MNT")
     code = {(32, 3): "f", (64, 3): "d", (16, 2): "h", (16, 1): "H",
-            (32, 2): "i", (32, 1): "I", (8, 1): "B"}.get((bits, fmt))
+            (32, 2): "i", (32, 1): "I"}.get((bits, fmt))
     if not code:
         raise ValueError(f"échantillon {bits} bits format {fmt} non géré")
     px = bits // 8

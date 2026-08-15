@@ -262,19 +262,37 @@ function marksPane(onPick) {
     wrap.append(el('div', 'empty', 'Aucune marque enregistrée. Appui long sur la carte pour en créer une.'));
   }
 
+  /* Trois natures de point, et il ne faut surtout pas les confondre : une
+   * marque relevée au sondeur, une ÉPAVE relevée par un service
+   * hydrographique, et un secteur type dessiné à la main. Le pictogramme et
+   * l'étiquette le disent avant qu'on ait lu le nom. */
   const box = el('div', 'card flush');
-  for (const { s, d, b } of list) {
-    box.append(pickRow({
-      emoji: s.seed ? '🟣' : '📍',
-      title: s.name,
-      sub: `${fmt.dist(d)} au ${fmt.heading(b)}${s.note ? ` · ${s.note}` : ''}`,
-      tag: s.seed ? 'secteur type' : null,
-      onClick: () => onPick({ lat: s.lat, lon: s.lon, name: s.name, note: s.note, id: s.id, kind: 'spot' }),
-    }));
-  }
+  const VISIBLE = 30;
+  for (const { s, d, b } of list.slice(0, VISIBLE)) box.append(spotRow(s, d, b, onPick));
   wrap.append(box);
-  wrap.append(el('p', 'tiny', 'Les secteurs types sont indicatifs : recale-les sur tes propres relevés avant de t’en servir comme but.'));
+  if (list.length > VISIBLE) {
+    const more = button(`Voir les ${list.length - VISIBLE} autres points`, 'btn-sm btn-ghost', () => {
+      const rest = el('div', 'card flush');
+      for (const { s, d, b } of list) rest.append(spotRow(s, d, b, onPick));
+      openSheet('Tous les points', rest);
+    });
+    more.style.margin = '8px 0';
+    wrap.append(more);
+  }
+  wrap.append(el('p', 'tiny',
+    'Les épaves viennent du SHOM et de l’UKHO via EMODnet : ce sont des positions hydrographiques, pas des marques de pêche — arrive dessus au sondeur. Les secteurs types, eux, sont dessinés à la main et à recaler.'));
   return wrap;
+}
+
+function spotRow(s, d, b, onPick) {
+  const wreck = s.source === 'wreck';
+  return pickRow({
+    emoji: wreck ? '🛳️' : s.seed ? '🟣' : '📍',
+    title: s.name,
+    sub: `${fmt.dist(d)} au ${fmt.heading(b)}${s.note ? ` · ${s.note}` : ''}`,
+    tag: wreck ? 'épave relevée' : s.seed ? 'secteur type' : null,
+    onClick: () => onPick({ lat: s.lat, lon: s.lon, name: s.name, note: s.note, id: s.id, kind: 'spot' }),
+  });
 }
 
 /* ==========================================================================

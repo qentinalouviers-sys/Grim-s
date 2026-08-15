@@ -187,6 +187,15 @@ export async function mount(container) {
   map.on('movestart', () => {
     if (ui.follow && !map._programmaticMove) setFollow(false);
   });
+  // Les épaves n'apparaissent qu'à partir du zoom 12 : il faut donc redessiner
+  // au changement d'échelle, sinon on descend sur un coin et il reste vide.
+  let lastZoom = map.getZoom();
+  map.on('zoomend', () => {
+    const z = map.getZoom();
+    const crossed = (lastZoom < 12) !== (z < 12) || (lastZoom < 13) !== (z < 13);
+    lastZoom = z;
+    if (crossed) drawSpots();
+  });
   // Appui long. `contextmenu` suffit sur desktop et Android, mais Safari iOS
   // ne le déclenche pas de façon fiable au toucher : on double avec un vrai
   // détecteur d'appui long, annulé au moindre déplacement (sinon un début de
@@ -529,15 +538,27 @@ function drawBoat() {
 function drawSpots() {
   const g = layers.spots;
   g.clearLayers();
+  /* Cent soixante-huit épaves relevées d'un coup, c'est une carte illisible :
+   * au zoom du large elles se recouvrent et masquent les secteurs et les
+   * marques personnelles, qui sont justement ce qu'on cherche. Elles
+   * apparaissent quand on descend regarder un coin, comme sur une carte
+   * marine papier où le détail n'existe qu'à la bonne échelle. */
+  const z = map ? map.getZoom() : 12;
   for (const s of spots.all()) {
+    const isWreck = s.source === 'wreck';
+    if (isWreck && z < 12) continue;
     const marker = L.circleMarker([s.lat, s.lon], {
-      radius: s.seed ? 7 : 6,
-      color: s.seed ? '#a78bfa' : '#a3e635',
+      radius: isWreck ? 5 : s.seed ? 7 : 6,
+      color: isWreck ? '#fbbf24' : s.seed ? '#a78bfa' : '#a3e635',
       weight: 2,
-      dashArray: s.seed ? '3 3' : null,
-      fillOpacity: s.seed ? 0.08 : 0.35,
+      dashArray: isWreck ? null : s.seed ? '3 3' : null,
+      fillOpacity: isWreck ? 0.25 : s.seed ? 0.08 : 0.35,
     }).addTo(g);
-    marker.bindTooltip(s.name, { className: 'spot-label', direction: 'top', offset: [0, -6] });
+    // Au-delà du zoom 13 seulement : cent soixante-huit étiquettes permanentes
+    // se chevauchent et ne se lisent pas. En dessous, le tap donne la fiche.
+    if (!isWreck || z >= 13) {
+      marker.bindTooltip(s.name, { className: 'spot-label', direction: 'top', offset: [0, -6] });
+    }
     marker.on('click', (e) => {
       L.DomEvent.stop(e);
       showSpot(s);
