@@ -127,6 +127,23 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
 }
 .icon-btn:active { background: var(--line); }
 .icon-btn.danger { color: var(--red); border-color: rgba(251,90,114,.4); font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+
+/* SOS et MOB sont voisins et tous les deux rouges : ils ne doivent pas se
+   confondre sous un doigt pressé. MOB reste un contour, SOS est PLEIN — la
+   différence se voit sans lire, ce qui est tout ce qu'on demande à ces deux
+   boutons-là. */
+.icon-btn.sos {
+  background: var(--red);
+  border-color: var(--red);
+  color: #1a0308;
+  font-size: 11px; font-weight: 900; letter-spacing: .04em;
+  box-shadow: 0 0 12px rgba(251,90,114,.45);
+}
+.icon-btn.sos:active { background: #ff8a9c; }
+
+/* Trois boutons d'action plus la pastille GPS : sur un écran étroit, c'est le
+   logo qui saute. Il est décoratif, les boutons ne le sont pas. */
+@media (max-width: 400px) { .brand { display: none; } }
 .icon-btn.on { background: rgba(34,211,238,.16); border-color: var(--cyan); color: var(--cyan); }
 
 .chip {
@@ -293,6 +310,9 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   font-size: 14px; font-weight: 650;
 }
 .btn:active { transform: scale(.98); background: var(--line); }
+/* Un lien système (tel:, sms:) déguisé en bouton ne doit pas traîner le
+   soulignement des liens : il est le seul de l'app, et il jure. */
+a.btn { text-decoration: none; }
 .btn-primary { background: rgba(34,211,238,.15); border-color: var(--cyan); color: var(--cyan); }
 .btn-lime    { background: rgba(163,230,53,.14); border-color: var(--lime); color: var(--lime); }
 .btn-danger  { background: rgba(251,90,114,.14); border-color: var(--red); color: var(--red); }
@@ -590,6 +610,91 @@ canvas { display: block; max-width: 100%; }
 .toast { display: flex; align-items: center; gap: 10px; }
 .toast.good { border-color: var(--lime); color: var(--lime); }
 @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } }
+
+/* ══ Écran de détresse ═════════════════════════════════════════════════
+   Plein écran, défilant, sans geste de fermeture accidentel : on ne referme
+   pas cet écran-là d'un glissé du pouce. Le fond reste sombre — un aplat rouge
+   plein écran détruirait la lisibilité des chiffres, et c'est la position qui
+   sauve, pas la dramatisation. */
+.sos-screen {
+  position: fixed; inset: 0; z-index: 85;
+  background: linear-gradient(180deg, #1a0610 0%, #050b14 40%);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px)
+           calc(var(--safe-b) + 24px) calc(var(--safe-l) + 12px);
+  animation: fade .14s ease;
+}
+.sos-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.sos-title {
+  font-size: 22px; font-weight: 900; letter-spacing: .18em;
+  color: var(--red);
+}
+.sos-pos {
+  background: rgba(251,90,114,.1);
+  border: 1px solid rgba(251,90,114,.45);
+  border-radius: var(--r);
+  padding: 12px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+.sos-lbl {
+  font-size: 10px; font-weight: 800; letter-spacing: .12em;
+  color: var(--txt-3); text-transform: uppercase; margin-bottom: 6px;
+}
+/* La position est le seul élément de l'app qu'on lit à voix haute sous stress :
+   elle est plus grosse que tout le reste, en chiffres tabulaires, et elle tient
+   sur une ligne par axe. */
+.sos-coord {
+  font-size: 26px; font-weight: 800; line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  color: var(--txt);
+}
+.sos-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 14px 12px;
+  border-radius: var(--r);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--txt);
+}
+.sos-btn:active { transform: scale(.99); }
+.sos-btn-main { font-size: 17px; font-weight: 800; }
+.sos-btn-sub { font-size: 11.5px; color: var(--txt-3); font-weight: 600; }
+.sos-call-main {
+  background: var(--red);
+  border-color: var(--red);
+  color: #1a0308;
+  min-height: 68px;
+  box-shadow: 0 6px 20px rgba(251,90,114,.3);
+}
+.sos-call-main .sos-btn-main { font-size: 20px; }
+.sos-call-main .sos-btn-sub { color: rgba(26,3,8,.75); }
+
+.sos-vhf, .sos-note {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: var(--r);
+  background: var(--bg-1);
+  border: 1px solid var(--line-soft);
+}
+.sos-script {
+  white-space: pre-line;
+  margin: 8px 0;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  background: #050b14;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--txt);
+}
+.sos-form { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
 
 /* ══ Alarme plein écran ════════════════════════════════════════════════ */
 .alarm {

@@ -19,6 +19,7 @@ import { state, set, subscribe, on } from './core/store.js';
 import { APP_VERSION } from './core/build.js';
 import * as idb from './core/idb.js';
 import * as dom from './ui/dom.js';
+import * as sos from './ui/sos.js';
 import * as fmt from './core/fmt.js';
 import { distance, bearing } from './core/geo.js';
 
@@ -510,6 +511,15 @@ function wireChrome() {
   });
 
   document.getElementById('btn-mob').addEventListener('click', onMOB);
+
+  /* SOS. Un seul appui ouvre l'écran de détresse — pas de confirmation, mais
+   * pas d'appel automatique non plus : c'est l'écran qui s'ouvre, et le numéro
+   * demande un second geste. Un appel aux secours déclenché par un doigt dans
+   * une poche coûte cher à tout le monde, et l'écran lui-même ne coûte rien. */
+  document.getElementById('btn-sos').addEventListener('click', () => {
+    dom.primeAudio();
+    sos.openSOS();
+  });
 
   document.getElementById('chip-gps').addEventListener('click', () => showFixDetail());
 }

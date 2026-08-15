@@ -42,8 +42,24 @@ cadran tourne, comme un compas de route), bandeau température d'eau / pression
 jusant sur la journée, conseil du guide en une ligne.
 
 Actions : veille de mouillage avec alarme de dérapage, enregistrement de
-sortie, retour au port, relevé de dérive. Bouton **MOB** en permanence dans la
-barre d'état — un seul appui, sans confirmation, position figée et alarme.
+sortie, retour au port, relevé de dérive. Deux boutons vivent en permanence
+dans la barre d'état :
+
+- **MOB** — un seul appui, sans confirmation : position figée, alarme, et
+  relèvement porté sur le compas et la carte.
+- **SOS** — l'écran de détresse. Il **ne déclenche pas** le SOS natif du
+  téléphone : aucune page web ne le peut, ces fonctions sont câblées sur les
+  boutons physiques et exposées à aucune API. L'écran le dit et rappelle la
+  combinaison de touches. Ce qu'il fait à la place est plus utile en mer, parce
+  qu'en détresse le temps ne se perd pas à composer un numéro mais à **dire où
+  l'on est** : la position en degrés-minutes décimales occupe le haut de
+  l'écran, en gros, dans la seule forme qui se lit à voix haute sans erreur.
+  Dessous, les trois canaux — **VHF 16** avec le message MAYDAY pré-rédigé
+  (nom du bateau et personnes à bord mémorisés une fois pour toutes), le
+  **196** qui tombe directement sur le CROSS là où le 112 passe par les secours
+  terrestres, et un SMS ou un partage avec la position dedans pour prévenir à
+  terre. Rien de tout ça n'a besoin de données : les numéros passent par le
+  réseau téléphonique, le message est calculé à bord.
 
 ### 🎯 PILOTE — navigation GPS
 
