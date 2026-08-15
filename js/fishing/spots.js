@@ -30,6 +30,8 @@ import * as idb from '../core/idb.js';
 import * as net from '../core/net.js';
 import * as streamModel from '../data/stream.js';
 import * as tide from '../data/tide.js';
+import * as bathy from '../data/bathy.js';
+import * as wrecks from '../data/wrecks.js';
 import { distance, bearing, angleDiff, norm360 } from '../core/geo.js';
 import { SPECIES_RULES } from './species.js';
 import { plateau, clamp01, ramp } from './curves.js';
@@ -51,7 +53,15 @@ export async function init() {
   return { seed: seed.length, personal: personal.length };
 }
 
-export const all = () => [...personal, ...seed];
+/* Trois sources, par ordre de confiance décroissante :
+ *   PERSO   le carnet de l'utilisateur, relevé au sondeur — imbattable ;
+ *   ÉPAVES  des points RÉELS, relevés par le SHOM et l'UKHO parce qu'ils sont
+ *           des obstacles à la navigation. Une épave dans 15 à 30 m d'eau en
+ *           Manche orientale est le poste à bar par excellence ;
+ *   SEED    les archétypes d'habitat, positionnés approximativement.
+ * Les épaves passent devant les archétypes : une position hydrographique vaut
+ * mieux qu'un rond dessiné à la main sur une carte. */
+export const all = () => [...personal, ...wrecks.asSpots(), ...seed];
 export const personalSpots = () => [...personal];
 
 /** Recharge le carnet personnel depuis IndexedDB — appelé après une synchro. */
@@ -167,10 +177,18 @@ export function scoreSpot(spot, speciesId, t, wx, fromPos = null) {
   const habitat = spotHab.length === 0 ? 0.5 : clamp01(overlap / Math.min(2, rule.habitat.length));
   if (overlap) reasons.push(`fond ${spotHab.filter((h) => rule.habitat.includes(h)).join(', ')}`);
 
-  // 2. Profondeur — sonde carte + marée = hauteur d'eau réelle
+  /* 2. Profondeur — sonde + marée = hauteur d'eau réelle.
+   *
+   * La sonde MESURÉE l'emporte sur la sonde déclarée. Les huit secteurs types
+   * livrés avec l'app portent une gamme écrite à la main (« 10 à 22 m ») ;
+   * EMODnet donne la valeur sous le point. Quand les deux existent, la mesure
+   * gagne — c'est tout l'intérêt d'avoir embarqué le relief. */
   let depth = 0.6;
-  if (Array.isArray(spot.depthM)) {
-    const h = tide.height(t);
+  const h = tide.height(t);
+  const measured = bathy.depthAt(spot.lat, spot.lon);
+  if (measured != null) {
+    depth = plateau(measured + h, rule.depthRangeM[0], rule.depthRangeM[1], 6);
+  } else if (Array.isArray(spot.depthM)) {
     const mid = (spot.depthM[0] + spot.depthM[1]) / 2 + h;
     depth = plateau(mid, rule.depthRangeM[0], rule.depthRangeM[1], 6);
   }
@@ -198,8 +216,30 @@ export function scoreSpot(spot, speciesId, t, wx, fromPos = null) {
     access = 0.45 + 0.55 * (1 - ramp(distanceM, 11000, 33000));
   }
 
-  const parts = { habitat, depth, drift: driftScore, seaKeeping, access };
-  const weights = { habitat: 3, depth: 2, drift: 3, seaKeeping: 2, access: 1.2 };
+  /* 6. Relief réel — l'accident, pas la sonde.
+   *
+   * Un bar ne cherche pas « 22 mètres », il cherche l'endroit où l'on PASSE de
+   * 22 à 16 : le bord du ridin, la lèvre de la fosse. C'est là que le courant
+   * décolle et que le fourrage se coince. Une plaine de sable régulière peut
+   * avoir la bonne sonde, le bon fond et la bonne dérive, et ne rien valoir.
+   *
+   * L'inverse est vrai pour qui vit couché sur le sable : le turbot et la raie
+   * veulent du plat, et un tombant ne leur apporte rien. On déduit la
+   * préférence des habitats déjà déclarés plutôt que d'ajouter un champ à
+   * maintenir dans sept fiches. */
+  const wantsBreak = rule.habitat.some((x) => ['epave', 'roche', 'tombant', 'ridin', 'veine'].includes(x));
+  const rel = bathy.relief(spot.lat, spot.lon);
+  let reliefScore = 0.55;              // neutre tant qu'on ne sait pas
+  if (rel) {
+    // 8 m d'écart au kilomètre est un accident très marqué en Manche orientale.
+    const roughness = clamp01(rel.reliefM / 8);
+    reliefScore = wantsBreak ? 0.25 + 0.75 * roughness : 1 - 0.6 * roughness;
+    if (wantsBreak && roughness > 0.55) reasons.push(rel.structure.label.toLowerCase());
+    else if (!wantsBreak && roughness < 0.25) reasons.push('fond régulier');
+  }
+
+  const parts = { habitat, depth, drift: driftScore, seaKeeping, access, relief: reliefScore };
+  const weights = { habitat: 3, depth: 2, drift: 3, seaKeeping: 2, access: 1.2, relief: rel ? 2 : 0 };
   const total =
     Object.entries(parts).reduce((a, [k, v]) => a + v * weights[k], 0) /
     Object.values(weights).reduce((a, b) => a + b, 0);
@@ -211,6 +251,7 @@ export function scoreSpot(spot, speciesId, t, wx, fromPos = null) {
     spot,
     score: Math.round(clamp01(total * trust) * 100),
     parts,
+    relief: rel,
     drift,
     windAgainstTide: wat,
     distanceM,

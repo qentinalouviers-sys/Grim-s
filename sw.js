@@ -47,6 +47,7 @@ const SHELL_FILES = [
   'js/data/seamarks.js',
   'js/data/seabed.js',
   'js/data/bathy.js',
+  'js/data/wrecks.js',
   'js/sensors/gps.js',
   'js/sensors/heading.js',
   'js/sensors/motion.js',

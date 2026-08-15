@@ -434,7 +434,7 @@ LAND = 32767          # sentinelle : au-dessus du zéro, donc pas de la mer
 NODATA = 32766        # pas de mesure
 
 
-def encode(grid: list[list[int | None]]) -> list[int]:
+def encode(grid: list[list[int | None]], sign: int = -1) -> list[int]:
     """
     Différences successives, en RLE : [valeur, répétitions, valeur, …].
 
@@ -449,7 +449,7 @@ def encode(grid: list[list[int | None]]) -> list[int]:
             if v is None:
                 flat.append(NODATA)
             else:
-                d = -v                      # élévation → sonde
+                d = sign * v            # élévation → sonde, ou sonde telle quelle
                 flat.append(LAND if d < 0 else min(d, 3000))
 
     out: list[int] = []
@@ -513,17 +513,40 @@ def main() -> int:
                 # retourne la grille pour que la ligne 0 soit le bord sud.
                 agg, _, _ = aggregate(grid)
                 rows, cols = len(agg), len(agg[0])
-                sea = sum(1 for r in agg for v in r if v is not None and -v > 0)
                 total = rows * cols
-                if sea < total * 0.4:
-                    log(f"    ✗ {sea}/{total} cases en mer — mauvaise couverture")
+
+                # ── Sens de la convention ────────────────────────────────
+                # EMODnet publie des ÉLÉVATIONS (négatives sous la mer), mais
+                # rien ne garantit que la couverture servie suive la même
+                # convention que la documentation. Le premier passage a
+                # assemblé 467 000 cases parfaitement — et mon propre contrôle
+                # les a jetées, parce qu'il tenait le signe pour acquis.
+                # On le DÉDUIT : la Manche orientale fait 10 à 60 m de fond,
+                # la côte est un liseré. Le signe qui produit une majorité de
+                # valeurs dans cette plage est le bon.
+                vals = [v for r in agg for v in r if v is not None]
+                if not vals:
+                    log("    ✗ grille vide")
+                    continue
+                plausible = lambda xs: sum(1 for x in xs if 2 <= x <= 200)
+                as_elev = plausible([-v for v in vals])      # v négatif = mer
+                as_depth = plausible(vals)                   # v positif = sonde
+                sign = -1 if as_elev >= as_depth else 1
+                sea = max(as_elev, as_depth)
+                vals.sort()
+                log(f"    valeurs : min {vals[0]}, médiane {vals[len(vals) // 2]}, "
+                    f"max {vals[-1]} · convention "
+                    f"{'élévation' if sign < 0 else 'sonde'} "
+                    f"({sea}/{total} cases en mer plausible)")
+                if sea < total * 0.2:
+                    log("    ✗ trop peu de mer plausible — mauvaise couverture")
                     continue
 
-                codes = encode(agg)
+                codes = encode(agg, sign)
                 flat = [v for r in agg for v in r]
                 decode(codes, len(flat))        # ceinture et bretelles
 
-                depths = [-v for r in agg for v in r if v is not None and -v > 0]
+                depths = [sign * v for r in agg for v in r if v is not None and sign * v > 0]
                 doc = {
                     "_comment": [
                         "Sonde du secteur de Dieppe, en mètres sous le zéro des cartes.",

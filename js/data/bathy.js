@@ -128,8 +128,25 @@ export function waterUnder(lat, lon, tideHeightM) {
  *            slopePer100M:number, samples:number, resolutionM:number,
  *            structure:{id:string,label:string,note:string}}|null}
  */
+/* Un relief() coûte une soixantaine de lectures de grille. Le moteur de postes
+ * le demande pour chaque poste et chaque instant scoré, sur des positions qui
+ * ne bougent pas : on mémorise à la case près. */
+const reliefCache = new Map();
+
 export function relief(lat, lon, radiusM = 900) {
   if (!model) return null;
+  const key = `${lat.toFixed(3)},${lon.toFixed(3)},${radiusM}`;
+  if (reliefCache.has(key)) return reliefCache.get(key);
+  const out = computeRelief(lat, lon, radiusM);
+  // Garde-fou mémoire : une marque personnelle par mille sur tout le secteur
+  // ne dépasse pas quelques milliers d'entrées ; au-delà on repart à zéro
+  // plutôt que de faire enfler l'onglet.
+  if (reliefCache.size > 4000) reliefCache.clear();
+  reliefCache.set(key, out);
+  return out;
+}
+
+function computeRelief(lat, lon, radiusM) {
   const centre = depthAt(lat, lon);
   if (centre == null) return null;
 
