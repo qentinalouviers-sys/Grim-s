@@ -24,11 +24,17 @@ large, la fosse du chenal. On ne voit pas la ride individuelle. L'app le dit ;
 le sondeur du bord reste le juge.
 
 ── FORMAT ───────────────────────────────────────────────────────────────────
-On demande une grille ASCII (ArcGrid) — du texte, lisible sans GDAL ni numpy,
-donc sans dépendance dans le job CI. On l'agrège 2×2, on quantifie au mètre,
-puis on encode la différence d'une case à la suivante en RLE. Le fond de la
-Manche est lisse : la plupart des différences valent zéro, et le fichier tombe
-à quelques dizaines de kilo-octets.
+On DEMANDE au service ce qu'il sait produire (DescribeCoverage) et on prend le
+premier format qu'on sait lire. Le premier passage avait codé ArcGrid en dur —
+du texte, idéal pour un job sans GDAL — et s'est fait répondre « format ArcGrid
+is not supported for this coverage ». D'où un petit lecteur GeoTIFF maison, en
+bibliothèque standard : quatre-vingts lignes contre une dépendance système de
+deux cents mégaoctets dans un job qui tourne une fois par an.
+
+On agrège ensuite 2×2, on quantifie au mètre, puis on encode la différence
+d'une case à la suivante en RLE. Le fond de la Manche est lisse : la plupart
+des différences valent zéro, et le fichier tombe à quelques dizaines de
+kilo-octets.
 
 ── ROBUSTESSE ───────────────────────────────────────────────────────────────
 Comme fetch_seabed.py : le script DÉCOUVRE la couverture et les formats
@@ -123,30 +129,70 @@ def rank(name: str) -> int:
 
 
 # ══ 2. Téléchargement ═════════════════════════════════════════════════════
-def fetch_grid(endpoint: str, coverage: str) -> str | None:
-    """Une grille ASCII couvrant l'emprise, ou None."""
+# Le premier passage a demandé ArcGrid — du texte, parfait pour un job sans
+# GDAL — et le service a répondu « format ArcGrid is not supported for this
+# coverage ». On ne devine plus : on DEMANDE au service ce qu'il sait produire,
+# et on prend le premier format qu'on sait lire.
+FORMAT_PREFS = ["arcgrid", "geotiff", "tiff", "image/tiff"]
+
+
+def supported_formats(endpoint: str, coverage: str) -> list[str]:
+    url = (f"{endpoint}?service=WCS&version=1.0.0&request=DescribeCoverage"
+           f"&coverage={urllib.parse.quote(coverage)}")
+    try:
+        xml = get(url, timeout=60).decode("utf-8", "replace")
+    except Exception:                                           # noqa: BLE001
+        return []
+    return [f.strip() for f in re.findall(r"<(?:\w+:)?formats>([^<]+)</", xml, re.I)]
+
+
+def fetch_grid(endpoint: str, coverage: str):
+    """
+    Renvoie (kind, payload) : ('ascii', texte) ou ('tiff', octets).
+    """
     cols = int(round((EAST - WEST) / FINE))
     rows = int(round((NORTH - SOUTH) / FINE))
-    params = {
-        "service": "WCS",
-        "version": "1.0.0",
-        "request": "GetCoverage",
-        "coverage": coverage,
-        "crs": "EPSG:4326",
-        "bbox": f"{WEST},{SOUTH},{EAST},{NORTH}",
-        "width": str(cols),
-        "height": str(rows),
-        "format": "ArcGrid",
-    }
-    url = f"{endpoint}?{urllib.parse.urlencode(params)}"
-    log(f"    GetCoverage {cols}×{rows} …")
-    raw = get(url)
-    txt = raw.decode("utf-8", "replace")
-    if not re.match(r"\s*ncols", txt, re.I):
-        head = txt[:220].replace("\n", " ")
-        log(f"    ✗ réponse non-ArcGrid : {head}")
-        return None
-    return txt
+    offered = supported_formats(endpoint, coverage)
+    log(f"    formats annoncés : {', '.join(offered) or '(aucun)'}")
+
+    # On tente ce que le service annonce, dans notre ordre de préférence, puis
+    # les valeurs par défaut si DescribeCoverage n'a rien donné.
+    order = []
+    for pref in FORMAT_PREFS:
+        for f in offered:
+            if pref in f.lower() and f not in order:
+                order.append(f)
+    for fallback in ("ArcGrid", "GeoTIFF", "image/tiff"):
+        if fallback not in order:
+            order.append(fallback)
+
+    for fmt in order:
+        params = {
+            "service": "WCS",
+            "version": "1.0.0",
+            "request": "GetCoverage",
+            "coverage": coverage,
+            "crs": "EPSG:4326",
+            "bbox": f"{WEST},{SOUTH},{EAST},{NORTH}",
+            "width": str(cols),
+            "height": str(rows),
+            "format": fmt,
+        }
+        url = f"{endpoint}?{urllib.parse.urlencode(params)}"
+        log(f"    GetCoverage {cols}×{rows} en {fmt} …")
+        try:
+            raw = get(url)
+        except Exception as e:                                  # noqa: BLE001
+            log(f"      ✗ {e}")
+            continue
+        if raw[:2] in (b"II", b"MM"):
+            return "tiff", raw
+        txt = raw.decode("utf-8", "replace")
+        if re.match(r"\s*ncols", txt, re.I):
+            return "ascii", txt
+        head = txt[:170].replace("\n", " ")
+        log(f"      ✗ réponse inexploitable : {head}")
+    return None, None
 
 
 def parse_arcgrid(txt: str) -> tuple[dict, list[list[float]]]:
@@ -177,6 +223,135 @@ def parse_arcgrid(txt: str) -> tuple[dict, list[list[float]]]:
         row = vals[r * ncols:(r + 1) * ncols]
         grid.append([None if abs(v - nodata) < 1e-6 else v for v in row])
     return {"ncols": ncols, "nrows": nrows, "nodata": nodata}, grid
+
+
+# ══ 2 bis. Lecture d'un GeoTIFF, sans GDAL ni numpy ═══════════════════════
+# Quatre-vingts lignes contre une dépendance système de deux cents mégaoctets
+# dans un job qui tourne une fois par an. Le TIFF produit par GeoServer est un
+# cas simple : une bande, float ou entier, en bandes ou en tuiles, sans
+# compression ou en deflate — que la bibliothèque standard sait défaire.
+TAGS = {
+    256: "width", 257: "height", 258: "bits", 259: "compression",
+    273: "stripOffsets", 277: "samples", 278: "rowsPerStrip", 279: "stripBytes",
+    317: "predictor", 322: "tileWidth", 323: "tileHeight",
+    324: "tileOffsets", 325: "tileBytes", 339: "sampleFormat", 42113: "nodata",
+}
+TYPE_SIZE = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8}
+
+
+def clean(v, nodata):
+    """NaN et sentinelle deviennent « pas de mesure ».
+
+    EMODnet marque l'absence de donnée tantôt par une valeur sentinelle, tantôt
+    par un NaN IEEE. Un NaN qui survit jusqu'à la moyenne empoisonne toute la
+    case agrégée — silencieusement, puisque NaN n'est ni None ni une erreur."""
+    if v != v:
+        return None
+    if nodata is not None and abs(v - nodata) < 1e-6:
+        return None
+    # Sous -12 000 m on est sous la fosse des Mariannes : c'est une sentinelle.
+    if v < -12000 or v > 9000:
+        return None
+    return float(v)
+
+
+def read_tiff(raw: bytes) -> tuple[int, int, list[list[float | None]]]:
+    import struct
+    import zlib
+
+    endian = "<" if raw[:2] == b"II" else ">"
+    magic, first = struct.unpack_from(endian + "HI", raw, 2)
+    if magic != 42:
+        raise ValueError("BigTIFF non géré")
+
+    tags: dict = {}
+    count = struct.unpack_from(endian + "H", raw, first)[0]
+    for i in range(count):
+        off = first + 2 + i * 12
+        tag, typ, n = struct.unpack_from(endian + "HHI", raw, off)
+        size = TYPE_SIZE.get(typ, 1) * n
+        payload = off + 8
+        if size > 4:
+            payload = struct.unpack_from(endian + "I", raw, off + 8)[0]
+        name = TAGS.get(tag)
+        if not name:
+            continue
+        if typ == 2:
+            tags[name] = raw[payload:payload + n].split(b"\0")[0].decode("ascii", "replace")
+            continue
+        code = {1: "B", 3: "H", 4: "I", 8: "h", 9: "i", 11: "f", 12: "d"}.get(typ)
+        if not code:
+            continue
+        tags[name] = list(struct.unpack_from(endian + code * n, raw, payload))
+
+    def one(name, default=None):
+        v = tags.get(name)
+        if v is None:
+            return default
+        return v[0] if isinstance(v, list) else v
+
+    w, h = one("width"), one("height")
+    bits = one("bits", 32)
+    fmt = one("sampleFormat", 1)
+    comp = one("compression", 1)
+    pred = one("predictor", 1)
+    if one("samples", 1) != 1:
+        raise ValueError("plusieurs bandes — couverture inattendue")
+    if pred not in (1,):
+        raise ValueError(f"prédicteur {pred} non géré")
+    if comp not in (1, 8, 32946):
+        raise ValueError(f"compression {comp} non gérée")
+
+    code = {(32, 3): "f", (64, 3): "d", (16, 2): "h", (16, 1): "H",
+            (32, 2): "i", (32, 1): "I", (8, 1): "B"}.get((bits, fmt))
+    if not code:
+        raise ValueError(f"échantillon {bits} bits format {fmt} non géré")
+    px = bits // 8
+
+    nodata = None
+    if tags.get("nodata"):
+        try:
+            nodata = float(tags["nodata"])
+        except (TypeError, ValueError):
+            nodata = None
+
+    def blob(off, n):
+        b = raw[off:off + n]
+        return zlib.decompress(b) if comp in (8, 32946) else b
+
+    grid: list[list[float | None]] = [[None] * w for _ in range(h)]
+
+    if tags.get("tileOffsets"):
+        tw, th = one("tileWidth"), one("tileHeight")
+        across = (w + tw - 1) // tw
+        offs, lens = tags["tileOffsets"], tags["tileBytes"]
+        for idx, (off, n) in enumerate(zip(offs, lens)):
+            data = blob(off, n)
+            tx, ty = (idx % across) * tw, (idx // across) * th
+            for r in range(th):
+                y = ty + r
+                if y >= h:
+                    break
+                base = r * tw * px
+                row = struct.unpack_from(endian + code * tw, data, base)
+                for c in range(tw):
+                    x = tx + c
+                    if x >= w:
+                        break
+                    grid[y][x] = clean(row[c], nodata)
+    else:
+        rps = one("rowsPerStrip", h)
+        offs, lens = tags["stripOffsets"], tags["stripBytes"]
+        y = 0
+        for off, n in zip(offs, lens):
+            data = blob(off, n)
+            rows_here = min(rps, h - y)
+            for r in range(rows_here):
+                row = struct.unpack_from(endian + code * w, data, r * w * px)
+                for c in range(w):
+                    grid[y][c] = clean(row[c], nodata)
+                y += 1
+    return w, h, grid
 
 
 # ══ 3. Agrégation ═════════════════════════════════════════════════════════
@@ -282,10 +457,15 @@ def main() -> int:
         for score, cov in ranked[:4]:
             log(f"  · essai {cov} (score {score})")
             try:
-                txt = fetch_grid(endpoint, cov)
-                if not txt:
+                kind, payload = fetch_grid(endpoint, cov)
+                if not kind:
                     continue
-                head, grid = parse_arcgrid(txt)
+                if kind == "ascii":
+                    _, grid = parse_arcgrid(payload)
+                else:
+                    _, _, grid = read_tiff(payload)
+                    # Un GeoTIFF se lit du NORD vers le sud, comme ArcGrid :
+                    # aggregate() retourne déjà la grille, rien à faire ici.
                 agg, _, _ = aggregate(grid)
                 rows, cols = len(agg), len(agg[0])
                 sea = sum(1 for r in agg for v in r if v is not None and -v > 0)

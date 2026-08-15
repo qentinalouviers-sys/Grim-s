@@ -96,20 +96,46 @@ def rank(name: str) -> int:
     return max((w for h, w in LAYER_HINTS if h in low), default=0)
 
 
+# L'ordre des axes de l'EPSG:4326 est le piège classique du WFS, et il a coûté
+# un passage complet : « EPSG:4326 » vaut latitude d'abord dans la norme, mais
+# GeoServer sert historiquement longitude d'abord sous ce nom court, et
+# latitude d'abord sous l'URN. Une emprise lue à l'envers place le rectangle au
+# large de la Somalie — le service répond poliment zéro entité, sans erreur.
+# On essaie donc les trois écritures et on garde celle qui rapporte.
+BBOX_FORMS = [
+    ("urn:ogc:def:crs:EPSG::4326", "{s},{w},{n},{e}", "lat d’abord (URN)"),
+    ("EPSG:4326", "{w},{s},{e},{n}", "lon d’abord (nom court)"),
+    ("EPSG:4326", "{s},{w},{n},{e}", "lat d’abord (nom court)"),
+]
+
+
 def fetch_features(endpoint: str, layer: str) -> list[dict]:
-    params = {
-        "service": "WFS",
-        "version": "2.0.0",
-        "request": "GetFeature",
-        "typeNames": layer,
-        "outputFormat": "application/json",
-        "srsName": "EPSG:4326",
-        "bbox": f"{SOUTH},{WEST},{NORTH},{EAST},EPSG:4326",
-        "count": "4000",
-    }
-    url = f"{endpoint}?{urllib.parse.urlencode(params)}"
-    data = json.loads(get(url).decode("utf-8", "replace"))
-    return data.get("features", [])
+    best: list[dict] = []
+    for crs, tpl, label in BBOX_FORMS:
+        box = tpl.format(s=SOUTH, w=WEST, n=NORTH, e=EAST)
+        params = {
+            "service": "WFS",
+            "version": "2.0.0",
+            "request": "GetFeature",
+            "typeNames": layer,
+            "outputFormat": "application/json",
+            "srsName": "EPSG:4326",
+            "bbox": f"{box},{crs}",
+            "count": "4000",
+        }
+        url = f"{endpoint}?{urllib.parse.urlencode(params)}"
+        try:
+            data = json.loads(get(url).decode("utf-8", "replace"))
+        except Exception as e:                                  # noqa: BLE001
+            log(f"      ✗ emprise {label} : {e}")
+            continue
+        feats = data.get("features", [])
+        log(f"      emprise {label} : {len(feats)} entités")
+        if len(feats) > len(best):
+            best = feats
+        if best:
+            break
+    return best
 
 
 # Les schémas EMODnet changent de casse et de nom d'un millésime à l'autre :
