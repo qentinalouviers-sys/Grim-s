@@ -63,6 +63,9 @@ let ui = {
   // Éteinte au départ : la nature des fonds est une couche de TRAVAIL, on
   // l'allume quand on cherche un poste, pas quand on rentre au port de nuit.
   seabed: false,
+  // Le menu d'outils est refermé à l'ouverture de la carte : le premier écran
+  // d'un mode CARTE doit être une carte, pas une liste de commandes.
+  menu: false,
   driftMin: 40,
   target: null,   // cible de dérive inverse
   mode: 'forward',
@@ -258,6 +261,10 @@ export async function mount(container) {
 export function unmount() {
   unsub?.();
   unsubHeading?.();
+  // L'écoute clavier vit sur `document`, pas sur la racine du mode : sans ce
+  // retrait elle survivrait à la carte et Échap taperait dans le vide.
+  if (refs.onKey) document.removeEventListener('keydown', refs.onKey);
+  ui.menu = false;
   boatMarker = null;
   clearInterval(timer);
   map?.remove();
@@ -285,7 +292,7 @@ function offlineNotice() {
 function buildOverlay() {
   /* --- Bandeau supérieur --- */
   const top = el('div', 'map-overlay map-top');
-  refs.readout = el('div', 'map-panel');
+  refs.readout = el('div', 'map-panel map-top-readout');
   refs.readout.style.flex = '1';
   refs.readout.style.fontSize = '12px';
   top.append(refs.readout);
@@ -298,19 +305,57 @@ function buildOverlay() {
      est une couche décorative. Elle n'apparaît qu'avec la couche. */
   refs.groundLegend = el('div');
   top.append(refs.groundLegend);
+  refs.topBar = top;
   root.append(top);
   paintFleetChip();
 
-  /* --- Colonne de boutons --- */
+  /* --- Colonne de boutons + menu déroulant ---------------------------------
+   * Il y avait DIX icônes en colonne le long du bord droit. Dix carrés muets :
+   * un `title` ne s'affiche jamais au doigt, donc le nom de chaque outil
+   * n'existait que dans la tête de celui qui les avait posés. Et dix fois
+   * 44 px plus les écarts font 494 px de haut — sur un iPhone SE (568 px de
+   * haut) la colonne mangeait le bord droit de la carte du haut en bas, juste
+   * là où le pouce se pose quand on tient le téléphone d'une main.
+   *
+   * Trois boutons restent dehors, et seulement trois : ceux qu'on presse en
+   * route, sans regarder, souvent une main sur la barre.
+   *   🎯 aller vers      ◎ recentrer      ☰ le reste
+   * Tout le reste descend dans un menu qui s'ouvre, s'écrit EN TOUTES LETTRES,
+   * et se referme. Un outil qu'on utilise trois fois par sortie n'a pas besoin
+   * d'occuper l'écran en permanence ; il a besoin d'être trouvable.
+   * ------------------------------------------------------------------------ */
   const right = el('div', 'map-overlay map-right');
-  refs.btnNav = mapBtn('🎯', navButton, 'Naviguer vers…');
-  refs.btnFollow = mapBtn('◎', () => setFollow(!ui.follow), 'Recentrer / suivre');
-  refs.btnSea = mapBtn('⚓', () => {
+  refs.btnNav = mapBtn('🎯', navButton, 'Naviguer vers…', 'Aller');
+  refs.btnFollow = mapBtn('◎', () => setFollow(!ui.follow), 'Recentrer / suivre', 'Suivre');
+  refs.btnMenu = mapBtn('☰', () => setMenu(!ui.menu), 'Outils de la carte', 'Outils');
+  refs.btnMenu.setAttribute('aria-expanded', 'false');
+  refs.btnMenu.setAttribute('aria-haspopup', 'true');
+  refs.btnMenu.setAttribute('aria-controls', 'map-menu');
+  right.append(refs.btnNav, refs.btnFollow, refs.btnMenu);
+  refs.btnNav.classList.toggle('on', !!state.nav);
+  refs.btnFollow.classList.add('on');
+  root.append(right);
+
+  const menu = el('div', 'map-overlay map-menu');
+  const card = el('div', 'map-menu-card');
+  card.id = 'map-menu';
+  // `group`, et non `menu` : les entrées sont de vrais boutons à bascule
+  // (`aria-pressed`), pas des `menuitem`. Un `role="menu"` peuplé de boutons
+  // ordinaires ment au lecteur d'écran sur la façon de le parcourir.
+  card.setAttribute('role', 'group');
+  card.setAttribute('aria-label', 'Outils de la carte');
+  menu.append(card);
+  refs.menu = menu;
+
+  /* Deux sections, et l'ordre n'est pas décoratif : ce qu'on AFFICHE d'abord
+     (on prépare la carte), ce qu'on FAIT ensuite (on s'en sert). */
+  card.append(el('div', 'map-menu-sect', 'Ce que la carte affiche'));
+  refs.btnSea = menuItem('⚓', 'Balisage maritime', 'Bouées, cardinales, feux', () => {
     ui.seamarks = !ui.seamarks;
     ui.seamarks ? layers.sea.addTo(map) : map.removeLayer(layers.sea);
-    refs.btnSea.classList.toggle('on', ui.seamarks);
-  }, 'Balisage maritime');
-  refs.btnGround = mapBtn('🪨', () => {
+    markToggle(refs.btnSea, ui.seamarks);
+  }, true);
+  refs.btnGround = menuItem('🪨', 'Nature des fonds', 'Sable, roche, gravier, vase', () => {
     ui.seabed = !ui.seabed;
     if (ui.seabed) {
       if (!layers.seabed) layers.seabed = seabedLayer.create(L);
@@ -320,36 +365,51 @@ function buildOverlay() {
     } else if (layers.seabed) {
       map.removeLayer(layers.seabed);
     }
-    refs.btnGround.classList.toggle('on', ui.seabed);
+    markToggle(refs.btnGround, ui.seabed);
     paintGroundLegend();
-  }, 'Nature des fonds');
-  refs.btnVec = mapBtn('↗', () => {
+  }, true);
+  refs.btnVec = menuItem('↗', 'Champ de courant', 'Le courant, en flèches', () => {
     ui.vectors = !ui.vectors;
     if (ui.vectors) {
       layers.vectors.addTo(map);
       drawVectors();
     } else map.removeLayer(layers.vectors);
-    refs.btnVec.classList.toggle('on', ui.vectors);
-  }, 'Champ de courant');
-  refs.btnCatch = mapBtn('🐟', () => {
+    markToggle(refs.btnVec, ui.vectors);
+  }, true);
+  refs.btnCatch = menuItem('🐟', 'Mes prises', 'Les poissons déjà notés', () => {
     ui.catches = !ui.catches;
     if (ui.catches) {
       layers.catches.addTo(map);
       drawCatches();
     } else map.removeLayer(layers.catches);
-    refs.btnCatch.classList.toggle('on', ui.catches);
-  }, 'Mes prises');
-  refs.btnMark = mapBtn('📍', markHere, 'Marquer la position');
-  refs.btnDl = mapBtn('⤓', downloadZone, 'Précharger la zone');
-  refs.btnDrift = mapBtn('⏱', recordDrift, 'Relever une dérive');
-  refs.btnGpx = mapBtn('📤', exportGPX, 'Exporter en GPX');
-  right.append(refs.btnNav, refs.btnFollow, refs.btnSea, refs.btnGround, refs.btnVec,
-               refs.btnCatch, refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
-  refs.btnNav.classList.toggle('on', !!state.nav);
-  refs.btnSea.classList.add('on');
-  refs.btnCatch.classList.add('on');
-  refs.btnFollow.classList.add('on');
-  root.append(right);
+    markToggle(refs.btnCatch, ui.catches);
+  }, true);
+  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnCatch);
+  markToggle(refs.btnSea, ui.seamarks);
+  markToggle(refs.btnGround, ui.seabed);
+  markToggle(refs.btnVec, ui.vectors);
+  markToggle(refs.btnCatch, ui.catches);
+
+  card.append(el('div', 'map-menu-sect', 'Actions'));
+  refs.btnMark = menuItem('📍', 'Marquer la position', 'Enregistrer un point ici', markHere);
+  refs.btnDrift = menuItem('⏱', 'Relever une dérive', 'Mesurer le courant réel', recordDrift);
+  refs.btnDl = menuItem('⤓', 'Précharger la zone', 'Pour naviguer hors ligne', downloadZone);
+  refs.btnGpx = menuItem('📤', 'Exporter en GPX', 'Vers un traceur ou une app', exportGPX);
+  card.append(refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
+
+  menu.hidden = true;
+  root.append(menu);
+
+  /* Fermeture. Toucher la carte, c'est vouloir la carte : le menu s'efface
+     sans qu'on ait à viser une croix.
+     C'est un `pointerdown` sur le conteneur Leaflet, et non `map.on('click')` :
+     l'événement de la carte ne se déclenche PAS quand le doigt tombe sur une
+     marque ou sur un bateau de la flotte — le menu restait alors ouvert
+     par-dessus la fiche qui venait de s'ouvrir. Mesuré. Le rail et le menu
+     sont hors de ce conteneur : ils ne se referment pas eux-mêmes. */
+  map.getContainer().addEventListener('pointerdown', closeMenu, { passive: true });
+  refs.onKey = (e) => { if (e.key === 'Escape' && ui.menu) closeMenu(); };
+  document.addEventListener('keydown', refs.onKey);
 
   /* --- Panneau de dérive --- */
   const bottom = el('div', 'map-overlay map-bottom');
@@ -402,13 +462,106 @@ function buildOverlay() {
   root.append(bottom);
 }
 
-function mapBtn(glyph, onClick, title) {
-  const b = el('button', 'map-btn', glyph);
+/**
+ * Bouton du rail. Le mot sous l'icône n'est pas une redite du `title` : un
+ * `title` ne s'affiche jamais sous le doigt, et trois pictogrammes muets au
+ * bord de l'écran, ça s'apprend par essais. Trois lettres suffisent à
+ * supprimer l'essai.
+ */
+function mapBtn(glyph, onClick, title, label) {
+  const b = el('button', 'map-btn');
   b.type = 'button';
   b.title = title;
   b.setAttribute('aria-label', title);
+  b.append(el('span', 'map-btn-ico', glyph));
+  if (label) {
+    const l = el('span', 'map-btn-lbl', label);
+    // L'étiquette est un raccourci pour l'œil ; c'est `aria-label`, complet,
+    // qui parle au lecteur d'écran. Sans ça il annoncerait « Aller » seul.
+    l.setAttribute('aria-hidden', 'true');
+    b.append(l);
+  }
   b.addEventListener('click', onClick);
   return b;
+}
+
+/**
+ * Une ligne du menu : l'icône, le NOM, et une phrase qui dit à quoi ça sert.
+ * Le nom n'est pas une politesse d'accessibilité — c'est la seule chose qui
+ * transforme une grille de pictogrammes en outil qu'on peut apprendre.
+ *
+ * @param {boolean} toggle Vrai pour une couche (garde le menu ouvert et
+ *   affiche son état) ; faux pour une action (referme le menu).
+ */
+function menuItem(glyph, name, hint, onClick, toggle = false) {
+  const b = el('button', 'map-mi');
+  b.type = 'button';
+  b.append(el('span', 'map-mi-ico', glyph));
+  const txt = el('div', 'map-mi-txt');
+  txt.append(el('div', 'map-mi-name', name));
+  if (hint) txt.append(el('div', 'map-mi-hint', hint));
+  b.append(txt);
+  if (toggle) {
+    // La coche est décorative : c'est `aria-pressed` qui porte l'état pour un
+    // lecteur d'écran. Sans `aria-hidden`, VoiceOver annoncerait « coché »
+    // même sur une couche éteinte — le signe est là, seule sa couleur change.
+    const s = el('span', 'map-mi-state', '✓');
+    s.setAttribute('aria-hidden', 'true');
+    b.append(s);
+  }
+  b.addEventListener('click', () => {
+    onClick();
+    // Une couche, on en enchaîne souvent deux ou trois : le menu reste ouvert
+    // et l'état change sous le doigt. Une action, elle, s'exécute et rend la
+    // carte — la garder ouverte cacherait précisément ce qu'on vient de faire.
+    if (!toggle) closeMenu();
+  });
+  return b;
+}
+
+/** Reflète l'état d'une couche : la case, la couleur, et le mot pour l'oreille
+ *  du lecteur d'écran — qui, lui, n'a pas de couleur. */
+function markToggle(item, on) {
+  if (!item) return;
+  item.classList.toggle('on', !!on);
+  item.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const name = item.querySelector('.map-mi-name')?.textContent || '';
+  item.title = `${name} — ${on ? 'affiché' : 'masqué'}`;
+}
+
+function setMenu(open) {
+  ui.menu = !!open;
+  if (!refs.menu) return;
+  refs.menu.hidden = !ui.menu;
+  refs.btnMenu?.classList.toggle('on', ui.menu);
+  refs.btnMenu?.setAttribute('aria-expanded', ui.menu ? 'true' : 'false');
+  // La légende des fonds s'efface pendant qu'on choisit : elle sert à LIRE la
+  // carte, et la carte est justement recouverte. Les deux se disputaient le
+  // haut de l'écran — sur un iPhone SE le menu se retrouvait tassé à trois
+  // lignes sur huit. Elle revient dès que le menu se referme.
+  if (refs.groundLegend) refs.groundLegend.hidden = ui.menu;
+  if (!ui.menu) return;
+  placeMenu();
+  navigator.vibrate?.(8);
+}
+
+/**
+ * Le bandeau du haut ne fait pas toujours la même hauteur : le relevé tient
+ * sur une ou deux lignes selon la position et la vitesse, et la pastille de
+ * flotte apparaît dès qu'un autre bateau est en mer. Un décalage fixe passait
+ * donc tantôt trop haut, tantôt trop bas. On mesure au moment de l'ouverture.
+ */
+function placeMenu() {
+  if (!refs.menu || !ui.menu) return;
+  const h = refs.topBar?.getBoundingClientRect().height || 40;
+  const t = Math.round(8 + h + 6);
+  refs.menu.style.top = `${t}px`;
+  // Dégagement du bas : l'attribution Leaflet et le bouton de prise.
+  refs.menu.style.maxHeight = `calc(100% - ${t + 76}px)`;
+}
+
+function closeMenu() {
+  if (ui.menu) setMenu(false);
 }
 
 function setMode(mode, bFwd, bRev) {
@@ -1322,9 +1475,11 @@ function paintFleetChip() {
 function paintGroundLegend() {
   if (!refs.groundLegend) return;
   clear(refs.groundLegend);
+  // Elle attend la fermeture du menu, qui occupe la même moitié d'écran.
+  refs.groundLegend.hidden = ui.menu;
   if (!ui.seabed || !seabed.ready()) return;
   const card = el('div', 'map-panel');
-  card.append(seabedLayer.legend());
+  card.append(seabedLayer.legend({ compact: true }));
   refs.groundLegend.append(card);
 }
 

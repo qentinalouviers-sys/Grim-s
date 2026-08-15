@@ -485,37 +485,131 @@ canvas { display: block; max-width: 100%; }
 .map-overlay > * { pointer-events: auto; }
 /* Le relevé du haut est plafonné à deux lignes : au-delà il recouvre le
    marqueur de destination, c'est-à-dire exactement ce qu'on est venu voir. */
-.map-top { top: 8px; left: 8px; right: 58px; display: flex; gap: 6px; flex-wrap: wrap; }
-.map-top .map-panel { max-height: 3.4em; overflow: hidden; line-height: 1.35; }
+.map-top { top: 8px; left: 8px; right: 68px; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Ce plafond vise LE RELEVÉ, pas tout ce qui passe dans le bandeau : appliqué
+   à `.map-panel` il rognait aussi la légende des fonds, coupée en plein milieu
+   d'une ligne de sédiment. Une légende à moitié lisible ne vaut pas mieux
+   qu'une légende absente. */
+.map-top .map-top-readout { max-height: 3.4em; overflow: hidden; line-height: 1.35; }
 .map-bottom {
   bottom: 8px; left: 8px;
   /* Dégagement pour le bouton de prise, qui vit dans le coin bas-droit :
      sans ça il recouvrait les actions du panneau. */
   right: 84px;
 }
+/* Le rail ne porte plus que trois boutons — aller vers, recentrer, le menu.
+   Il tient donc toujours dans l'écran, quelle qu'en soit la hauteur, et le
+   défilement qui rattrapait autrefois dix icônes n'a plus lieu d'être. */
 .map-right {
   top: 54px; right: 8px;
   display: flex; flex-direction: column; gap: 6px;
-  /* La colonne peut devenir plus haute que l'écran sur un petit téléphone :
-     elle défile plutôt que de disparaître sous le panneau. */
-  max-height: calc(100% - 210px);
-  overflow-y: auto;
-  scrollbar-width: none;
 }
-.map-right::-webkit-scrollbar { display: none; }
 .map-btn {
-  /* Le rail droit est une colonne flex qui déborde : sans flex-shrink:0 les
-     boutons se compriment à 29 px de haut dès qu'il y en a cinq. Mesuré. */
   flex: 0 0 auto;
-  width: 44px; height: 44px;
-  display: grid; place-items: center;
+  /* Un peu plus haut et large que les 44 px réglementaires : il porte un mot.
+     Trois boutons de 54 px font 174 px avec les écarts — le tiers de ce que
+     prenait l'ancienne colonne de dix, mots compris. */
+  width: 54px; min-height: 54px;
+  display: grid; place-items: center; gap: 1px;
+  padding: 4px 2px;
   border-radius: var(--r-sm);
   background: rgba(10,20,33,.92);
   border: 1px solid var(--line);
-  font-size: 17px;
   backdrop-filter: blur(8px);
 }
+.map-btn-ico { font-size: 17px; line-height: 1; }
+.map-btn-lbl {
+  /* 11 px : c'est le plancher de lisibilité retenu pour toute l'app, et une
+     étiquette de bouton n'a aucune raison d'y échapper. */
+  font-size: 11px; font-weight: 700; line-height: 1;
+  letter-spacing: .01em; color: var(--muted);
+}
 .map-btn.on { border-color: var(--cyan); color: var(--cyan); background: rgba(34,211,238,.2); }
+.map-btn.on .map-btn-lbl { color: var(--cyan); }
+
+/* --- Menu d'outils --------------------------------------------------------
+   Il s'ouvre À GAUCHE du rail, pas dessous : sous le rail il finirait derrière
+   le panneau de dérive sur un petit écran, et surtout le pouce droit
+   masquerait la ligne qu'on est en train de lire. Largeur bornée pour laisser
+   voir un bout de carte même ouvert — on choisit un outil POUR la carte, on
+   doit continuer à la voir. */
+.map-menu {
+  top: 54px; left: 8px; right: 68px;
+  /* Au-dessus des autres surcouches. Le panneau de dérive est ajouté APRÈS le
+     menu dans le document : à z-index égal il gagnait, et le menu ouvert se
+     faisait couper en deux par le panneau. Vu à l'écran. */
+  z-index: 620;
+  /* Il défile s'il dépasse ; il ne se comprime jamais. */
+  max-height: calc(100% - 130px);
+  display: flex;
+}
+/* La règle du dessus pose `display:flex`, ce qui l'emporte sur la feuille par
+   défaut du navigateur (`[hidden] { display: none }`, de spécificité nulle) :
+   sans cette ligne le menu restait affiché après `hidden = true`. Il
+   s'ouvrait, ne se refermait jamais, et rien dans le JS ne le laissait voir.
+   Mesuré au banc, pas déduit. */
+.map-menu[hidden] { display: none; }
+.map-menu-card {
+  flex: 1;
+  /* Il se colle au rail plutôt que de s'étirer sur toute la largeur d'une
+     tablette : un menu de 700 px de large pour huit lignes serait ridicule. */
+  max-width: 320px; margin-left: auto;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: rgba(8,16,27,.96);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 5px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.45);
+}
+.map-menu-card::-webkit-scrollbar { display: none; }
+.map-menu-sect {
+  font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
+  padding: 7px 8px 4px;
+}
+.map-mi {
+  /* 44 px de haut minimum : c'est la règle de toute l'app, un menu n'y échappe
+     pas parce qu'il est temporaire. */
+  width: 100%; min-height: 44px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  color: var(--fg);
+}
+.map-mi:active { background: rgba(255,255,255,.07); }
+.map-mi-ico { flex: 0 0 22px; font-size: 16px; text-align: center; }
+.map-mi-txt { flex: 1; min-width: 0; }
+/* Le nom passe à la ligne s'il le faut. Un nom coupé par des points de
+   suspension serait le comble : on a ouvert ce menu POUR lire les noms. */
+.map-mi-name { font-size: 13px; font-weight: 650; line-height: 1.25; }
+/* L'explication est en gris et en petit : présente pour qui la cherche,
+   silencieuse pour qui connaît déjà l'outil. Elle, on peut la tronquer — elle
+   ne sert qu'à la première rencontre. */
+.map-mi-hint {
+  font-size: 10.5px; color: var(--muted); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Une case à cocher plutôt que le mot « affiché » : le mot mangeait cinquante
+   pixels de la colonne de texte, et c'est le NOM qui s'en trouvait tronqué.
+   L'état reste lisible — case pleine, ligne cyan — et l'intitulé complet. */
+.map-mi-state {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px; line-height: 1; color: transparent;
+}
+.map-mi.on { border-color: rgba(34,211,238,.42); background: rgba(34,211,238,.12); }
+.map-mi.on .map-mi-name { color: var(--cyan); }
+.map-mi.on .map-mi-state {
+  color: #061019; border-color: var(--cyan); background: var(--cyan);
+}
 .map-panel {
   background: rgba(8,16,27,.94);
   border: 1px solid var(--line);

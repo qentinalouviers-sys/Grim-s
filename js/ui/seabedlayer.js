@@ -112,8 +112,14 @@ export function create(L) {
  * Légende. Elle ne liste que les fonds RÉELLEMENT présents dans le secteur
  * embarqué : une légende qui annonce des vasières là où il n'y en a pas
  * apprend une fausse géographie.
+ *
+ * @param {boolean} compact Version courte, pour la surcouche de la carte. La
+ *   mise en garde reste — elle est le mode d'emploi de la donnée, pas une
+ *   mention légale — mais tenue en une ligne : posée en trois lignes au-dessus
+ *   de la carte, elle poussait la légende hors du cadre et on ne lisait ni
+ *   l'une ni l'autre.
  */
-export function legend() {
+export function legend({ compact = false } = {}) {
   const box = el('div', 'seabed-legend');
   for (const c of seabed.classes()) {
     const colour = colourOf(c);
@@ -126,8 +132,9 @@ export function legend() {
   }
   const m = seabed.meta();
   if (m) {
-    box.append(el('div', 'tiny',
-      `${m.source} · maille ${m.resolutionM} m. Sédiment DOMINANT de la case : une tête de roche isolée au milieu du sable n’y figure pas.`));
+    box.append(el('div', 'tiny', compact
+      ? `Sédiment dominant · maille ${m.resolutionM} m`
+      : `${m.source} · maille ${m.resolutionM} m. Sédiment DOMINANT de la case : une tête de roche isolée au milieu du sable n’y figure pas.`));
   }
   return box;
 }
