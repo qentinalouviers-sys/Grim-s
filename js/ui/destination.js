@@ -267,7 +267,10 @@ function marksPane(onPick) {
    * hydrographique, et un secteur type dessiné à la main. Le pictogramme et
    * l'étiquette le disent avant qu'on ait lu le nom. */
   const box = el('div', 'card flush');
-  const VISIBLE = 30;
+  // Douze, pas trente : ce panneau se lit en mer, d'une main, pour choisir un
+  // but qui est presque toujours l'un des plus proches. Trente lignes, c'est
+  // huit hauteurs d'écran à faire défiler sur un bateau qui tape — mesuré.
+  const VISIBLE = 12;
   for (const { s, d, b } of list.slice(0, VISIBLE)) box.append(spotRow(s, d, b, onPick));
   wrap.append(box);
   if (list.length > VISIBLE) {

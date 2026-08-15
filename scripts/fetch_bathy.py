@@ -552,35 +552,49 @@ def main() -> int:
                 # ── Sens de la convention ────────────────────────────────
                 # EMODnet publie des ÉLÉVATIONS (négatives sous la mer), mais
                 # rien ne garantit que la couverture servie suive la même
-                # convention que la documentation. Le premier passage a
-                # assemblé 467 000 cases parfaitement — et mon propre contrôle
-                # les a jetées, parce qu'il tenait le signe pour acquis.
-                # On le DÉDUIT : la Manche orientale fait 10 à 60 m de fond,
-                # la côte est un liseré. Le signe qui produit une majorité de
-                # valeurs dans cette plage est le bon.
+                # convention. On ne suppose donc pas — on regarde un endroit
+                # dont on SAIT qu'il est de l'eau.
+                #
+                # La première version de ce test comptait les valeurs comprises
+                # entre 2 et 200 et prenait le signe majoritaire. Elle s'est
+                # trompée, et de la pire façon : le plateau de Caux culmine à
+                # 100-150 m d'altitude et occupe la moitié du rectangle, si
+                # bien que « majorité de valeurs entre 2 et 200 » désignait la
+                # TERRE. La grille livrée annonçait des sondes de 1 à 253 m avec
+                # un mode vers 120 m — c'était l'altitude des falaises, lue à
+                # l'envers, et rien dans le fichier ne le disait.
+                #
+                # Le coin nord-ouest de l'emprise est à trente milles au large
+                # de Fécamp. C'est de l'eau, toujours, quelle que soit la
+                # marée. Son signe donne la convention, sans arbitrage.
+                i0 = int(len(agg) * 0.85)
+                j1 = int(len(agg[0]) * 0.18)
+                probe = [v for r in agg[i0:] for v in r[:j1] if v is not None]
                 vals = [v for r in agg for v in r if v is not None]
-                if not vals:
-                    log("    ✗ grille vide")
+                if not vals or len(probe) < 50:
+                    log("    ✗ grille vide ou coin large non renseigné")
                     continue
-                plausible = lambda xs: sum(1 for x in xs if 2 <= x <= 200)
-                as_elev = plausible([-v for v in vals])      # v négatif = mer
-                as_depth = plausible(vals)                   # v positif = sonde
-                sign = -1 if as_elev >= as_depth else 1
-                sea = max(as_elev, as_depth)
+                probe.sort()
+                med_probe = probe[len(probe) // 2]
+                sign = -1 if med_probe < 0 else 1
+                depths = [sign * v for v in vals if sign * v > 0]
+                sea = sum(1 for d in depths if 2 <= d <= 200)
                 vals.sort()
-                log(f"    valeurs : min {vals[0]}, médiane {vals[len(vals) // 2]}, "
-                    f"max {vals[-1]} · convention "
-                    f"{'élévation' if sign < 0 else 'sonde'} "
-                    f"({sea}/{total} cases en mer plausible)")
+                log(f"    coin du large : médiane {med_probe} sur {len(probe)} cases "
+                    f"→ convention {'élévation' if sign < 0 else 'sonde'}")
+                log(f"    valeurs : min {vals[0]}, médiane {vals[len(vals) // 2]}, max {vals[-1]}")
+                if not (5 <= abs(med_probe) <= 90):
+                    log(f"    ✗ {abs(med_probe)} m au large de Fécamp — la Manche "
+                        "orientale fait 10 à 60 m, ce n'est pas une sonde")
+                    continue
                 if sea < total * 0.2:
-                    log("    ✗ trop peu de mer plausible — mauvaise couverture")
+                    log(f"    ✗ {sea}/{total} cases de mer plausible — trop peu")
                     continue
 
                 codes = encode(agg, sign)
                 flat = [v for r in agg for v in r]
                 decode(codes, len(flat))        # ceinture et bretelles
 
-                depths = [sign * v for r in agg for v in r if v is not None and sign * v > 0]
                 doc = {
                     "_comment": [
                         "Sonde du secteur de Dieppe, en mètres sous le zéro des cartes.",
