@@ -798,6 +798,10 @@ function newSpotForm(pos) {
   for (const hb of habitats) {
     const b = el('button', 'chip chip-btn', hb);
     b.type = 'button';
+    // Les cases pré-remplies depuis EMODnet doivent se VOIR cochées : une
+    // sélection en mémoire que l'écran ne montre pas se fait décocher par
+    // quelqu'un qui croit la cocher.
+    b.classList.toggle('good', chosen.has(hb));
     b.addEventListener('click', () => {
       chosen.has(hb) ? chosen.delete(hb) : chosen.add(hb);
       b.classList.toggle('good', chosen.has(hb));

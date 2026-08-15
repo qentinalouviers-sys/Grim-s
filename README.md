@@ -166,6 +166,22 @@ Un modèle de courant affiché comme un trait fin est un mensonge graphique.
 Aussi : champ de vecteurs de courant, import/export GPX, waypoints, cercle de
 mouillage, et la **route active** avec son cercle d'arrivée.
 
+Le **type de fond est pré-rempli** à la création d'une marque, depuis la carte
+EMODnet embarquée (EUSeaMap 2025, rastérisée à 278 m, 15 ko, hors ligne). À
+l'échelle où l'on pêche, le fond est la donnée qui décide — le turbot est sur le
+sable et le ridin, la dorade sur la roche, la sole sur la vase — et l'app le
+demandait jusqu'ici case par case. Elle le propose désormais, sans jamais
+l'imposer : la source est cartographiée au 1:250 000, une tête de roche de vingt
+mètres n'y existe pas, et une marque relevée au sondeur reste plus juste. Le
+fond entre aussi dans l'instantané de chaque prise — c'est le seul champ qui
+décrive le terrain et non l'instant, donc le seul que deux prises au même
+endroit à six mois d'écart partagent.
+
+Le secteur couvert va du Tréport à Fécamp sur 30 milles au large ; la couverture
+est de 92 % en mer, le quadrant nord-est (approches de la Somme) étant absent de
+la source. Là où EMODnet ne dit rien, l'app écrit « fond non renseigné » plutôt
+que de deviner.
+
 Les **marques personnelles** ont un titre et une description libre, éditables
 après coup (un repère qu'on ne peut plus renommer se fige sur le nom donné à la
 va-vite, et six mois plus tard « Marque 12/04 » ne dit plus rien). Elles se
@@ -472,9 +488,11 @@ data/
   zones-dieppe.json         secteurs types et nœuds de courant
   tide-dieppe.json          fenêtre SHOM courante (généré)
   tide-history.json         archive glissante pour l'ajustement (généré)
+  seabed-dieppe.json        nature des fonds, grille RLE (généré)
 scripts/
   tidal.py                  arguments astronomiques — miroir de js/data/harmonics.js
   refresh_tide.py           récupération SHOM + archive
+  fetch_seabed.py           nature des fonds EMODnet → grille rastérisée
   fit_harmonics.py          ajustement par moindres carrés régularisés
   selftest.py               contrôles de cohérence, dont JS ↔ Python
 ```
@@ -575,6 +593,7 @@ Toutes gratuites, sans clé ni inscription.
 - **OpenSeaMap** — balisage maritime (tuiles)
 - **OpenStreetMap via Overpass API** — attributs du balisage : catégorie, voyant,
   couleur, rythme et portée des feux (mode HORIZON)
+- **EMODnet Seabed Habitats** — nature des fonds (EUSeaMap 2025, CC-BY 4.0)
 - Soleil et lune : calculés localement (NOAA / série lunaire tronquée)
 
 ## Vie privée
