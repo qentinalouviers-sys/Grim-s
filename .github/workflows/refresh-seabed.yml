@@ -1,0 +1,61 @@
+name: Nature des fonds
+
+# La nature des fonds ne change pas d'une marée à l'autre : ce n'est pas une
+# donnée à rafraîchir, c'est une donnée à récolter une fois et à revérifier
+# quand EMODnet publie une nouvelle version de ses couches. D'où le
+# déclenchement manuel, plus un passage annuel de contrôle.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '31 4 12 1 *'   # 12 janvier, une fois l'an
+
+permissions:
+  contents: write
+
+concurrency:
+  group: seabed-refresh
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Récupération EMODnet
+        # Non bloquant, comme la marée : si EMODnet renomme une couche, l'app
+        # continue de tourner — elle est seulement moins renseignée. Le journal
+        # du job liste alors les couches réellement disponibles, ce qui suffit à
+        # corriger le script.
+        continue-on-error: true
+        run: python scripts/fetch_seabed.py
+
+      - name: Contrôle de cohérence
+        run: python scripts/selftest.py
+
+      - name: Commit si changement
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/
+          if git diff --cached --quiet -- data/; then
+            echo "Aucun changement de données."
+            exit 0
+          fi
+          summary=$(python - <<'PY'
+          import json, os
+          p = 'data/seabed-dieppe.json'
+          if os.path.exists(p):
+              d = json.load(open(p))
+              rows, cols = d['size']
+              print(f"{rows}×{cols}, {len(d['classes']) - 1} classes, {d.get('layer', '?')}")
+          else:
+              print("aucune donnée")
+          PY
+          )
+          git commit -m "data: nature des fonds EMODnet (${summary})"
+          git push
