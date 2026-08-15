@@ -226,6 +226,121 @@ console.log(JSON.stringify(out));
         check(r["impossible"] is False, "une dérive supérieure à la vitesse est signalée intenable")
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 6. Code QR de partage
+# ═══════════════════════════════════════════════════════════════════════════
+# L'encodeur a été validé une fois contre un décodeur indépendant. Ce contrôle
+# empêche la régression : il RELIT la matrice produite — démasquage, parcours en
+# zigzag, extraction des mots — et vérifie qu'on retrouve le texte de départ.
+# Un QR cassé ne se voit pas à l'œil : il reste une belle grille noire et
+# blanche que plus aucun téléphone ne décode.
+print("\n6. Code QR")
+if node.returncode != 0:
+    print("  ! node absent, contrôle ignoré")
+else:
+    script = f"""
+import {{ encode, blockStructure }} from '{os.path.join(ROOT, 'js', 'core', 'qr.js')}';
+
+const MASKS = [
+  (i, j) => (i + j) % 2 === 0, (i) => i % 2 === 0, (i, j) => j % 3 === 0,
+  (i, j) => (i + j) % 3 === 0,
+  (i, j) => (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0,
+  (i, j) => ((i * j) % 2) + ((i * j) % 3) === 0,
+  (i, j) => (((i * j) % 2) + ((i * j) % 3)) % 2 === 0,
+  (i, j) => (((i + j) % 2) + ((i * j) % 3)) % 2 === 0,
+];
+
+/* Relecture : on reconstruit la carte des modules de fonction à partir de la
+   seule géométrie, on démasque, puis on suit le parcours en zigzag. */
+function readBack(qr) {{
+  const {{ size, modules, version, mask }} = qr;
+  const fn = new Uint8Array(size * size);
+  const mark = (x, y) => {{ if (x >= 0 && y >= 0 && x < size && y < size) fn[y * size + x] = 1; }};
+  for (const [ox, oy] of [[0, 0], [size - 7, 0], [0, size - 7]]) {{
+    for (let dy = -1; dy <= 7; dy++) for (let dx = -1; dx <= 7; dx++) mark(ox + dx, oy + dy);
+  }}
+  for (let i = 0; i < size; i++) {{ mark(i, 6); mark(6, i); }}
+  const ALIGN = {{1:[],2:[6,18],3:[6,22],4:[6,26],5:[6,30],6:[6,34],7:[6,22,38],8:[6,24,42],9:[6,26,46],10:[6,28,50]}};
+  for (const cy of ALIGN[version]) for (const cx of ALIGN[version]) {{
+    if ((cx <= 8 && cy <= 8) || (cx <= 8 && cy >= size - 9) || (cx >= size - 9 && cy <= 8)) continue;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) mark(cx + dx, cy + dy);
+  }}
+  for (let i = 0; i < 9; i++) {{ mark(i, 8); mark(8, i); }}
+  for (let i = 0; i < 8; i++) {{ mark(size - 1 - i, 8); mark(8, size - 1 - i); }}
+  if (version >= 7) for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) {{
+    mark(i, size - 11 + j); mark(size - 11 + j, i);
+  }}
+
+  const rule = MASKS[mask];
+  const bits = [];
+  let upward = true;
+  for (let col = size - 1; col > 0; col -= 2) {{
+    if (col === 6) col--;
+    for (let row = 0; row < size; row++) {{
+      const y = upward ? size - 1 - row : row;
+      for (let c = 0; c < 2; c++) {{
+        const x = col - c;
+        if (fn[y * size + x]) continue;
+        bits.push(modules[y * size + x] ^ (rule(y, x) ? 1 : 0));
+      }}
+    }}
+    upward = !upward;
+  }}
+  /* Les mots lus sont ENTRELACÉS entre blocs dès qu'il y en a plus d'un : les
+     relire en séquence donne du bruit. On rétablit l'ordre d'origine. */
+  const words = [];
+  for (let i = 0; i + 7 < bits.length; i += 8) {{
+    words.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+  }}
+  const {{ blocks }} = blockStructure(version, qr.level);
+  const parts = blocks.map((n) => new Array(n));
+  let k = 0;
+  for (let i = 0; i < Math.max(...blocks); i++) {{
+    for (let b = 0; b < blocks.length; b++) if (i < blocks[b]) parts[b][i] = words[k++];
+  }}
+  const data = parts.flat();
+
+  const dataBits = [];
+  for (const w of data) for (let i = 7; i >= 0; i--) dataBits.push((w >> i) & 1);
+  const num = (from, len) => dataBits.slice(from, from + len).reduce((a, b) => (a << 1) | b, 0);
+  const mode = num(0, 4);
+  const countBits = version < 10 ? 8 : 16;
+  const len = num(4, countBits);
+  const bytes = [];
+  for (let i = 0; i < len; i++) bytes.push(num(4 + countBits + i * 8, 8));
+  return {{ mode, len, text: new TextDecoder().decode(Uint8Array.from(bytes)) }};
+}}
+
+const cases = [
+  'https://qentinalouviers-sys.github.io/Grim-s/',
+  'https://example.org/',
+  "Position 49°55.94'N 001°04.98'E",
+];
+const out = [];
+for (const level of ['L', 'M', 'Q', 'H']) {{
+  for (const text of cases) {{
+    const qr = encode(text, {{ level }});
+    const back = readBack(qr);
+    out.push({{ level, version: qr.version, size: qr.size, ok: back.mode === 4 && back.text === text, text }});
+  }}
+}}
+console.log(JSON.stringify(out));
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "qr.mjs")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(script)
+        res = subprocess.run(["node", path], capture_output=True, text=True)
+
+    if res.returncode != 0:
+        check(False, f"exécution de l'encodeur QR — {res.stderr.strip().splitlines()[-1] if res.stderr else 'échec'}")
+    else:
+        rows = json.loads(res.stdout)
+        bad = [r for r in rows if not r["ok"]]
+        check(not bad, f"{len(rows)} codes relus à l'identique (v{min(r['version'] for r in rows)}"
+                       f"–v{max(r['version'] for r in rows)})"
+                       + ("" if not bad else f" — échecs : {[(r['level'], r['text'][:20]) for r in bad]}"))
+
+# ═══════════════════════════════════════════════════════════════════════════
 print()
 for n in notes:
     print(f"  ℹ {n}")

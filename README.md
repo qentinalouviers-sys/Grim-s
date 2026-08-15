@@ -267,6 +267,32 @@ confiance fausse. La fiche est en revanche déjà structurée comme le futur
 compte : identifiant stable, date de création, numéro de version pour la
 migration.
 
+### 📱 PARTAGER L'APP — un code à faire viser
+
+Deux bateaux bord à bord, moteurs au ralenti, six milles au large : on tend son
+téléphone, l'autre le vise, il a l'app. Pas d'adresse à épeler dans le vent.
+
+Le code QR est **calculé à bord** (`js/core/qr.js`, encodeur ISO/IEC 18004
+écrit pour l'occasion, mode octet, versions 1 à 10, quatre niveaux de
+correction). Un QR fabriqué par un service en ligne ne s'afficherait pas là où
+on en a besoin — c'est-à-dire sans réseau. Niveau de correction **H** : jusqu'à
+30 % du code peut être illisible (reflet, gouttes, doigt sur l'écran) et il se
+lit quand même, ce qui autorise aussi l'ancre au centre. Un mode plein écran
+sur fond blanc franc donne le contraste que réclame un écran de téléphone en
+plein soleil — et il ignore le filtre rouge du mode nuit, parce que c'est le
+contraste qui décide.
+
+L'encodeur a été validé contre un décodeur indépendant, et deux défauts que
+l'œil ne voit pas y ont été trouvés : l'information de format écrite
+transposée, et le polynôme générateur de Reed-Solomon rendu dans l'ordre
+inverse de celui qu'attend la division. Dans les deux cas la matrice restait
+une belle grille noire et blanche que pas un téléphone au monde ne décodait.
+`scripts/selftest.py` relit désormais chaque code produit — démasquage, zigzag,
+dés-entrelacement des blocs — et échoue si le texte ne revient pas à
+l'identique. Le style aussi est mesuré et non choisi : à modules trop détachés,
+un lecteur décroche ; les valeurs retenues sont les plus arrondies qui se
+relisent à tous les coups.
+
 ### 📓 JOURNAL
 Prises avec leur contexte complet, marques, et surtout **ce que le modèle a
 appris** — avec les chiffres. Calibration du modèle de dérive, export/import

@@ -886,6 +886,59 @@ canvas { display: block; max-width: 100%; }
 .tap-main { font-size: 15px; font-weight: 800; letter-spacing: .08em; }
 .tap-sub { font-size: 11.5px; font-weight: 600; opacity: .85; font-variant-numeric: tabular-nums; }
 
+/* ══ Partage par QR ════════════════════════════════════════════════════
+   Le code est posé sur du BLANC, toujours, y compris en mode nuit : un
+   lecteur cherche un contraste franc, et le filtre rouge de la passerelle le
+   lui retire. Le reste de l'écran garde le mode nuit, la pastille non. */
+.qr-holder {
+  display: grid; place-items: center;
+  margin: 12px 0 10px;
+  padding: 14px;
+  background: #fff;
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.qr-holder canvas { max-width: 100%; height: auto; }
+.qr-thumb {
+  flex: 0 0 auto;
+  padding: 5px;
+  background: #fff;
+  border-radius: var(--r-sm);
+  line-height: 0;
+}
+.qr-thumb canvas { display: block; }
+.qr-url {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--txt-2);
+  word-break: break-all;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.qr-full {
+  position: fixed; inset: 0; z-index: 95;
+  background: #fff;
+  color: #0a1421;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding: calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 16px);
+  overflow-y: auto;
+}
+.qr-full-inner { margin: auto 0; text-align: center; }
+.qr-full canvas { max-width: 100%; height: auto; }
+.qr-full-title { font-size: 17px; font-weight: 900; letter-spacing: .16em; margin-top: 14px; }
+.qr-full-sub { font-size: 12.5px; color: #475569; margin-top: 2px; }
+.qr-full-url { font-family: var(--mono); font-size: 11px; color: #64748b; margin-top: 8px; word-break: break-all; }
+.qr-full-close {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: #0a1421;
+  color: #fff;
+  font-size: 15px; font-weight: 700;
+}
+
 /* ══ Fiche bateau ══════════════════════════════════════════════════════
    Des cartes à toucher plutôt qu'un menu déroulant : un <select> natif sur un
    bateau qui bouge demande deux gestes précis et masque l'écran pendant qu'on

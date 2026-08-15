@@ -11,6 +11,7 @@ import { state, set, on, emit } from '../core/store.js';
 import { el, clear, button, chip, toast, openSheet, closeSheet } from '../ui/dom.js';
 import * as profile from '../core/profile.js';
 import { openBoatForm } from '../ui/boat.js';
+import { openShare, renderQR, appUrl } from '../ui/share.js';
 import * as fmt from '../core/fmt.js';
 import * as learning from '../fishing/learning.js';
 import * as spots from '../fishing/spots.js';
@@ -76,6 +77,29 @@ async function render() {
     boatCard.append(el('p', 'muted', 'Nom, coque, taille, motorisation, types de pêche. Le nom part dans le message de détresse ; la coque et la taille adaptent les avertissements à ton bateau plutôt qu’à un bateau moyen.'));
   }
   box.append(boatCard);
+
+  /* ══ Passer l'app au bateau d'à côté ═════════════════════════════════
+     Une vignette, pas un bouton : le code se voit, donc le geste s'invente
+     tout seul. Un lien caché derrière un menu « Partager » ne se tend pas
+     par-dessus un pare-battage. */
+  const shareCard = el('div', 'card');
+  const shh = el('div', 'card-head');
+  shh.append(el('h3', null, 'PARTAGER L’APP'));
+  shareCard.append(shh);
+  const shRow = el('div', 'row');
+  const thumb = el('div', 'qr-thumb');
+  try {
+    thumb.append(renderQR(appUrl(), 88));
+  } catch { /* rendu impossible : le bouton reste */ }
+  const shMain = el('div', 'list-main');
+  shMain.append(el('div', 'list-title', 'Un code à faire viser'));
+  shMain.append(el('div', 'list-sub', 'Bord à bord, sans réseau et sans épeler d’adresse dans le vent. Le code est calculé à bord.'));
+  shRow.append(thumb, shMain);
+  shareCard.append(shRow);
+  const shBtn = button('Afficher en grand', 'btn-sm', () => openShare());
+  shBtn.style.marginTop = '10px';
+  shareCard.append(shBtn);
+  box.append(shareCard);
 
   /* ══ Ce que le modèle a appris ═══════════════════════════════════════ */
   const learnCard = el('div', 'card');
