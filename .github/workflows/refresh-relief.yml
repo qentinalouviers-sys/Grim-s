@@ -1,0 +1,77 @@
+name: Relief et épaves
+
+# Comme la nature des fonds : ce n'est pas une donnée à rafraîchir, c'est une
+# donnée à récolter une fois et à revérifier quand EMODnet publie un nouveau
+# millésime. Déclenchement manuel, plus un passage annuel de contrôle.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '47 4 13 1 *'   # 13 janvier, une fois l'an
+
+permissions:
+  contents: write
+
+concurrency:
+  group: relief-refresh
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Non bloquants : si EMODnet renomme une couche, l'app continue de
+      # tourner — elle est seulement moins renseignée. Le journal du job liste
+      # alors ce qui était réellement disponible, ce qui suffit à corriger.
+      - name: Bathymétrie EMODnet
+        continue-on-error: true
+        run: python scripts/fetch_bathy.py
+
+      - name: Épaves EMODnet
+        continue-on-error: true
+        run: python scripts/fetch_wrecks.py
+
+      - name: Contrôle de cohérence
+        run: python scripts/selftest.py
+
+      - name: Commit si changement
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/
+          if git diff --cached --quiet -- data/; then
+            echo "Aucun changement de données."
+            exit 0
+          fi
+          summary=$(python - <<'PY'
+          import json, os
+          bits = []
+          p = 'data/bathy-dieppe.json'
+          if os.path.exists(p):
+              d = json.load(open(p))
+              r, c = d['size']
+              lo, hi = d['depthRangeM']
+              bits.append(f"sonde {r}×{c} ({lo}–{hi} m)")
+          p = 'data/wrecks-dieppe.json'
+          if os.path.exists(p):
+              bits.append(f"{json.load(open(p))['count']} épaves")
+          print(", ".join(bits) or "aucune donnée")
+          PY
+          )
+          git commit -m "data: relief et épaves EMODnet (${summary})"
+          # Le robot de marée pousse deux fois par jour sur la même branche.
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "push refusé (tentative ${attempt}) — rebase sur la branche distante"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || exit 1
+            sleep $((attempt * 5))
+          done
+          echo "::error::push impossible après trois tentatives"
+          exit 1
