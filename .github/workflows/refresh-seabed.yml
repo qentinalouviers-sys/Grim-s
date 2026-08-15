@@ -58,4 +58,17 @@ jobs:
           PY
           )
           git commit -m "data: nature des fonds EMODnet (${summary})"
-          git push
+          # Le robot de marée pousse deux fois par jour sur la même branche, et
+          # il l'a fait pendant cette collecte : le push est parti dans le vide
+          # et une carte des fonds parfaitement calculée a été perdue. On rejoue
+          # sur la tête distante avant d'insister.
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "push refusé (tentative ${attempt}) — rebase sur la branche distante"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || exit 1
+            sleep $((attempt * 5))
+          done
+          echo "::error::push impossible après trois tentatives"
+          exit 1
