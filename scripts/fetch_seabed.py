@@ -154,37 +154,59 @@ def score_layer(name: str) -> int:
     return score
 
 
+PAGE = 5000
+MAX_PAGES = 12
+
+
 def get_features(endpoint: str, layer: str) -> dict | None:
-    """GetFeature en GeoJSON sur l'emprise, en essayant les deux conventions
-    d'axes : WFS 2.0 impose lat/lon en EPSG:4326, ce que tout le monde
-    n'applique pas de la même façon."""
-    variants = [
-        {"version": "2.0.0", "typenames": layer, "count": "8000",
+    """
+    GetFeature en GeoJSON sur l'emprise, paginé.
+
+    Deux conventions d'axes sont tentées : WFS 2.0 impose lat/lon en EPSG:4326,
+    ce que tout le monde n'applique pas de la même façon.
+
+    Et surtout la PAGINATION : le premier passage plafonnait à 8000 polygones,
+    ce qui suffisait à couvrir Dieppe mais laissait un trou franc au nord-est,
+    au large du Tréport — c'est-à-dire sur de vrais fonds de pêche. Un plafond
+    silencieux qui ampute une carte est pire qu'une erreur : la carte a l'air
+    complète.
+    """
+    axis_variants = [
+        {"version": "2.0.0", "typenames": layer,
          "bbox": f"{SOUTH},{WEST},{NORTH},{EAST},urn:ogc:def:crs:EPSG::4326"},
-        {"version": "2.0.0", "typenames": layer, "count": "8000",
+        {"version": "2.0.0", "typenames": layer,
          "bbox": f"{WEST},{SOUTH},{EAST},{NORTH},EPSG:4326"},
-        {"version": "1.1.0", "typename": layer, "maxFeatures": "8000",
+        {"version": "1.1.0", "typename": layer,
          "bbox": f"{WEST},{SOUTH},{EAST},{NORTH},EPSG:4326"},
     ]
-    for params in variants:
-        q = {"service": "WFS", "request": "GetFeature",
-             "outputFormat": "application/json", "srsName": "EPSG:4326", **params}
-        url = f"{endpoint}?{urllib.parse.urlencode(q)}"
-        try:
-            raw = fetch(url)
-        except Exception as e:  # noqa: BLE001
-            log(f"GetFeature ({params['version']}) : {type(e).__name__}")
-            continue
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            log(f"GetFeature ({params['version']}) : réponse non JSON "
-                f"({raw[:120].decode('utf-8', 'replace')!r})")
-            continue
-        feats = data.get("features") or []
-        if feats:
-            log(f"{len(feats)} polygones reçus ({params['version']})")
-            return data
+    for params in axis_variants:
+        collected: list[dict] = []
+        for page in range(MAX_PAGES):
+            paging = ({"count": str(PAGE), "startIndex": str(page * PAGE)}
+                      if params["version"] == "2.0.0"
+                      else {"maxFeatures": str(PAGE), "startIndex": str(page * PAGE)})
+            q = {"service": "WFS", "request": "GetFeature",
+                 "outputFormat": "application/json", "srsName": "EPSG:4326",
+                 **params, **paging}
+            url = f"{endpoint}?{urllib.parse.urlencode(q)}"
+            try:
+                raw = fetch(url)
+            except Exception as e:  # noqa: BLE001
+                log(f"GetFeature ({params['version']}, page {page}) : {type(e).__name__}")
+                break
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                log(f"GetFeature ({params['version']}) : réponse non JSON "
+                    f"({raw[:120].decode('utf-8', 'replace')!r})")
+                break
+            feats = data.get("features") or []
+            collected.extend(feats)
+            if len(feats) < PAGE:
+                break
+        if collected:
+            log(f"{len(collected)} polygones reçus ({params['version']})")
+            return {"features": collected}
         log(f"GetFeature ({params['version']}) : 0 polygone")
     return None
 
