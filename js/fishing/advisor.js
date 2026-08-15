@@ -27,6 +27,8 @@ import * as spots from './spots.js';
 import * as weather from '../data/weather.js';
 import { hhmm, hhmmDay, cardinal, num, dist, beaufort, beaufortLabel } from '../core/fmt.js';
 import { moonPhase } from '../data/astro.js';
+import { state } from '../core/store.js';
+import * as profile from '../core/profile.js';
 
 const HOUR = 3600000;
 
@@ -75,6 +77,29 @@ export function brief({ now = Date.now(), samples = [], scores = {}, hourly = []
       conditions.push({ label: 'Mer', value: `${num(wx.waveHeightM, 1)} m${wx.wavePeriodS ? ` / ${Math.round(wx.wavePeriodS)} s` : ''}` });
       if (wx.waveHeightM >= 1.5) {
         warnings.push({ level: 'warn', text: `Mer à ${num(wx.waveHeightM, 1)} m : tenue de poste difficile, verticale peu précise.` });
+      }
+    }
+
+    /* ---- Limites du bateau ---------------------------------------------- *
+     * Un seuil unique pour tout le monde ne veut rien dire : 1,2 m de mer sous
+     * un semi-rigide de 5 m et sous une coque dure de 8 m, ce ne sont pas les
+     * mêmes conditions. Dès que la fiche du bateau est renseignée, l'avis est
+     * comparé à CE bateau. Sans fiche, on ne dit rien de plus qu'avant. */
+    const p = state.profile;
+    if (p?.lengthM && p?.hull) {
+      const lim = profile.comfort(p);
+      const over = [];
+      if (wx.waveHeightM != null && wx.waveHeightM > lim.seaLimitM) {
+        over.push(`mer ${num(wx.waveHeightM, 1)} m pour une limite de ${String(lim.seaLimitM).replace('.', ',')} m`);
+      }
+      if (wx.windSpeedKn > lim.windLimitKn) {
+        over.push(`vent ${Math.round(wx.windSpeedKn)} nd pour une limite de ${lim.windLimitKn} nd`);
+      }
+      if (over.length) {
+        warnings.push({
+          level: 'danger',
+          text: `Au-dessus de ce que ${p.boatName || 'ton bateau'} encaisse confortablement : ${over.join(', ')}. Seuils indicatifs — c’est toi le chef de bord.`,
+        });
       }
     }
     if (wx.seaTempC != null) conditions.push({ label: 'Eau', value: `${num(wx.seaTempC, 1)} °C` });

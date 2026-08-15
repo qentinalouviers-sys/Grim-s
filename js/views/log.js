@@ -8,7 +8,9 @@
  * ========================================================================== */
 
 import { state, set, on, emit } from '../core/store.js';
-import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
+import { el, clear, button, chip, toast, openSheet, closeSheet } from '../ui/dom.js';
+import * as profile from '../core/profile.js';
+import { openBoatForm } from '../ui/boat.js';
 import * as fmt from '../core/fmt.js';
 import * as learning from '../fishing/learning.js';
 import * as spots from '../fishing/spots.js';
@@ -32,9 +34,48 @@ export function unmount() {
 }
 
 on('catches:changed', () => refs.body && render());
+on('profile:changed', () => refs.body && render());
+
+/** Libellé lisible d'un identifiant de liste (coque, motorisation, pêche). */
+const profileLabel = (list, id) => list.find((x) => x.id === id)?.name || null;
 
 async function render() {
   const box = clear(refs.body);
+
+  /* ══ Le bateau ═══════════════════════════════════════════════════════
+     En tête du journal, parce que c'est l'identité de tout le reste : le nom
+     qui part à la VHF, la coque et la taille qui décident de ce qui est
+     raisonnable comme mer, et demain le compte de la communauté. */
+  const p = state.profile || {};
+  const boatCard = el('div', 'card');
+  const bh = el('div', 'card-head');
+  bh.append(el('h3', null, 'MON BATEAU'), el('div', 'spacer'));
+  bh.append(button(p.boatName ? 'Modifier' : 'Renseigner', 'btn-sm', () => openBoatForm({ onSaved: render })));
+  boatCard.append(bh);
+  if (p.boatName) {
+    boatCard.append(el('div', 'list-title', p.boatName));
+    const bits = [
+      profileLabel(profile.HULL_TYPES, p.hull),
+      p.lengthM ? `${String(p.lengthM).replace('.', ',')} m` : null,
+      profileLabel(profile.PROPULSIONS, p.propulsion),
+      p.powerHp ? `${p.powerHp} ch` : null,
+      p.pob ? `${p.pob} à bord` : null,
+    ].filter(Boolean);
+    boatCard.append(el('div', 'list-sub', bits.join(' · ') || 'Fiche incomplète'));
+    if (p.fishing?.length) {
+      const fr = el('div', 'row wrap');
+      fr.style.marginTop = '6px';
+      for (const f of p.fishing) fr.append(chip(profileLabel(profile.FISHING_TYPES, f) || f));
+      boatCard.append(fr);
+    }
+    if (p.lengthM && p.hull) {
+      const c = profile.comfort(p);
+      boatCard.append(el('div', 'tiny', `Seuils de confort déduits : mer ≤ ${String(c.seaLimitM).replace('.', ',')} m, vent ≤ ${c.windLimitKn} nd. Le guide prévient au-delà.`));
+    }
+  } else {
+    boatCard.append(el('p', 'muted', 'Nom, coque, taille, motorisation, types de pêche. Le nom part dans le message de détresse ; la coque et la taille adaptent les avertissements à ton bateau plutôt qu’à un bateau moyen.'));
+  }
+  box.append(boatCard);
 
   /* ══ Ce que le modèle a appris ═══════════════════════════════════════ */
   const learnCard = el('div', 'card');

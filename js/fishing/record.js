@@ -33,6 +33,8 @@ import { el, button, toast, openSheet, closeSheet } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
 import { distance, bearing } from '../core/geo.js';
 import { SPECIES_RULES, SPECIES_ORDER, OTHER_SPECIES, getRegulationStatus } from './species.js';
+import * as catalog from './catalog.js';
+import { openSpeciesBook } from '../ui/speciesbook.js';
 import * as spots from './spots.js';
 import * as tide from '../data/tide.js';
 import * as stream from '../data/stream.js';
@@ -84,6 +86,11 @@ export function speciesInfo(id, fallbackName = null) {
     const r = SPECIES_RULES[id];
     return { id, name: r.name, emoji: r.emoji, color: r.color, custom: false };
   }
+  // Le catalogue prend le relais : une prise enregistrée depuis une fiche garde
+  // son nom, sa couleur et son emoji partout — carte, journal, export GPX.
+  const cat = catalog.findSpecies(id);
+  if (cat) return { id, name: cat.name, emoji: cat.emoji, color: cat.color, custom: false };
+
   const c = customSpecies.find((x) => x.id === id);
   if (c) return { ...c, custom: true };
   return {
@@ -312,6 +319,17 @@ export async function record(speciesId, opts = {}) {
       label: 'Annuler',
       onClick: () => undoLast(),
     });
+
+    /* Contrôle de maille. Il arrive APRÈS l'enregistrement, jamais avant : un
+     * poisson sous la maille se remet à l'eau tout de suite, et l'app n'a pas à
+     * retenir la main de quelqu'un pendant qu'il tient un poisson vivant. Elle
+     * le dit, l'enregistrement reste, et la remise à l'eau se coche après. */
+    const size = catalog.sizeCheck(speciesId, rec.lengthCm);
+    if (size.verdict === 'undersize') {
+      toast(`⚠︎ Sous la maille : ${size.minSizeCm} cm pour ${info.name}. À remettre à l’eau.`, 'danger', 7000);
+    } else if (size.verdict === 'forbidden') {
+      toast(`⛔️ ${info.name} : espèce interdite à la capture. Relâcher immédiatement.`, 'danger', 8000);
+    }
   }
   return rec;
 }
@@ -425,6 +443,21 @@ export function openQuickRecord() {
 
   for (const id of SPECIES_ORDER) grid.append(tile(speciesInfo(id)));
   for (const c of customSpecies) grid.append(tile(c));
+
+  /* Le catalogue avant la saisie libre : une plie enregistrée depuis la fiche
+   * garde son identifiant, sa maille et sa saison ; la même tapée à la main
+   * devient une chaîne de caractères dont l'app ne saura plus rien. */
+  const bookTile = el('button', 'species-tile species-tile--add');
+  bookTile.type = 'button';
+  bookTile.append(el('span', 'species-emoji', '📖'), el('span', 'species-name', 'Catalogue'));
+  bookTile.addEventListener('click', () => {
+    closeSheet();
+    setTimeout(() => openSpeciesBook({
+      title: 'Choisir l’espèce',
+      onPick: (s) => record(s.id, { name: s.name, extra }),
+    }), 80);
+  });
+  grid.append(bookTile);
 
   const addTile = el('button', 'species-tile species-tile--add');
   addTile.type = 'button';

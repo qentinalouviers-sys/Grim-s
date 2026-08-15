@@ -16,6 +16,8 @@ import { state, subscribe, emit, set } from '../core/store.js';
 import { el, clear, card, button, toast, openSheet, closeSheet, heatColor, scoreBadge, factorBars } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
 import { SPECIES_RULES, SPECIES_ORDER, getRegulationStatus, REGULATION_META } from '../fishing/species.js';
+import * as catalog from '../fishing/catalog.js';
+import { openSpeciesBook } from '../ui/speciesbook.js';
 import { findWindows } from '../fishing/engine.js';
 import * as spots from '../fishing/spots.js';
 import * as weather from '../data/weather.js';
@@ -78,6 +80,13 @@ function render() {
     seg.append(b);
   });
   head.append(seg);
+
+  /* Le catalogue complet, à un tap du tableau des scores. Sept espèces sont
+   * scorées ; il s'en pêche soixante sur la côte, et la question « je peux le
+   * garder ? » ne se pose jamais pour celles qu'on attendait. */
+  const bookBtn = button(`📖 Les ${catalog.count()} espèces des côtes normandes`, 'btn-sm', () => openSpeciesBook());
+  bookBtn.style.marginTop = '10px';
+  head.append(bookBtn);
 
   /* ---- Avertissements --------------------------------------------------- */
   const warn = clear(refs.warn);

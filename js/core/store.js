@@ -43,6 +43,7 @@ export const state = {
   online: navigator.onLine,
   nightMode: false,
   settings: null,
+  profile: null,      // fiche du bateau : nom, coque, taille, motorisation, pêches
   banner: null,
 };
 

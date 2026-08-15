@@ -209,6 +209,33 @@ emporte avec leur contexte en description, lisible dans OpenCPN ou Navionics.
 Une prise s'écrivant en un tap, elle s'annule en un tap : la confirmation
 porte un bouton **Annuler**.
 
+### 📖 LE CATALOGUE DES ESPÈCES
+
+Les **62 espèces des côtes normandes** — poissons, céphalopodes, crustacés —
+plus celles qu'il faut savoir reconnaître pour les relâcher. Accessible depuis
+le mode PÊCHE, et depuis le carnet de prise au moment d'enregistrer.
+
+Chaque fiche porte ce qu'on cherche quand on tient un poisson dans la main :
+comment le **reconnaître** (le détail qui le distingue de son sosie — les
+tubercules du turbot contre la peau lisse de la barbue, la mâchoire du congre
+contre celle de l'anguille), la **saison** en douze cases avec le mois courant
+encadré, la **maille**, la **sonde**, la **technique**, et le danger quand il y
+en a un — la petite vive a droit à son protocole de piqûre en toute lettre.
+
+Le tri par défaut est la **saison, pas l'alphabet** : fin août on veut voir
+maquereau, bar et seiche, pas anchois et araignée. La recherche accepte le nom
+local et le nom latin — « carrelet » trouve la plie, « morue » le cabillaud,
+« solea » la sole.
+
+Sept espèces seulement sont **scorées** (mode PÊCHE) : chacune porte une
+dizaine de facteurs pondérés, refittables sur le journal de captures. Les
+inventer pour soixante espèces produirait un modèle qui a l'air savant et ne
+sait rien. Le catalogue porte donc ce qui s'affirme sans modèle, et le dit.
+
+Et quand une maille n'est pas garantie par nos sources, la fiche écrit
+**« à vérifier »** au lieu d'un chiffre. Une taille inventée, au bout, c'est une
+amende ou un poisson tué pour rien.
+
 ### 🐟 PÊCHE
 Trois niveaux de lecture, dans l'ordre des questions qu'on se pose :
 
@@ -220,6 +247,25 @@ Trois niveaux de lecture, dans l'ordre des questions qu'on se pose :
 
 Sept espèces de la Manche orientale : bar, lieu jaune, turbot/barbue,
 saint-pierre, raie bouclée, dorade grise, maquereau.
+
+### ⛵️ MON BATEAU
+
+Nom, type de coque, longueur, motorisation, puissance, équipage, types de pêche
+pratiqués. Renseigné une fois depuis le JOURNAL, il sert immédiatement :
+
+- le **nom** part dans le message MAYDAY de l'écran SOS ;
+- la **coque et la longueur** donnent une limite de mer et de vent propre au
+  bateau. « Mer 1,2 m » ne veut pas dire la même chose sous un semi-rigide de
+  5 m et sous une coque dure de 8 m, et un seuil unique pour tout le monde ne
+  veut rien dire. Le guide prévient quand les conditions dépassent *ce*
+  bateau-là.
+
+Il n'y a **pas de mot de passe**, et c'est un refus assumé tant qu'il n'y a pas
+de serveur : sans personne à qui le prouver, un mot de passe stocké sur le
+téléphone ne protège rien — il se lit en clair dans IndexedDB — et fabrique une
+confiance fausse. La fiche est en revanche déjà structurée comme le futur
+compte : identifiant stable, date de création, numéro de version pour la
+migration.
 
 ### 📓 JOURNAL
 Prises avec leur contexte complet, marques, et surtout **ce que le modèle a

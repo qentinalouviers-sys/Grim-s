@@ -18,6 +18,7 @@
 import { state, set, subscribe, on } from './core/store.js';
 import { APP_VERSION } from './core/build.js';
 import * as idb from './core/idb.js';
+import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
 import * as fmt from './core/fmt.js';
@@ -85,6 +86,7 @@ async function boot() {
 
   const settings = (await idb.get('kv', 'settings')) || {};
   set({ settings, nightMode: !!settings.nightMode });
+  await profile.init();
   document.body.classList.toggle('night', !!settings.nightMode);
 
   record.mountFab();
