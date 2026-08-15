@@ -41,6 +41,30 @@ Comme fetch_seabed.py : le script DÉCOUVRE la couverture et les formats
 disponibles au lieu de coder en dur des noms qui changeront, et sort en code 0
 avec un rapport de ce qu'il a vu s'il n'obtient rien. L'application fonctionne
 sans ce fichier ; elle est seulement moins renseignée.
+
+── ÉTAT AU 15 AOÛT 2026 : CE SCRIPT NE RAPPORTE RIEN, ET C'EST VOULU ────────
+Quatre passages en conditions réelles ont établi que le point d'entrée
+https://ows.emodnet-bathymetry.eu/wcs ne sert PAS le modèle de terrain. Il
+répond, il découpe, il livre un GeoTIFF parfaitement formé — sur UNE BANDE DE
+HUIT BITS. C'est un rendu colorié : les valeurs sont des index de palette de 0
+à 255, pas des mètres.
+
+Le troisième passage l'a d'ailleurs livré tel quel, et le fichier annonçait des
+sondes de 1 à 253 m avec un mode vers 120 m. Personne n'aurait tiqué sans
+connaître le coin : 120 m, c'est l'altitude du plateau de Caux, lue comme une
+profondeur. D'où les deux garde-fous qui restent ici et qui sont le vrai
+résultat de ce travail :
+
+  1. une bande de huit bits n'est jamais un MNT, quel que soit son en-tête ;
+  2. le coin nord-ouest de l'emprise est à trente milles au large de Fécamp,
+     donc sous 5 à 90 m d'eau. Toute grille qui prétend autre chose est
+     refusée, sans discussion.
+
+Pour obtenir la vraie donnée il faut passer par le portail de téléchargement
+d'EMODnet Bathymetry : les tuiles du DTM en NetCDF ou GeoTIFF, une centaine de
+mégaoctets par tuile, à réduire dans ce même job. C'est un travail distinct et
+plus lourd que ce collecteur, et il vaut d'être fait — la sonde est la donnée
+qui manque le plus à l'app. En attendant, mieux vaut rien qu'une carte fausse.
 """
 
 from __future__ import annotations
