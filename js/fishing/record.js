@@ -38,6 +38,7 @@ import { openSpeciesBook } from '../ui/speciesbook.js';
 import * as spots from './spots.js';
 import * as tide from '../data/tide.js';
 import * as stream from '../data/stream.js';
+import * as seabed from '../data/seabed.js';
 import * as weather from '../data/weather.js';
 import { sunTimes, sunAltitude, moonPhase, lightPhaseAt } from '../data/astro.js';
 import * as learning from './learning.js';
@@ -235,6 +236,15 @@ export function buildSnapshot(t = Date.now(), speciesId = null) {
     /* ressenti bord — la mer sous la coque, pas celle d'une maille de 8 km */
     seaStateOnboardM: round(state.motion?.hsEstimateM, 2),
     seaStateLabel: state.motion?.seaState?.label ?? null,
+
+    /* nature du fond, si la carte EMODnet est embarquée. C'est le seul champ
+       de l'instantané qui décrit le TERRAIN et non l'instant : deux prises au
+       même endroit à six mois d'écart partagent leur fond, et c'est justement
+       ce qui rend l'apprentissage par poste possible. */
+    seabed: (() => {
+      const g = seabed.at(pos.lat, pos.lon);
+      return g ? { label: g.label, fr: g.fr, habitat: g.habitat } : null;
+    })(),
 
     /* lumière */
     lightPhase: lightPhaseAt(t, pos.lat, pos.lon),
@@ -694,6 +704,7 @@ export function describeSnapshot(s) {
   if (s.nearestSpot) {
     pos.push(['Poste', `${s.nearestSpot.name} · ${fmt.dist(s.nearestSpot.distanceM)} au ${fmt.heading(s.nearestSpot.bearingDeg)}`]);
   }
+  if (s.seabed) pos.push(['Nature du fond', s.seabed.fr]);
   if (s.waterDepthM != null) pos.push(["Hauteur d'eau", `${fmt.num(s.waterDepthM, 1)} m`]);
   else if (s.waterDepthRangeM) {
     pos.push(["Hauteur d'eau", `${fmt.num(s.waterDepthRangeM[0], 0)}–${fmt.num(s.waterDepthRangeM[1], 0)} m (secteur)`]);

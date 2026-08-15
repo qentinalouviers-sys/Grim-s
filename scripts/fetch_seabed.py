@@ -154,60 +154,74 @@ def score_layer(name: str) -> int:
     return score
 
 
-PAGE = 5000
-MAX_PAGES = 12
+PER_TILE = 6000
+TILES_LON, TILES_LAT = 5, 3
+
+
+def fetch_box(endpoint: str, layer: str, s: float, w: float, n: float, e: float) -> list[dict]:
+    """Une emprise, en essayant les deux conventions d'axes : WFS 2.0 impose
+    lat/lon en EPSG:4326, ce que tout le monde n'applique pas pareil."""
+    variants = [
+        {"version": "2.0.0", "typenames": layer, "count": str(PER_TILE),
+         "bbox": f"{s},{w},{n},{e},urn:ogc:def:crs:EPSG::4326"},
+        {"version": "2.0.0", "typenames": layer, "count": str(PER_TILE),
+         "bbox": f"{w},{s},{e},{n},EPSG:4326"},
+        {"version": "1.1.0", "typename": layer, "maxFeatures": str(PER_TILE),
+         "bbox": f"{w},{s},{e},{n},EPSG:4326"},
+    ]
+    for params in variants:
+        q = {"service": "WFS", "request": "GetFeature",
+             "outputFormat": "application/json", "srsName": "EPSG:4326", **params}
+        try:
+            raw = fetch(f"{endpoint}?{urllib.parse.urlencode(q)}")
+            data = json.loads(raw)
+        except Exception:  # noqa: BLE001
+            continue
+        feats = data.get("features") or []
+        if feats:
+            return feats
+    return []
 
 
 def get_features(endpoint: str, layer: str) -> dict | None:
     """
-    GetFeature en GeoJSON sur l'emprise, paginé.
+    Récupère l'emprise TUILE PAR TUILE.
 
-    Deux conventions d'axes sont tentées : WFS 2.0 impose lat/lon en EPSG:4326,
-    ce que tout le monde n'applique pas de la même façon.
+    La pagination a été essayée et n'a rien donné : ce serveur ignore
+    `startIndex` et renvoyait douze fois la même première page — d'où une carte
+    qui semblait complète et laissait tout le quadrant nord-est vide, au large
+    du Tréport et de la Somme, c'est-à-dire sur de vrais fonds de pêche. Un
+    plafond silencieux qui ampute une carte est pire qu'une erreur franche.
 
-    Et surtout la PAGINATION : le premier passage plafonnait à 8000 polygones,
-    ce qui suffisait à couvrir Dieppe mais laissait un trou franc au nord-est,
-    au large du Tréport — c'est-à-dire sur de vrais fonds de pêche. Un plafond
-    silencieux qui ampute une carte est pire qu'une erreur : la carte a l'air
-    complète.
+    Découper l'emprise en tuiles ne dépend, lui, d'aucune fonction optionnelle
+    du serveur : chaque requête a son propre plafond, et un polygone à cheval
+    sur deux tuiles est simplement rastérisé deux fois, sans conséquence.
     """
-    axis_variants = [
-        {"version": "2.0.0", "typenames": layer,
-         "bbox": f"{SOUTH},{WEST},{NORTH},{EAST},urn:ogc:def:crs:EPSG::4326"},
-        {"version": "2.0.0", "typenames": layer,
-         "bbox": f"{WEST},{SOUTH},{EAST},{NORTH},EPSG:4326"},
-        {"version": "1.1.0", "typename": layer,
-         "bbox": f"{WEST},{SOUTH},{EAST},{NORTH},EPSG:4326"},
-    ]
-    for params in axis_variants:
-        collected: list[dict] = []
-        for page in range(MAX_PAGES):
-            paging = ({"count": str(PAGE), "startIndex": str(page * PAGE)}
-                      if params["version"] == "2.0.0"
-                      else {"maxFeatures": str(PAGE), "startIndex": str(page * PAGE)})
-            q = {"service": "WFS", "request": "GetFeature",
-                 "outputFormat": "application/json", "srsName": "EPSG:4326",
-                 **params, **paging}
-            url = f"{endpoint}?{urllib.parse.urlencode(q)}"
-            try:
-                raw = fetch(url)
-            except Exception as e:  # noqa: BLE001
-                log(f"GetFeature ({params['version']}, page {page}) : {type(e).__name__}")
-                break
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                log(f"GetFeature ({params['version']}) : réponse non JSON "
-                    f"({raw[:120].decode('utf-8', 'replace')!r})")
-                break
-            feats = data.get("features") or []
-            collected.extend(feats)
-            if len(feats) < PAGE:
-                break
-        if collected:
-            log(f"{len(collected)} polygones reçus ({params['version']})")
-            return {"features": collected}
-        log(f"GetFeature ({params['version']}) : 0 polygone")
+    collected: list[dict] = []
+    seen_ids: set = set()
+    dLat = (NORTH - SOUTH) / TILES_LAT
+    dLon = (EAST - WEST) / TILES_LON
+    truncated = 0
+
+    for a in range(TILES_LAT):
+        for b in range(TILES_LON):
+            s = SOUTH + a * dLat
+            w = WEST + b * dLon
+            feats = fetch_box(endpoint, layer, s, w, s + dLat, w + dLon)
+            if len(feats) >= PER_TILE:
+                truncated += 1
+            for f in feats:
+                fid = f.get("id") or id(f)
+                if fid in seen_ids:
+                    continue
+                seen_ids.add(fid)
+                collected.append(f)
+
+    if truncated:
+        log(f"⚠ {truncated} tuile(s) au plafond de {PER_TILE} — couverture possiblement incomplète")
+    if collected:
+        log(f"{len(collected)} polygones distincts sur {TILES_LAT}×{TILES_LON} tuiles")
+        return {"features": collected}
     return None
 
 

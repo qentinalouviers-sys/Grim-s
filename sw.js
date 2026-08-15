@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.11.0';
+const VERSION = 'v1.12.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -45,6 +45,7 @@ const SHELL_FILES = [
   'js/data/weather.js',
   'js/data/stream.js',
   'js/data/seamarks.js',
+  'js/data/seabed.js',
   'js/sensors/gps.js',
   'js/sensors/heading.js',
   'js/sensors/motion.js',
@@ -83,7 +84,12 @@ const SHELL_FILES = [
   'assets/icon-512.png',
 ];
 
-const DATA_FILES = ['data/harmonics-dieppe.json', 'data/zones-dieppe.json', 'data/tide-dieppe.json'];
+const DATA_FILES = [
+  'data/harmonics-dieppe.json',
+  'data/zones-dieppe.json',
+  'data/tide-dieppe.json',
+  'data/seabed-dieppe.json',
+];
 
 // Leaflet est désormais dans le dépôt : il fait partie de la coque, précaché
 // avec elle. Plus de dépendance CDN, donc plus de mode CARTE inutilisable au

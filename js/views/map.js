@@ -31,6 +31,7 @@ import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
 import * as idb from '../core/idb.js';
 import * as learning from '../fishing/learning.js';
+import * as seabed from '../data/seabed.js';
 import * as record from '../fishing/record.js';
 
 // Leaflet est EMBARQUÉ, pas en CDN. Le CDN condamnait ce mode au premier
@@ -786,9 +787,14 @@ function newSpotForm(pos) {
   depth.placeholder = 'Sonde en mètres (carte)';
   mk('Profondeur', depth);
 
-  const habitats = ['epave', 'roche', 'ridin', 'banc-de-sable', 'sable', 'vase', 'chenal', 'tombant', 'veine', 'pleine-eau'];
+  const habitats = ['epave', 'roche', 'ridin', 'banc-de-sable', 'sable', 'sable-coquillier', 'vase', 'sablo-vaseux', 'chenal', 'tombant', 'veine', 'pleine-eau'];
   const habBox = el('div', 'row wrap');
   const chosen = new Set();
+  /* Le fond est PRÉ-COCHÉ depuis la carte EMODnet, jamais imposé : la carte
+     est au 1:250 000, une marque relevée au sondeur est plus juste qu'elle.
+     L'app propose ce qu'elle sait, l'utilisateur garde le dernier mot. */
+  const known = seabed.habitatsAround(pos.lat, pos.lon);
+  for (const h of known) chosen.add(h);
   for (const hb of habitats) {
     const b = el('button', 'chip chip-btn', hb);
     b.type = 'button';
@@ -799,6 +805,12 @@ function newSpotForm(pos) {
     habBox.append(b);
   }
   mk('Type de fond', habBox);
+  const ground = seabed.at(pos.lat, pos.lon);
+  if (ground) {
+    body.append(el('p', 'tiny',
+      `Fond relevé par EMODnet à cet endroit : ${ground.fr.toLowerCase()} `
+      + `(maille ${ground.resolutionM} m — recale si ton sondeur dit autre chose).`));
+  }
 
   const note = document.createElement('textarea');
   note.rows = 3;
@@ -880,6 +892,11 @@ function showSpot(s) {
   body.append(el('p', 'tiny', `${fmt.latDDM(s.lat)} ${fmt.lonDDM(s.lon)}${
     Array.isArray(s.depthM) ? ` · sonde ${s.depthM[0]}–${s.depthM[1]} m` : ''
   }`));
+  // Ce que dit la carte des fonds, à côté de ce que dit la marque. Les deux
+  // peuvent diverger, et c'est une information en soi : une tête de roche de
+  // vingt mètres n'existe pas dans une carte au 1:250 000.
+  const ground = seabed.at(s.lat, s.lon);
+  if (ground) body.append(el('p', 'tiny', `Fond cartographié : ${ground.fr.toLowerCase()} (EMODnet, maille ${ground.resolutionM} m)`));
 
   const drift = stream.driftVector(now, s, wx);
   body.append(el('div', 'hr'));
