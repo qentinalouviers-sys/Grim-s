@@ -140,11 +140,22 @@ def fetch_features(endpoint: str, layer: str) -> list[dict]:
 
 # Les schémas EMODnet changent de casse et de nom d'un millésime à l'autre :
 # on cherche par intention plutôt que par clé exacte.
+# Les jeux hydrographiques ne laissent presque jamais un champ vide : ils
+# écrivent « n/a », « unknown », « - ». Un premier passage a donc annoncé
+# « 189 nommées » alors que 188 s'appelaient n/a.
+BLANK = {"", "-", "--", "n/a", "na", "null", "unknown", "unnamed", "none", "0", "nan"}
+
+
 def pick(props: dict, *needles: str):
     for k, v in props.items():
         kl = k.lower()
-        if any(n in kl for n in needles) and v not in (None, "", "NULL", "Unknown"):
-            return v
+        if not any(n in kl for n in needles):
+            continue
+        if v is None:
+            continue
+        if str(v).strip().lower() in BLANK:
+            continue
+        return v
     return None
 
 
@@ -237,7 +248,10 @@ def main() -> int:
                 if depth is not None:
                     w["depthM"] = depth
                 if year:
-                    w["year"] = str(year)[:10]
+                    ys = str(year)
+                    m = re.match(r"(1[89]\d\d|20\d\d)", ys)
+                    if m:
+                        w["year"] = m.group(1)
                 wrecks.append(w)
 
             if len(wrecks) < 3:

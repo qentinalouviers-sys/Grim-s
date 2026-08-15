@@ -146,53 +146,102 @@ def supported_formats(endpoint: str, coverage: str) -> list[str]:
     return [f.strip() for f in re.findall(r"<(?:\w+:)?formats>([^<]+)</", xml, re.I)]
 
 
+# Côté maximal d'une tuile demandée. Le service a refusé 1000 × 467 avec
+# « An error occurred while checking serving limits » : il y a un plafond, il
+# n'est pas documenté, et on ne le contourne pas en insistant. On découpe.
+TILE_MAX = 320
+
+
+def one_request(endpoint: str, coverage: str, fmt: str, box, w: int, h: int):
+    params = {
+        "service": "WCS",
+        "version": "1.0.0",
+        "request": "GetCoverage",
+        "coverage": coverage,
+        "crs": "EPSG:4326",
+        "bbox": f"{box[0]},{box[1]},{box[2]},{box[3]}",
+        "width": str(w),
+        "height": str(h),
+        "format": fmt,
+    }
+    raw = get(f"{endpoint}?{urllib.parse.urlencode(params)}")
+    if raw[:2] in (b"II", b"MM"):
+        return "tiff", raw
+    txt = raw.decode("utf-8", "replace")
+    if re.match(r"\s*ncols", txt, re.I):
+        return "ascii", txt
+    return None, txt[:170].replace("\n", " ")
+
+
 def fetch_grid(endpoint: str, coverage: str):
     """
-    Renvoie (kind, payload) : ('ascii', texte) ou ('tiff', octets).
+    Grille complète de l'emprise, assemblée à partir de tuiles.
+
+    Renvoie la matrice ligne 0 = NORD, comme ArcGrid et comme GeoTIFF, ou None.
     """
     cols = int(round((EAST - WEST) / FINE))
     rows = int(round((NORTH - SOUTH) / FINE))
     offered = supported_formats(endpoint, coverage)
     log(f"    formats annoncés : {', '.join(offered) or '(aucun)'}")
 
-    # On tente ce que le service annonce, dans notre ordre de préférence, puis
-    # les valeurs par défaut si DescribeCoverage n'a rien donné.
     order = []
     for pref in FORMAT_PREFS:
         for f in offered:
             if pref in f.lower() and f not in order:
                 order.append(f)
-    for fallback in ("ArcGrid", "GeoTIFF", "image/tiff"):
+    for fallback in ("GeoTIFF", "ArcGrid", "image/tiff"):
         if fallback not in order:
             order.append(fallback)
 
+    nx = (cols + TILE_MAX - 1) // TILE_MAX
+    ny = (rows + TILE_MAX - 1) // TILE_MAX
+
     for fmt in order:
-        params = {
-            "service": "WCS",
-            "version": "1.0.0",
-            "request": "GetCoverage",
-            "coverage": coverage,
-            "crs": "EPSG:4326",
-            "bbox": f"{WEST},{SOUTH},{EAST},{NORTH}",
-            "width": str(cols),
-            "height": str(rows),
-            "format": fmt,
-        }
-        url = f"{endpoint}?{urllib.parse.urlencode(params)}"
-        log(f"    GetCoverage {cols}×{rows} en {fmt} …")
-        try:
-            raw = get(url)
-        except Exception as e:                                  # noqa: BLE001
-            log(f"      ✗ {e}")
-            continue
-        if raw[:2] in (b"II", b"MM"):
-            return "tiff", raw
-        txt = raw.decode("utf-8", "replace")
-        if re.match(r"\s*ncols", txt, re.I):
-            return "ascii", txt
-        head = txt[:170].replace("\n", " ")
-        log(f"      ✗ réponse inexploitable : {head}")
-    return None, None
+        grid: list[list[float | None]] = [[None] * cols for _ in range(rows)]
+        ok = True
+        log(f"    {cols}×{rows} en {fmt}, {nx}×{ny} tuiles …")
+        for ty in range(ny):
+            for tx in range(nx):
+                # Les bornes sont calculées EN CASES puis converties, jamais
+                # l'inverse : additionner des degrés flottants tuile après
+                # tuile décale l'assemblage d'une demi-case au bout de la
+                # quatrième, et le raccord se voit comme une faille.
+                c0, c1 = tx * TILE_MAX, min(cols, (tx + 1) * TILE_MAX)
+                r0, r1 = ty * TILE_MAX, min(rows, (ty + 1) * TILE_MAX)
+                w, h = c1 - c0, r1 - r0
+                west = WEST + c0 * FINE
+                east = WEST + c1 * FINE
+                # r0 se compte depuis le NORD, comme la matrice de sortie.
+                north = NORTH - r0 * FINE
+                south = NORTH - r1 * FINE
+                try:
+                    kind, payload = one_request(endpoint, coverage, fmt,
+                                                (west, south, east, north), w, h)
+                except Exception as e:                          # noqa: BLE001
+                    log(f"      ✗ tuile {tx},{ty} : {e}")
+                    ok = False
+                    break
+                if not kind:
+                    log(f"      ✗ tuile {tx},{ty} : {payload}")
+                    ok = False
+                    break
+                if kind == "ascii":
+                    _, sub = parse_arcgrid(payload)
+                else:
+                    sw, sh, sub = read_tiff(payload)
+                    if (sw, sh) != (w, h):
+                        log(f"      ✗ tuile {tx},{ty} : {sw}×{sh} au lieu de {w}×{h}")
+                        ok = False
+                        break
+                for r in range(h):
+                    grid[r0 + r][c0:c1] = sub[r][:w]
+            if not ok:
+                break
+        if ok:
+            filled = sum(1 for row in grid for v in row if v is not None)
+            log(f"    ✓ assemblé, {filled}/{cols * rows} cases renseignées")
+            return grid
+    return None
 
 
 def parse_arcgrid(txt: str) -> tuple[dict, list[list[float]]]:
@@ -457,15 +506,11 @@ def main() -> int:
         for score, cov in ranked[:4]:
             log(f"  · essai {cov} (score {score})")
             try:
-                kind, payload = fetch_grid(endpoint, cov)
-                if not kind:
+                grid = fetch_grid(endpoint, cov)
+                if not grid:
                     continue
-                if kind == "ascii":
-                    _, grid = parse_arcgrid(payload)
-                else:
-                    _, _, grid = read_tiff(payload)
-                    # Un GeoTIFF se lit du NORD vers le sud, comme ArcGrid :
-                    # aggregate() retourne déjà la grille, rien à faire ici.
+                # ArcGrid comme GeoTIFF descendent du nord ; aggregate()
+                # retourne la grille pour que la ligne 0 soit le bord sud.
                 agg, _, _ = aggregate(grid)
                 rows, cols = len(agg), len(agg[0])
                 sea = sum(1 for r in agg for v in r if v is not None and -v > 0)
