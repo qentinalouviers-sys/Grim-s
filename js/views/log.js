@@ -22,6 +22,7 @@ import * as idb from '../core/idb.js';
 import * as record from '../fishing/record.js';
 import * as account from '../ui/account.js';
 import * as sync from '../core/sync.js';
+import * as rescue from '../ui/rescue.js';
 
 let root;
 let refs = {};
@@ -107,6 +108,13 @@ async function render() {
       'Retrouve ton journal et tes marques sur un autre téléphone, et sauvegarde-les. Sans compte, tout reste sur cet appareil.'));
   }
   box.append(acctCard);
+
+  /* ══ Sauvegarde ══════════════════════════════════════════════════════
+     Placée haut, et pas dans les réglages : une sauvegarde qu'on ne voit
+     pas est une sauvegarde qu'on ne fait pas. La carte ne parle que s'il y
+     a quelque chose à perdre. */
+  const bk = await rescue.backupCard();
+  if (bk) box.append(bk);
 
   /* ══ Passer l'app au bateau d'à côté ═════════════════════════════════
      Une vignette, pas un bouton : le code se voit, donc le geste s'invente

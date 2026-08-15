@@ -362,7 +362,7 @@ export function noteBanner(text, level = 'warn') {
 /* --------------------------------------------------------------------------
  * Alarme plein écran
  * --------------------------------------------------------------------------
- * Une alarme de mouillage ou un MOB ne peut pas être un toast. Elle prend
+ * Une alerte de mouillage ou un MOB ne peut pas être un toast. Elle prend
  * l'écran, elle vibre, elle sonne, et elle ne part que sur une action.
  * ------------------------------------------------------------------------ */
 let alarmNode = null;

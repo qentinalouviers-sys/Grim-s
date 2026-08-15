@@ -13,7 +13,7 @@
  *              points d'entrée de chenal.
  *   PRISES     là où ça a mordu. C'est le vrai carnet de pêche, et y retourner
  *              est la première chose qu'on veut faire à la sortie suivante.
- *   REPÈRES    le port, l'homme à la mer, le mouillage : les points qu'on ne
+ *   REPÈRES    le port, l'homme à la mer, l'alerte mouillage : les points qu'on
  *              cherche pas, on les veut tout de suite.
  *
  * Tout est trié par distance quand une position est connue : la liste répond à
@@ -350,7 +350,7 @@ function refsPane(onPick) {
   const entries = [
     { emoji: '🏠', title: `Retour ${port.name}`, sub: 'Port d’attache', p: port },
     state.mob ? { emoji: '🆘', title: 'Homme à la mer', sub: `Marqué à ${fmt.hhmmss(state.mob.t)}`, p: state.mob, urgent: true } : null,
-    state.anchor?.armed ? { emoji: '⚓', title: 'Point de mouillage', sub: `Rayon ${state.anchor.radiusM} m`, p: state.anchor } : null,
+    state.anchor?.armed ? { emoji: '⚓', title: 'Point d’alerte mouillage', sub: `Rayon ${state.anchor.radiusM} m`, p: state.anchor } : null,
     state.waypoint ? { emoji: '🏁', title: state.waypoint.name || 'Waypoint posé', sub: 'Dernier point posé sur la carte', p: state.waypoint } : null,
   ].filter(Boolean);
 

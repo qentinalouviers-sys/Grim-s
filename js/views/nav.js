@@ -9,7 +9,7 @@
  *   2. cap — ce qui décide où on va
  *   3. marée et courant — ce qui décide quand
  *   4. le conseil du guide — ce qui décide quoi faire
- *   5. les actions d'urgence — mouillage, retour, MOB
+ *   5. les actions d'urgence — alerte mouillage, retour, MOB
  * ========================================================================== */
 
 import { state, subscribe, emit } from '../core/store.js';
@@ -94,8 +94,8 @@ export function mount(container) {
   /* ---- Actions ---------------------------------------------------------
    * Elles vivent ICI, juste sous le compas, et c'est un choix de mer : le tour
    * d'audit a mesuré quatre écrans et demi de défilement pour atteindre
-   * « Naviguer », « Mouillage » ou « Retour port ». À bord, une commande qu'on
-   * ne trouve pas sous le pouce n'existe pas. Marée, courant et conseil restent
+   * « Naviguer », « Alerte mouillage » ou « Retour port ». À bord, une commande
+   * qu'on ne trouve pas sous le pouce n'existe pas. Marée, courant et conseil restent
    * en dessous : ils se consultent, ils ne s'actionnent pas. */
   const actions = el('div', 'card');
   const head = el('div', 'card-head');
@@ -109,7 +109,7 @@ export function mount(container) {
 
   const row1 = el('div', 'btn-row');
   row1.style.marginTop = '8px';
-  refs.btnAnchor = button('⚓ Mouillage', '', toggleAnchor);
+  refs.btnAnchor = button('⚓ Alerte mouillage', '', toggleAnchor);
   refs.btnTrip = button('▶︎ Sortie', '', toggleTrip);
   row1.append(refs.btnAnchor, refs.btnTrip);
 
@@ -279,14 +279,14 @@ function renderKinetics() {
   renderWatches(now, fix);
 }
 
-/** Sortie en cours, veille de mouillage, route sur waypoint. */
+/** Sortie en cours, alerte mouillage, route sur waypoint. */
 function renderWatches(now, fix) {
   const parts = [];
   if (state.trip) {
     parts.push(`Sortie : ${fmt.dist(state.trip.distanceM)} · ${fmt.duration(now - state.trip.startedAt)} · max ${fmt.num(state.trip.maxSpeedKn, 1)} nd`);
   }
   if (state.anchor?.armed && fix) {
-    parts.push(`Mouillage : ${Math.round(distance(state.anchor, fix))} m du point / rayon ${state.anchor.radiusM} m`);
+    parts.push(`Alerte mouillage : ${Math.round(distance(state.anchor, fix))} m du point / rayon ${state.anchor.radiusM} m`);
   }
   if (state.waypoint && fix) {
     const d = distance(fix, state.waypoint);
@@ -398,7 +398,7 @@ function render() {
   renderAdvice();
 
   /* ---- Actions --------------------------------------------------------- */
-  refs.btnAnchor.textContent = state.anchor?.armed ? '⚓ Lever la veille' : '⚓ Mouillage';
+  refs.btnAnchor.textContent = state.anchor?.armed ? '⚓ Lever l’alerte' : '⚓ Alerte mouillage';
   refs.btnAnchor.className = `btn ${state.anchor?.armed ? 'btn-lime' : ''}`;
   refs.btnTrip.textContent = state.trip ? '⏹ Fin de sortie' : '▶︎ Sortie';
   refs.btnTrip.className = `btn ${state.trip ? 'btn-lime' : ''}`;
@@ -552,7 +552,7 @@ function openCompassDiag() {
 function toggleAnchor() {
   if (state.anchor?.armed) {
     gps.weighAnchor();
-    toast('Veille de mouillage levée');
+    toast('Alerte mouillage levée');
     return;
   }
   if (!state.fix) return void toast('Pas de position GPS', 'danger');
@@ -571,10 +571,10 @@ function toggleAnchor() {
   body.append(field);
   body.append(button('Armer la veille', 'btn-primary btn-lg', () => {
     gps.dropAnchor(Math.max(15, Math.min(300, Number(input.value) || 50)));
-    toast('Veille de mouillage armée', 'good');
+    toast('Alerte mouillage armée', 'good');
     document.getElementById('sheet-backdrop').hidden = true;
   }));
-  openSheet('Veille de mouillage', body);
+  openSheet('Alerte mouillage', body);
 }
 
 function toggleTrip() {

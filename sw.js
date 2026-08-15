@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.17.0';
+const VERSION = 'v1.18.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -69,6 +69,7 @@ const SHELL_FILES = [
   'js/ui/boat.js',
   'js/ui/share.js',
   'js/ui/install.js',
+  'js/ui/rescue.js',
   'js/ui/speciesbook.js',
   'js/views/nav.js',
   'js/views/pilot.js',

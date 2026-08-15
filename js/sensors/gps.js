@@ -169,7 +169,7 @@ export function stopTrip() {
 }
 
 /* --------------------------------------------------------------------------
- * Veille de mouillage
+ * Alerte mouillage
  * --------------------------------------------------------------------------
  * On dérape rarement d'un coup : on part en biais, doucement, pendant que
  * tout le monde pêche. Deux fixes consécutifs hors du cercle déclenchent —
