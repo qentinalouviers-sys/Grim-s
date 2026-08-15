@@ -44,6 +44,12 @@ jobs:
   deploy:
     name: Publication
     needs: verify
+    # L'environnement `github-pages` n'accepte les déploiements QUE depuis la
+    # branche par défaut : sur toute autre branche, ce job était refusé avant
+    # même de démarrer — un échec en une seconde, sans log, à chaque poussée.
+    # Une branche de travail mérite ses vérifications, pas une croix rouge
+    # permanente qui finit par ne plus rien vouloir dire.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     environment:
       name: github-pages
