@@ -47,6 +47,13 @@ export const authEmail = () => auth?.user?.email || null;
 /** Abonnement à la fin d'un tour de synchro (pour l'état affiché). */
 export const onDone = (fn) => on('sync:done', fn);
 
+/**
+ * Appel authentifié pour les autres modules — la présence de flotte s'appuie
+ * dessus. On expose l'appel, pas le jeton : personne d'autre que ce module ne
+ * doit avoir à savoir comment on s'authentifie.
+ */
+export const apiCall = (path, opts) => api(path, opts);
+
 async function api(path, { method = 'GET', body = null } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort('timeout'), FETCH_TIMEOUT);

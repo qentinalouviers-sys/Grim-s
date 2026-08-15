@@ -30,7 +30,7 @@
  * réseau téléphonique, et le message MAYDAY est calculé à bord.
  * ========================================================================== */
 
-import { state, set } from '../core/store.js';
+import { state, set, emit } from '../core/store.js';
 import { el, clear, button, toast } from './dom.js';
 import * as fmt from '../core/fmt.js';
 import * as idb from '../core/idb.js';
@@ -51,6 +51,9 @@ export function isOpen() {
 export function openSOS() {
   if (screenNode) return;
   navigator.vibrate?.([80, 50, 80]);
+  // Les bateaux du secteur équipés de l'app verront le pavillon de détresse,
+  // même si le partage de position est éteint. C'est délibéré et annoncé.
+  emit('sos:open');
   frozen = state.fix ? { ...state.fix, t: Date.now() } : null;
 
   screenNode = el('div', 'sos-screen');

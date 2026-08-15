@@ -15,9 +15,10 @@
  *   tick lent    (5 min) météo, échantillons, scoring, conseil
  * ========================================================================== */
 
-import { state, set, subscribe, on } from './core/store.js';
+import { state, set, subscribe, on, emit } from './core/store.js';
 import { APP_VERSION } from './core/build.js';
 import * as idb from './core/idb.js';
+import * as presence from './core/presence.js';
 import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
@@ -93,6 +94,7 @@ async function boot() {
   seabed.init();
   bathy.init();
   wrecks.init();
+  presence.init();
   await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord()]);
 
   const settings = (await idb.get('kv', 'settings')) || {};
@@ -570,6 +572,9 @@ function onMOB() {
   if (!m) return void dom.toast('Pas de position GPS — impossible de marquer', 'danger');
   navigator.vibrate?.([100, 60, 100, 60, 400]);
   dom.toast('MOB marqué — position figée', 'danger', 5000);
+  // La flotte doit le savoir : un homme à l'eau, c'est le seul cas où la
+  // position part même si le partage est éteint.
+  emit('mob:set', m);
   showView('map');
 }
 

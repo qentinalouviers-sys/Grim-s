@@ -22,6 +22,8 @@ import { state, subscribe, set, on, emit } from '../core/store.js';
 import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
 import { distance, bearing, destination as project, toGPX } from '../core/geo.js';
+import * as presence from '../core/presence.js';
+import * as fleet from '../ui/fleet.js';
 import * as route from '../nav/route.js';
 import { openDestinationPicker, startNav } from '../ui/destination.js';
 import * as stream from '../data/stream.js';
@@ -175,6 +177,8 @@ export async function mount(container) {
   layers.spots = L.layerGroup().addTo(map);
   layers.catches = L.layerGroup().addTo(map);
   layers.boat = L.layerGroup().addTo(map);
+  // La flotte au-dessus des marques : un bateau qui bouge prime sur un point fixe.
+  layers.fleet = L.layerGroup().addTo(map);
 
   // Référence de débogage : permet d'inspecter les couches depuis la console
   // ou un test de bout en bout. Aucun code applicatif ne l'utilise.
@@ -183,6 +187,7 @@ export async function mount(container) {
   buildOverlay();
   drawSpots();
   drawCatches();
+  drawFleet();
 
   map.on('movestart', () => {
     if (ui.follow && !map._programmaticMove) setFollow(false);
@@ -280,7 +285,13 @@ function buildOverlay() {
   refs.readout.style.flex = '1';
   refs.readout.style.fontSize = '12px';
   top.append(refs.readout);
+  /* Pastille de flotte : à côté du relevé, donc dans le champ de vision quand
+     on regarde sa position — et pas au fond d'un menu. Elle reste vide tant
+     que le serveur ne connaît pas la route. */
+  refs.fleetChip = el('div');
+  top.append(refs.fleetChip);
   root.append(top);
+  paintFleetChip();
 
   /* --- Colonne de boutons --- */
   const right = el('div', 'map-overlay map-right');
@@ -1267,6 +1278,25 @@ on('nav:stop', () => {
   refs.btnNav?.classList.remove('on');
   drawRoute();
 });
+
+function drawFleet() {
+  if (!map || !layers.fleet) return;
+  fleet.draw(L, layers.fleet, (b) => fleet.openBoat(b));
+}
+
+on('presence:fleet', () => drawFleet());
+on('presence:changed', () => { drawFleet(); paintFleetChip(); });
+
+/* Pastille d'état de la flotte : combien de bateaux autour, et ce que les
+   autres voient de toi. Sur la carte, pas dans un réglage — une fonction qui
+   expose la position doit pouvoir se couper sans chercher. */
+function paintFleetChip() {
+  if (!refs.fleetChip) return;
+  clear(refs.fleetChip);
+  if (!presence.serverAvailable()) return;   // pas de serveur, pas de pastille
+  const chip = fleet.statusChip();
+  if (chip) refs.fleetChip.append(chip);
+}
 
 /* Rafraîchit les marques quand elles changent ailleurs (import GPX, journal). */
 on('spots:changed', () => map && drawSpots());

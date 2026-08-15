@@ -1157,6 +1157,12 @@ input[type=range]::-moz-range-thumb {
 }
 
 
+/* ══ Flotte ════════════════════════════════════════════════════════════
+   Leaflet donne aux divIcon un fond blanc et une bordure grise par défaut :
+   sur une carte de nuit, chaque bateau devient un timbre-poste. */
+.fleet-icon { background: none; border: 0; }
+.fleet-icon svg { display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+
 /* ══ Boîte à leurres ═══════════════════════════════════════════════════
    Un choix de couleur se fait à l'œil, pas à la lecture : la pastille porte
    l'information, le mot ne fait que la confirmer. D'où des pastilles larges
