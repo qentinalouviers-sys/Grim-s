@@ -15,7 +15,7 @@
  "layer": "emodnet:wwshipwrecks",
  "endpoint": "https://ows.emodnet-humanactivities.eu/wfs",
  "licence": "CC-BY 4.0 — EMODnet Human Activities",
- "fetchedAt": "2026-08-15T15:54:04+00:00",
+ "fetchedAt": "2026-08-15T15:58:11+00:00",
  "port": {
   "lat": 49.9319,
   "lon": 1.0847
