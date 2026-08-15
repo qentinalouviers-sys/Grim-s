@@ -54,10 +54,17 @@ export async function init() {
 export const all = () => [...personal, ...seed];
 export const personalSpots = () => [...personal];
 
+/** Recharge le carnet personnel depuis IndexedDB — appelé après une synchro. */
+export async function reload() {
+  personal = (await idb.get('kv', 'spots')) || [];
+  return personal.length;
+}
+
 export async function addSpot(spot) {
   const s = {
     id: `p${Date.now().toString(36)}`,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     source: 'personal',
     seed: false,
     radiusM: 150,
@@ -74,7 +81,7 @@ export async function addSpot(spot) {
 export async function updateSpot(id, patch) {
   const i = personal.findIndex((s) => s.id === id);
   if (i < 0) return null;
-  personal[i] = { ...personal[i], ...patch };
+  personal[i] = { ...personal[i], ...patch, updatedAt: Date.now() };
   await idb.put('kv', 'spots', personal);
   return personal[i];
 }

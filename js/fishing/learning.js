@@ -67,6 +67,7 @@ export async function logDrift(obs) {
   list.push({ ...obs, id: Date.now() });
   // On garde 400 relevés : au-delà, on n'apprend plus rien et on paie le disque.
   await idb.put('kv', 'driftObs', list.slice(-400));
+  await idb.put('kv', 'driftObsAt', Date.now());
   return list.length;
 }
 

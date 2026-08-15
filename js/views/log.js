@@ -20,6 +20,8 @@ import * as stream from '../data/stream.js';
 import * as tide from '../data/tide.js';
 import * as idb from '../core/idb.js';
 import * as record from '../fishing/record.js';
+import * as account from '../ui/account.js';
+import * as sync from '../core/sync.js';
 
 let root;
 let refs = {};
@@ -37,6 +39,8 @@ export function unmount() {
 
 on('catches:changed', () => refs.body && render());
 on('profile:changed', () => refs.body && render());
+on('account:changed', () => refs.body && render());
+on('sync:done', () => refs.body && render());
 
 /** Libellé lisible d'un identifiant de liste (coque, motorisation, pêche). */
 const profileLabel = (list, id) => list.find((x) => x.id === id)?.name || null;
@@ -78,6 +82,31 @@ async function render() {
     boatCard.append(el('p', 'muted', 'Nom, coque, taille, motorisation, types de pêche. Le nom part dans le message de détresse ; la coque et la taille adaptent les avertissements à ton bateau plutôt qu’à un bateau moyen.'));
   }
   box.append(boatCard);
+
+  /* ══ Compte & synchro ═════════════════════════════════════════════════
+     Le compte est optionnel : l'app reste pleinement utilisable sans. La
+     carte affiche l'état réel — connecté ou non, dernière synchro — sans
+     jamais promettre de serveur quand il n'y a pas de réseau. */
+  const acctCard = el('div', 'card');
+  const acctHead = el('div', 'card-head');
+  acctHead.append(el('h3', null, 'COMPTE & SYNCHRO'), el('div', 'spacer'));
+  if (sync.isLoggedIn()) {
+    acctHead.append(button('Gérer', 'btn-sm', () => account.openAccount()));
+    acctCard.append(acctHead);
+    acctCard.append(el('div', 'list-title', sync.authEmail() || 'Connecté'));
+    acctCard.append(el('div', 'list-sub',
+      state.syncing
+        ? 'Synchronisation en cours…'
+        : state.lastSyncAt
+          ? `Dernière synchro il y a ${fmt.age(state.lastSyncAt)}.`
+          : 'Connecté — en attente de la première synchro.'));
+  } else {
+    acctHead.append(button('Se connecter', 'btn-sm', () => account.openAccount()));
+    acctCard.append(acctHead);
+    acctCard.append(el('p', 'muted',
+      'Retrouve ton journal et tes marques sur un autre téléphone, et sauvegarde-les. Sans compte, tout reste sur cet appareil.'));
+  }
+  box.append(acctCard);
 
   /* ══ Passer l'app au bateau d'à côté ═════════════════════════════════
      Une vignette, pas un bouton : le code se voit, donc le geste s'invente

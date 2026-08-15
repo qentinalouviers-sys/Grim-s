@@ -72,6 +72,7 @@ async function rememberCustom(name) {
     customSpecies.unshift({ id, name: clean, emoji: '🎣', color: '#e8f1fa', custom: true });
     customSpecies = customSpecies.slice(0, 20);
     await idb.put('kv', 'customSpecies', customSpecies);
+    await idb.put('kv', 'customSpeciesAt', Date.now());
   }
   return { id, name: clean };
 }
@@ -79,6 +80,7 @@ async function rememberCustom(name) {
 export async function forgetCustom(id) {
   customSpecies = customSpecies.filter((c) => c.id !== id);
   await idb.put('kv', 'customSpecies', customSpecies);
+  await idb.put('kv', 'customSpeciesAt', Date.now());
 }
 
 /** Descripteur d'affichage d'une espèce, connue ou libre. */

@@ -40,6 +40,7 @@ import * as engine from './fishing/engine.js';
 import * as advisor from './fishing/advisor.js';
 import * as learning from './fishing/learning.js';
 import * as record from './fishing/record.js';
+import * as sync from './core/sync.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
 // Importé pour son effet de bord autant que pour son API : le module abonne la
@@ -94,6 +95,11 @@ async function boot() {
   set({ settings, nightMode: !!settings.nightMode });
   await profile.init();
   document.body.classList.toggle('night', !!settings.nightMode);
+
+  // Compte & synchro : restaure la session puis synchronise en tâche de fond,
+  // sans jamais bloquer l'écran ni dépendre du réseau.
+  await sync.initSync();
+  if (sync.isLoggedIn()) setTimeout(() => sync.sync().catch(() => {}), 2000);
 
   record.mountFab();
   syncNavTab();

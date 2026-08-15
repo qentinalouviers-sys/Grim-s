@@ -116,7 +116,7 @@ export async function save(patch) {
 
   // Le nom du bateau et l'équipage restent aussi dans les réglages : l'écran
   // SOS les lit là, et il ne doit dépendre de rien qui puisse manquer.
-  const settings = { ...(state.settings || {}), boatName: next.boatName, pob: next.pob };
+  const settings = { ...(state.settings || {}), boatName: next.boatName, pob: next.pob, updatedAt: now };
   set({ settings });
   await idb.put('kv', 'settings', settings);
 
