@@ -10,16 +10,86 @@
   "orientation": "portrait",
   "background_color": "#050b14",
   "theme_color": "#050b14",
-  "categories": ["navigation", "sports", "utilities"],
+  "categories": [
+    "navigation",
+    "sports",
+    "utilities"
+  ],
   "icons": [
-    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Mode pêche", "short_name": "Pêche", "url": "./#fish" },
-    { "name": "Carte & dérive", "short_name": "Carte", "url": "./#map" },
-    { "name": "Journal", "short_name": "Journal", "url": "./#log" }
+    {
+      "name": "Naviguer vers un point",
+      "short_name": "Piloter",
+      "url": "./#pilot"
+    },
+    {
+      "name": "Carte & dérive",
+      "short_name": "Carte",
+      "url": "./#map"
+    },
+    {
+      "name": "Horizon — identifier un feu",
+      "short_name": "Horizon",
+      "url": "./#horizon"
+    },
+    {
+      "name": "Mode pêche",
+      "short_name": "Pêche",
+      "url": "./#fish"
+    }
+  ],
+  "id": "/Grim-s/",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "screenshots": [
+    {
+      "src": "assets/screenshots/nav.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Instruments de navigation : vitesse, vent, compas, marée, courant"
+    },
+    {
+      "src": "assets/screenshots/peche.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Scoring des espèces heure par heure"
+    },
+    {
+      "src": "assets/screenshots/especes.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Catalogue des 62 espèces des côtes normandes"
+    }
   ]
 }

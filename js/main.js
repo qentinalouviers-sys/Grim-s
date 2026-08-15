@@ -21,6 +21,7 @@ import * as idb from './core/idb.js';
 import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
+import * as install from './ui/install.js';
 import * as fmt from './core/fmt.js';
 import { distance, bearing } from './core/geo.js';
 
@@ -73,6 +74,7 @@ let wakeLock = null;
  * ========================================================================== */
 async function boot() {
   dom.initSheet();
+  install.init();
   measureChrome();
   wireChrome();
   registerServiceWorker();
@@ -107,6 +109,8 @@ async function boot() {
     document.getElementById('gate').hidden = true;
     startSensors(false);
   }
+  install.maybeOffer();
+  lockOrientation();
 }
 
 /* ==========================================================================
@@ -158,6 +162,18 @@ function measureChrome() {
   for (const d of [300, 1200, 3000]) setTimeout(apply, d);
   window.addEventListener('orientationchange', () => setTimeout(apply, 260));
   window.visualViewport?.addEventListener('resize', apply);
+}
+
+/**
+ * Verrouillage en portrait, une fois installée. Sur un bateau qui gîte, un
+ * téléphone posé sur le tableau de bord bascule tout seul en paysage au pire
+ * moment — celui où l'on regarde le cap. Le verrou n'est accordé qu'aux apps
+ * installées ; ailleurs l'appel échoue sans conséquence.
+ */
+function lockOrientation() {
+  try {
+    screen.orientation?.lock?.('portrait').catch(() => {});
+  } catch { /* non supporté : le manifeste demande déjà le portrait */ }
 }
 
 /* ==========================================================================

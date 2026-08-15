@@ -51,10 +51,20 @@ export function mount(container) {
 
   const speedCard = el('div', 'card tight');
   speedCard.append(gaugeRow);
+  /* Titre et qualificatif sur deux lignes DÉLIBÉRÉES. En une seule chaîne,
+   * « VITESSE FOND · ±10 M » repassait à la ligne tout seul, en capitales
+   * espacées, coupé n'importe où — deux cadrans côte à côte n'ont pas la
+   * largeur d'une phrase. */
   const gaugeLabels = el('div', 'gauge-pair');
+  const speedCol = el('div');
+  const windCol = el('div');
   refs.speedLbl = el('div', 'metric-lbl', 'VITESSE FOND');
+  refs.speedQual = el('div', 'metric-qual', 'sans position');
   refs.windLbl = el('div', 'metric-lbl', 'VENT');
-  gaugeLabels.append(refs.speedLbl, refs.windLbl);
+  refs.windQual = el('div', 'metric-qual', 'indisponible');
+  speedCol.append(refs.speedLbl, refs.speedQual);
+  windCol.append(refs.windLbl, refs.windQual);
+  gaugeLabels.append(speedCol, windCol);
   speedCard.append(gaugeLabels);
   root.append(speedCard);
 
@@ -81,10 +91,50 @@ export function mount(container) {
   compassCard.addEventListener('click', openCompassDiag);
   root.append(compassCard);
 
+  /* ---- Actions ---------------------------------------------------------
+   * Elles vivent ICI, juste sous le compas, et c'est un choix de mer : le tour
+   * d'audit a mesuré quatre écrans et demi de défilement pour atteindre
+   * « Naviguer », « Mouillage » ou « Retour port ». À bord, une commande qu'on
+   * ne trouve pas sous le pouce n'existe pas. Marée, courant et conseil restent
+   * en dessous : ils se consultent, ils ne s'actionnent pas. */
+  const actions = el('div', 'card');
+  const head = el('div', 'card-head');
+  head.append(el('h3', null, 'ACTIONS'));
+  actions.append(head);
+
+  // La navigation GPS est l'action la plus lourde de conséquences de cet
+  // écran : elle occupe toute la largeur, seule, et se lit sans chercher.
+  refs.btnGo = button('🎯 Naviguer vers…', 'btn-primary btn-lg', () => openDestinationPicker());
+  actions.append(refs.btnGo);
+
+  const row1 = el('div', 'btn-row');
+  row1.style.marginTop = '8px';
+  refs.btnAnchor = button('⚓ Mouillage', '', toggleAnchor);
+  refs.btnTrip = button('▶︎ Sortie', '', toggleTrip);
+  row1.append(refs.btnAnchor, refs.btnTrip);
+
+  const row2 = el('div', 'btn-row');
+  row2.style.marginTop = '8px';
+  refs.btnHome = button('🏠 Retour port', '', () => {
+    const p = spots.getPort();
+    route.start({ lat: p.lat, lon: p.lon, name: p.name, kind: 'port' });
+  });
+  refs.btnDrift = button('⏱ Relever dérive', '', () => emit('drift:record'));
+  row2.append(refs.btnHome, refs.btnDrift);
+
+  actions.append(row1, row2);
+  refs.tripInfo = el('div', 'tiny');
+  refs.tripInfo.style.marginTop = '8px';
+  actions.append(refs.tripInfo);
+  root.append(actions);
+
+
   /* ---- Bandeau d'infos ------------------------------------------------- */
   refs.strip = el('div', 'strip');
+  const stripWrap = el('div', 'strip-wrap');
+  stripWrap.append(refs.strip);
   const stripCard = el('div', 'card tight');
-  stripCard.append(refs.strip);
+  stripCard.append(stripWrap);
   root.append(stripCard);
 
   /* ---- Marée ----------------------------------------------------------- */
@@ -130,38 +180,6 @@ export function mount(container) {
   /* ---- Conseil --------------------------------------------------------- */
   refs.advice = el('div', 'card');
   root.append(refs.advice);
-
-  /* ---- Actions --------------------------------------------------------- */
-  const actions = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.append(el('h3', null, 'ACTIONS'));
-  actions.append(head);
-
-  // La navigation GPS est l'action la plus lourde de conséquences de cet
-  // écran : elle occupe toute la largeur, seule, et se lit sans chercher.
-  refs.btnGo = button('🎯 Naviguer vers…', 'btn-primary btn-lg', () => openDestinationPicker());
-  actions.append(refs.btnGo);
-
-  const row1 = el('div', 'btn-row');
-  row1.style.marginTop = '8px';
-  refs.btnAnchor = button('⚓ Mouillage', '', toggleAnchor);
-  refs.btnTrip = button('▶︎ Sortie', '', toggleTrip);
-  row1.append(refs.btnAnchor, refs.btnTrip);
-
-  const row2 = el('div', 'btn-row');
-  row2.style.marginTop = '8px';
-  refs.btnHome = button('🏠 Retour port', '', () => {
-    const p = spots.getPort();
-    route.start({ lat: p.lat, lon: p.lon, name: p.name, kind: 'port' });
-  });
-  refs.btnDrift = button('⏱ Relever dérive', '', () => emit('drift:record'));
-  row2.append(refs.btnHome, refs.btnDrift);
-
-  actions.append(row1, row2);
-  refs.tripInfo = el('div', 'tiny');
-  refs.tripInfo.style.marginTop = '8px';
-  actions.append(refs.tripInfo);
-  root.append(actions);
 
   root.append(el('div', 'tiny', 'Les données affichées ne remplacent pas les documents nautiques officiels. Marée : SHOM. Météo : Open-Meteo.'));
 
@@ -254,9 +272,7 @@ function renderKinetics() {
   if (!refs.speedLbl) return;
 
   widgets.speed.set(fix?.speedKn ?? null);
-  refs.speedLbl.textContent = fix
-    ? `VITESSE FOND · ±${Math.round(fix.accuracy || 0)} m`
-    : 'VITESSE FOND · sans position';
+  refs.speedQual.textContent = fix ? `±${Math.round(fix.accuracy || 0)} m` : 'sans position';
 
   computeMarks(now, fix, fix ? { lat: fix.lat, lon: fix.lon } : spots.getPort());
   renderHeading();
@@ -290,16 +306,14 @@ function render() {
 
   /* ---- Jauges ---------------------------------------------------------- */
   widgets.speed.set(fix?.speedKn ?? null);
-  refs.speedLbl.textContent = fix
-    ? `VITESSE FOND · ±${Math.round(fix.accuracy || 0)} m`
-    : 'VITESSE FOND · sans position';
+  refs.speedQual.textContent = fix ? `±${Math.round(fix.accuracy || 0)} m` : 'sans position';
 
   widgets.wind.set(wx?.windSpeedKn ?? null, wx ? fmt.cardinal(wx.windDirDeg) : '');
-  refs.windLbl.textContent = wx
-    ? `VENT ${fmt.cardinal(wx.windDirDeg)} · F${fmt.beaufort(wx.windSpeedKn)}${
+  refs.windQual.textContent = wx
+    ? `${fmt.cardinal(wx.windDirDeg)} · F${fmt.beaufort(wx.windSpeedKn)}${
         wx.windGustKn > wx.windSpeedKn + 4 ? ` · raf ${Math.round(wx.windGustKn)}` : ''
       }`
-    : 'VENT · indisponible';
+    : 'indisponible';
 
   /* ---- Compas ---------------------------------------------------------- */
   const hd = state.heading;

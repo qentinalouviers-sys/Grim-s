@@ -38,7 +38,8 @@ const HOUR = 3600000;
  * @returns {{
  *   headline: string,
  *   subline: string,
- *   plan: {t:number, until:number, speciesId:string, title:string, lines:string[], score:number, spot:object|null}[],
+ *   plan: {t:number, until:number, speciesId:string, title:string, lines:string[],
+ *          notes:string[], score:number, spot:object|null}[],
  *   warnings: {level:'info'|'warn'|'danger', text:string}[],
  *   conditions: {label:string, value:string}[],
  *   closed: string[]
@@ -216,7 +217,13 @@ function buildPlanEntry(w, { hourly, pos, now }) {
   const turb = hourly.length ? weather.turbidity(hourly, w.peakT, 70) : null;
   const murky = turb != null && turb > 0.45;
 
+  /* Deux niveaux, et pas un seul. « lines » est ce qu'on lit d'un coup d'œil
+   * dans le plan : où, et avec quoi. « notes » est ce qu'on veut savoir quand
+   * on a choisi cette fenêtre-là, et qui n'a rien à faire dans une liste — six
+   * lignes de prose par entrée, c'est un demi-écran de téléphone par fenêtre,
+   * donc un plan qu'on ne compare plus. */
   const lines = [];
+  const notes = [];
 
   // Où
   if (best) {
@@ -224,23 +231,23 @@ function buildPlanEntry(w, { hourly, pos, now }) {
       ? `${best.spot.name} — ${dist(best.distanceM)} au ${Math.round(best.bearingDeg)}°`
       : best.spot.name;
     lines.push(`📍 ${where}${best.spot.seed ? ' (secteur type, à recaler)' : ''}`);
-    if (best.reasons.length) lines.push(`   ${best.reasons.slice(0, 2).join(' · ')}`);
+    if (best.reasons.length) notes.push(`🗺️ ${best.reasons.slice(0, 2).join(' · ')}`);
   }
 
   // Comment
   lines.push(`🎣 ${murky ? rule.technique.murky : rule.technique.clear}`);
 
   // Pourquoi ça marche / ce qui freine
-  if (w.drivingFactor) lines.push(`✅ ${w.drivingFactor.label} : ${pct(w.drivingFactor.value)}`);
+  if (w.drivingFactor) notes.push(`✅ ${w.drivingFactor.label} : ${pct(w.drivingFactor.value)}`);
   if (w.limitingFactor && w.limitingFactor.value < 0.6) {
-    lines.push(`⚠️ ${w.limitingFactor.label} : ${pct(w.limitingFactor.value)} — ${limitAdvice(w.limitingFactor.key, rule)}`);
+    notes.push(`⚠️ ${w.limitingFactor.label} : ${pct(w.limitingFactor.value)} — ${limitAdvice(w.limitingFactor.key, rule)}`);
   }
 
   // Réglementation quand elle contraint
   const reg = getRegulationStatus(w.speciesId, w.peakT);
-  if (reg.mode === 'no-kill') lines.push('🚫 Période no-kill : remise à l’eau obligatoire.');
+  if (reg.mode === 'no-kill') notes.push('🚫 Période no-kill : remise à l’eau obligatoire.');
   else if (rule.regulation.minSizeCm) {
-    lines.push(
+    notes.push(
       `📏 Maille ${rule.regulation.minSizeCm} cm${rule.regulation.dailyBag ? ` · ${rule.regulation.dailyBag}/jour` : ''}${
         rule.regulation.markingRequired ? ' · marquage' : ''
       }`,
@@ -255,6 +262,7 @@ function buildPlanEntry(w, { hourly, pos, now }) {
     score: w.peakScore,
     title: `${rule.name} — ${hhmmDay(w.startT, now)} à ${hhmm(w.endT)}`,
     lines,
+    notes,
     spot: best,
   };
 }

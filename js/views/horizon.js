@@ -10,15 +10,18 @@
  *    marques du balisage posées à leur relèvement, dessinées comme sur la
  *    carte. On lève les yeux, on baisse les yeux, c'est au même endroit.
  *
- * 2. L'IDENTIFICATEUR. On décrit ce qu'on voit — couleur, rythme, et surtout
- *    la PÉRIODE, qu'on donne en tapant l'écran en cadence avec les éclats.
- *    Compter « vingt-et-un, vingt-deux » en pleine mer est le moyen le plus sûr
- *    de se tromper d'une seconde ; taper du doigt ne demande aucun calcul, et
- *    la médiane de quatre intervalles vaut mieux qu'un chronométrage unique.
- *
- * 3. LA LISTE. Ce qui est autour, avec le verdict de visibilité : portée du
+ * 2. LA LISTE. Ce qui est autour, avec le verdict de visibilité : portée du
  *    feu, portée géographique, visibilité météo — et lequel des trois limite.
- *    Chaque marque est un but de navigation en un tap.
+ *    Chaque marque est un but de navigation en un tap. Neuf fois sur dix, le
+ *    feu qu'on cherche est déjà là, à son relèvement : c'est la réponse
+ *    passive, elle passe donc avant l'outil qu'il faut manœuvrer.
+ *
+ * 3. L'IDENTIFICATEUR, replié tant qu'on ne le demande pas. On décrit ce qu'on
+ *    voit — couleur, rythme, et surtout la PÉRIODE, qu'on donne en tapant
+ *    l'écran en cadence avec les éclats. Compter « vingt-et-un, vingt-deux » en
+ *    pleine mer est le moyen le plus sûr de se tromper d'une seconde ; taper du
+ *    doigt ne demande aucun calcul, et la médiane de quatre intervalles vaut
+ *    mieux qu'un chronométrage unique.
  *
  * ── HONNÊTETÉ ─────────────────────────────────────────────────────────────
  * Les données viennent d'OpenStreetMap : contributives, donc parfois
@@ -29,7 +32,7 @@
  * ========================================================================== */
 
 import { state, subscribe, set } from '../core/store.js';
-import { el, clear, button, chip, toast, openSheet, closeSheet } from '../ui/dom.js';
+import { el, clear, button, chip, toast, openSheet, closeSheet, collapsible } from '../ui/dom.js';
 import { HorizonStrip } from '../ui/widgets.js';
 import * as fmt from '../core/fmt.js';
 import * as seamarks from '../data/seamarks.js';
@@ -77,14 +80,19 @@ export function mount(container) {
   refs.status = el('div', 'card tight');
   root.append(refs.status);
 
-  /* ---- Identificateur de feu -------------------------------------------- */
-  refs.ident = el('div', 'card');
-  root.append(refs.ident);
-  buildIdentifier();
-
   /* ---- Liste ------------------------------------------------------------ */
   refs.list = el('div', 'card flush');
   root.append(refs.list);
+
+  /* ---- Identificateur de feu --------------------------------------------
+   * Replié : déployé, il fait 680 px — deux écrans de pouce entre le bandeau
+   * d'horizon et la liste des marques, alors qu'il ne sert que dans le cas
+   * précis où un feu n'est PAS dans la liste. Un tap pour l'ouvrir. */
+  refs.ident = el('div');
+  root.append(collapsible('🔦 IDENTIFIER UN FEU', refs.ident, {
+    hint: 'un feu que tu ne retrouves pas',
+  }));
+  buildIdentifier();
 
   root.append(el('div', 'tiny',
     'Balisage OpenStreetMap / OpenSeaMap — donnée contributive, sans garantie. '
@@ -241,10 +249,7 @@ function renderStatus() {
  * Identificateur de feu
  * ------------------------------------------------------------------------ */
 function buildIdentifier() {
-  const box = clear(refs.ident);
-  const head = el('div', 'card-head');
-  head.append(el('h3', null, '🔦 IDENTIFIER UN FEU'));
-  box.append(head);
+  const box = clear(refs.ident);   // le titre est porté par le repli
 
   /* --- Couleur ---------------------------------------------------------- */
   const colRow = el('div', 'row wrap');

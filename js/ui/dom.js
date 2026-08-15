@@ -59,6 +59,28 @@ export function card(title, ...children) {
   return c;
 }
 
+/**
+ * Carte repliable. Un écran de réglages qui empile neuf cartes ouvertes fait
+ * dix-neuf hauteurs d'écran : on ne le parcourt pas, on s'y perd. `<details>`
+ * natif plutôt qu'un accordéon maison — il apporte le clavier, le lecteur
+ * d'écran et la recherche dans la page sans une ligne de JavaScript.
+ */
+export function collapsible(title, content, { open = false, hint = null } = {}) {
+  const d = document.createElement('details');
+  d.className = 'card fold';
+  d.open = open;
+  const sum = document.createElement('summary');
+  sum.className = 'fold-head';
+  sum.append(el('h3', null, title));
+  if (hint) sum.append(el('span', 'fold-hint', hint));
+  sum.append(el('span', 'fold-chevron', '⌄'));
+  d.append(sum);
+  const wrap = el('div', 'fold-body');
+  wrap.append(content);
+  d.append(wrap);
+  return d;
+}
+
 export function button(label, cls = '', onClick) {
   const b = el('button', `btn ${cls}`, label);
   b.type = 'button';
@@ -71,36 +93,87 @@ export function button(label, cls = '', onClick) {
  * ------------------------------------------------------------------------ */
 const backdrop = () => document.getElementById('sheet-backdrop');
 
+/* --------------------------------------------------------------------------
+ * Pile de feuilles
+ * --------------------------------------------------------------------------
+ * Ouvrir une fiche depuis une liste DÉTRUISAIT la liste : on ressortait de
+ * l'écran entier, et il fallait rouvrir le catalogue, retaper sa recherche,
+ * refaire défiler soixante espèces pour regarder la suivante. C'était le
+ * défaut le plus coûteux de l'app — pas une gêne, un mur.
+ *
+ * Une feuille ouverte par-dessus une autre EMPILE désormais, avec un chevron
+ * de retour et la position de défilement conservée. Les gestes suivent la
+ * convention mobile : ‹ et Échap et le glissé vers le bas reviennent d'un
+ * niveau, ✕ et le fond ferment tout.
+ * ------------------------------------------------------------------------ */
+const stack = [];
+
 /**
- * @param {() => void} [onClose] Appelé à la fermeture, quelle qu'en soit la
- *   voie — bouton, glissé, Échap, clic sur le fond. Une feuille qui rafraîchit
- *   en direct doit pouvoir arrêter sa boucle, sinon elle tourne pour rien
- *   jusqu'à la fin de la sortie.
+ * @param {() => void} [onClose] Appelé quand CETTE feuille disparaît, quelle
+ *   qu'en soit la voie — retour, fermeture, glissé. Une feuille qui rafraîchit
+ *   en direct doit pouvoir arrêter sa boucle.
  */
 export function openSheet(title, content, onClose = null) {
   const bd = backdrop();
-  closeSheet(); // une feuille déjà ouverte doit d'abord rendre ses ressources
-  document.getElementById('sheet-title').textContent = title;
-  const body = clear(document.getElementById('sheet-body'));
-  body.append(content);
-  body.scrollTop = 0;
-  sheetOnClose = onClose;
+  const body = document.getElementById('sheet-body');
+
+  // Mémorise l'état de la feuille courante avant de la recouvrir.
+  if (stack.length) {
+    const top = stack[stack.length - 1];
+    top.scrollTop = body.scrollTop;
+    top.nodes = [...body.childNodes];
+  }
+
+  stack.push({ title, content, onClose, scrollTop: 0, nodes: null });
+  paintSheet();
   bd.hidden = false;
-  return { close: closeSheet, body };
+  return { close: closeSheet, back: popSheet, body };
 }
 
-let sheetOnClose = null;
+function paintSheet() {
+  const top = stack[stack.length - 1];
+  if (!top) return;
+  document.getElementById('sheet-title').textContent = top.title;
+  const body = clear(document.getElementById('sheet-body'));
+  if (top.nodes) body.append(...top.nodes);
+  else body.append(top.content);
+  // Lire scrollHeight force le recalcul de mise en page. Sans ça, la position
+  // restaurée est rabotée par la hauteur de la feuille PRÉCÉDENTE — on revenait
+  // d'une fiche courte au tout début d'une liste de soixante espèces.
+  void body.scrollHeight;
+  body.scrollTop = top.scrollTop;
+  const back = document.getElementById('sheet-back');
+  if (back) back.hidden = stack.length < 2;
+  document.getElementById('sheet').classList.toggle('has-back', stack.length > 1);
+}
+
+/** Revient d'un niveau. Ferme si on était au premier. */
+export function popSheet() {
+  if (stack.length <= 1) return closeSheet();
+  const gone = stack.pop();
+  runClose(gone);
+  paintSheet();
+  return undefined;
+}
 
 export function closeSheet() {
   backdrop().hidden = true;
-  const fn = sheetOnClose;
-  sheetOnClose = null;
+  const gone = stack.splice(0, stack.length).reverse();
+  for (const s of gone) runClose(s);
+  const back = document.getElementById('sheet-back');
+  if (back) back.hidden = true;
+}
+
+function runClose(entry) {
   try {
-    fn?.();
+    entry?.onClose?.();
   } catch (e) {
     console.error('[sheet] fermeture', e);
   }
 }
+
+/** Profondeur courante — utile aux vues qui veulent savoir où elles sont. */
+export const sheetDepth = () => stack.length;
 
 export function initSheet() {
   const bd = backdrop();
@@ -108,8 +181,19 @@ export function initSheet() {
     if (e.target === bd) closeSheet();
   });
   document.getElementById('sheet-close').addEventListener('click', closeSheet);
+  document.getElementById('sheet-back')?.addEventListener('click', () => {
+    navigator.vibrate?.(6);
+    popSheet();
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !bd.hidden) closeSheet();
+    if (e.key === 'Escape' && !bd.hidden) popSheet();
+  });
+
+  /* Bouton « retour » du téléphone : sur Android il fermait l'app entière au
+     lieu de refermer la feuille ouverte. On pousse une entrée d'historique
+     par feuille pour qu'il fasse ce qu'il fait partout ailleurs. */
+  window.addEventListener('popstate', () => {
+    if (!bd.hidden) popSheet();
   });
 
   // Fermeture par glissé vers le bas — le geste attendu sur une feuille.
@@ -129,7 +213,7 @@ export function initSheet() {
     const dy = (e.changedTouches[0]?.clientY ?? startY) - startY;
     sheet.style.transform = '';
     startY = null;
-    if (dy > 110) closeSheet();
+    if (dy > 110) popSheet();
   });
 }
 
@@ -170,12 +254,21 @@ export function toast(text, kind = '', ms = 2600, action = null) {
 const shownBanners = new Set();
 const bannerById = new Map();
 
-/**
- * Les bandeaux sont en position fixe au-dessus du contenu : on répercute leur
- * hauteur réelle sur --banner-h, sinon un avertissement de trois lignes
- * recouvre la première jauge. Or c'est justement quand il y a un
- * avertissement qu'on a besoin de voir l'instrument.
- */
+/* Les bandeaux sont en position fixe au-dessus du contenu et lui volent donc
+ * de la hauteur pour de bon. Mesuré sur iPhone SE : deux bandeaux empilés —
+ * « compas silencieux » et l'invitation à installer — occupaient 278 px sur
+ * 568, laissant 147 px de contenu. Un quart d'écran utile.
+ *
+ * D'où deux règles :
+ *   1. UN SEUL bandeau visible, le plus grave ; les autres attendent leur tour
+ *      et se signalent par un compteur. Deux avertissements simultanés, ce
+ *      n'est pas deux fois plus d'information, c'est zéro fois — on les chasse
+ *      tous les deux sans les lire.
+ *   2. Deux lignes maximum, le texte complet au tap. Un bandeau doit se lire
+ *      d'un coup d'œil ; s'il faut le lire vraiment, il faut le demander. */
+const RANK = { danger: 0, warn: 1, good: 2, info: 3 };
+const queue = [];   // { node, rank, seq } — ordonné à l'affichage
+
 function measureBanners() {
   const host = document.getElementById('banner-host');
   const h = host.getBoundingClientRect().height;
@@ -183,6 +276,28 @@ function measureBanners() {
 }
 
 let bannerObserver = null;
+let bannerSeq = 0;
+
+function paintBanners() {
+  const host = clear(document.getElementById('banner-host'));
+  queue.sort((a, b) => a.rank - b.rank || a.seq - b.seq);
+  const top = queue[0];
+  if (top) {
+    host.append(top.node);
+    const badge = top.node.querySelector('.banner-more');
+    if (badge) {
+      badge.textContent = `+${queue.length - 1}`;
+      badge.hidden = queue.length < 2;
+    }
+  }
+  measureBanners();
+}
+
+function removeBanner(node) {
+  const i = queue.findIndex((e) => e.node === node);
+  if (i >= 0) queue.splice(i, 1);
+  paintBanners();
+}
 
 export function banner(text, level = 'info', { id = null, dismissible = true } = {}) {
   if (id && shownBanners.has(id)) return null;
@@ -192,20 +307,26 @@ export function banner(text, level = 'info', { id = null, dismissible = true } =
     bannerObserver = new ResizeObserver(measureBanners);
     bannerObserver.observe(host);
   }
-  const b = el('div', `banner ${level}`);
-  b.append(el('span', null, text));
+  const b = el('div', `banner ${level} clamped`);
+  const span = el('span', null, text);
+  b.append(span);
+  // Le texte tronqué se déplie au tap — sur le texte, pas sur les boutons
+  // qu'on aura pu greffer à côté.
+  span.addEventListener('click', () => {
+    b.classList.toggle('clamped');
+    measureBanners();
+  });
+  b.append(el('span', 'banner-more'));
+  b.querySelector('.banner-more').hidden = true;
   if (dismissible) {
     const x = el('button', 'x', '✕');
     x.type = 'button';
-    x.addEventListener('click', () => {
-      b.remove();
-      measureBanners();
-    });
+    x.addEventListener('click', () => removeBanner(b));
     b.append(x);
   }
   if (id) bannerById.set(id, b);
-  host.append(b);
-  measureBanners();
+  queue.push({ node: b, rank: RANK[level] ?? 3, seq: bannerSeq++ });
+  paintBanners();
   return b;
 }
 
@@ -216,15 +337,26 @@ export function banner(text, level = 'info', { id = null, dismissible = true } =
 export function dismissBanner(id) {
   const b = bannerById.get(id);
   if (!b) return;
-  b.remove();
   bannerById.delete(id);
   shownBanners.delete(id);
-  measureBanners();
+  removeBanner(b);
 }
 
 export function clearBanners() {
-  clear(document.getElementById('banner-host'));
-  measureBanners();
+  queue.length = 0;
+  paintBanners();
+}
+
+/**
+ * Bandeau posé DANS une vue (et non dans le bandeau fixe) : même discipline
+ * des deux lignes, même dépliement au tap. Sert aux avertissements qui
+ * expliquent un calcul dégradé — utiles, mais pas au prix d'un tiers d'écran.
+ */
+export function noteBanner(text, level = 'warn') {
+  const b = el('div', `banner ${level} clamped`);
+  b.append(el('span', null, text));
+  b.querySelector('span').addEventListener('click', () => b.classList.toggle('clamped'));
+  return b;
 }
 
 /* --------------------------------------------------------------------------

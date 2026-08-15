@@ -8,10 +8,11 @@
  * ========================================================================== */
 
 import { state, set, on, emit } from '../core/store.js';
-import { el, clear, button, chip, toast, openSheet, closeSheet } from '../ui/dom.js';
+import { el, clear, button, chip, collapsible, toast, openSheet, closeSheet } from '../ui/dom.js';
 import * as profile from '../core/profile.js';
 import { openBoatForm } from '../ui/boat.js';
 import { openShare, renderQR, appUrl } from '../ui/share.js';
+import * as install from '../ui/install.js';
 import * as fmt from '../core/fmt.js';
 import * as learning from '../fishing/learning.js';
 import * as spots from '../fishing/spots.js';
@@ -99,13 +100,16 @@ async function render() {
   const shBtn = button('Afficher en grand', 'btn-sm', () => openShare());
   shBtn.style.marginTop = '10px';
   shareCard.append(shBtn);
-  box.append(shareCard);
+  const appBox = el('div');
+  appBox.append(shareCard, install.card());
+  for (const c of appBox.querySelectorAll('.card')) c.style.marginBottom = '8px';
+  /* Titre explicite : « APPLICATION » ne dit pas ce qu'on y trouve, et le
+   * partage bord à bord est justement ce qu'on cherche quand un voisin de
+   * ponton demande « c'est quoi, ton appli ? ». */
+  box.append(collapsible('PARTAGER & INSTALLER', appBox, { hint: 'QR code bord à bord' }));
 
   /* ══ Ce que le modèle a appris ═══════════════════════════════════════ */
-  const learnCard = el('div', 'card');
-  const lh = el('div', 'card-head');
-  lh.append(el('h3', null, 'CE QUE LE MODÈLE A APPRIS'));
-  learnCard.append(lh);
+  const learnCard = el('div');
   for (const item of learning.explain()) {
     const r = el('div');
     r.style.padding = '5px 0';
@@ -113,7 +117,8 @@ async function render() {
     r.append(el('div', 'list-sub', item.text));
     learnCard.append(r);
   }
-  box.append(learnCard);
+  box.append(collapsible('CE QUE LE MODÈLE A APPRIS', learnCard,
+    { hint: `${learning.model().totalCatches || 0} prises` }));
 
   /* ══ Journal de captures ═════════════════════════════════════════════ */
   const list = (await learning.catches()).sort((a, b) => b.t - a.t);
@@ -164,9 +169,10 @@ async function render() {
   /* ══ Marques ═════════════════════════════════════════════════════════ */
   const personal = spots.personalSpots();
   const spotCard = el('div', 'card flush');
+  spotCard.style.marginBottom = '0';
   const sh = el('div', 'card-head');
-  sh.style.padding = '12px 12px 0';
-  sh.append(el('h3', null, `MES MARQUES (${personal.length})`), el('div', 'spacer'));
+  sh.style.padding = '0 0 8px';
+  sh.append(el('div', 'spacer'));
   const imp = button('Importer GPX', 'btn-sm', importGPX);
   sh.append(imp);
   spotCard.append(sh);
@@ -190,16 +196,13 @@ async function render() {
     }
     spotCard.append(l);
   }
-  box.append(spotCard);
+  box.append(collapsible(`MES MARQUES`, spotCard, { hint: `${personal.length}`, open: false }));
 
-  /* ══ Calibration ═════════════════════════════════════════════════════ */
-  box.append(calibrationCard());
-
-  /* ══ Réglages ════════════════════════════════════════════════════════ */
-  box.append(await settingsCard());
-
-  /* ══ Sources et mentions ═════════════════════════════════════════════ */
-  box.append(aboutCard());
+  /* ══ Repliés : on les ouvre quand on en a besoin, pas à chaque fois ══ */
+  box.append(collapsible('CALIBRATION DU COURANT', calibrationCard(),
+    { hint: stream.config().calibrated ? 'calibré' : 'non calibré' }));
+  box.append(collapsible('RÉGLAGES & DONNÉES', await settingsCard()));
+  box.append(collapsible('SOURCES & MENTIONS', aboutCard()));
 }
 
 /* ==========================================================================
@@ -286,9 +289,6 @@ function leewayForm() {
  * ========================================================================== */
 async function settingsCard() {
   const c = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.append(el('h3', null, 'RÉGLAGES & DONNÉES'));
-  c.append(head);
 
   const info = tide.info();
   const src = el('div', 'row');
@@ -441,9 +441,6 @@ function showCatch(c) {
  * ========================================================================== */
 function aboutCard() {
   const c = el('div', 'card');
-  const head = el('div', 'card-head');
-  head.append(el('h3', null, 'SOURCES & LIMITES'));
-  c.append(head);
 
   const rows = [
     ['Marée', 'SHOM (vignette officielle Dieppe) + modèle harmonique 23 constituants ajusté sur cette série. Calcul embarqué, fonctionne hors réseau, horizon illimité.'],

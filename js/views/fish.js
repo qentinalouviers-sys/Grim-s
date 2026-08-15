@@ -13,7 +13,7 @@
  * ========================================================================== */
 
 import { state, subscribe, emit, set } from '../core/store.js';
-import { el, clear, card, button, toast, openSheet, closeSheet, heatColor, scoreBadge, factorBars } from '../ui/dom.js';
+import { el, clear, card, button, toast, openSheet, closeSheet, collapsible, noteBanner, heatColor, scoreBadge, factorBars } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
 import { SPECIES_RULES, SPECIES_ORDER, getRegulationStatus, REGULATION_META } from '../fishing/species.js';
 import * as catalog from '../fishing/catalog.js';
@@ -24,6 +24,10 @@ import * as weather from '../data/weather.js';
 import * as learning from '../fishing/learning.js';
 import * as tide from '../data/tide.js';
 import * as record from '../fishing/record.js';
+import { startNav } from '../ui/destination.js';
+
+/** Fenêtres du plan visibles sans ouvrir la feuille. */
+const PLAN_VISIBLE = 3;
 
 let root;
 let unsub;
@@ -37,10 +41,15 @@ export function mount(container) {
   refs.warn = el('div');
   refs.cond = el('div', 'card tight');
   refs.plan = el('div');
-  refs.grid = el('div', 'card');
+  refs.grid = el('div');
   refs.foot = el('div', 'tiny');
 
-  root.append(refs.head, refs.warn, refs.cond, refs.plan, refs.grid, refs.foot);
+  /* La grille est l'outil de celui qui veut se faire son propre avis : précieux,
+   * mais jamais ce qu'on regarde en premier. Repliée, elle rend au plan les
+   * 470 px qu'elle lui prenait. */
+  const gridFold = collapsible('ESPÈCES × HEURES', refs.grid, { hint: 'la journée en un coup d’œil' });
+
+  root.append(refs.head, refs.warn, refs.cond, refs.plan, gridFold, refs.foot);
 
   unsub = subscribe(['advice', 'scores', 'samples', 'weather', 'fix'], render);
   render();
@@ -59,7 +68,13 @@ function render() {
   const scores = state.scores;
   const samples = state.samples || [];
 
-  /* ---- Titre + sélecteur de jour --------------------------------------- */
+  /* ---- Verdict -----------------------------------------------------------
+   * Deux lignes, rien d'autre. Le sélecteur de jour a longtemps vécu ici, en
+   * haut d'écran, en grand — alors qu'il ne pilote QUE le tableau horaire :
+   * une commande bien en vue qui ne fait pas ce qu'elle a l'air de faire.
+   * Il est descendu contre le tableau qu'il commande. Le catalogue, lui, se
+   * consulte à la maison, pas au moment de décider où mouiller : il rejoint
+   * le pied de page. */
   const head = clear(refs.head);
   if (!a || !scores) {
     head.append(el('div', 'muted', 'Calcul en cours…'));
@@ -68,31 +83,15 @@ function render() {
   head.append(el('h2', 'list-title', a.headline));
   head.append(el('div', 'list-sub', a.subline));
 
-  const seg = el('div', 'seg');
-  seg.style.marginTop = '10px';
-  ['Aujourd’hui', 'Demain', 'J+2'].forEach((label, i) => {
-    const b = el('button', dayOffset === i ? 'on' : '', label);
-    b.type = 'button';
-    b.addEventListener('click', () => {
-      dayOffset = i;
-      render();
-    });
-    seg.append(b);
-  });
-  head.append(seg);
-
-  /* Le catalogue complet, à un tap du tableau des scores. Sept espèces sont
-   * scorées ; il s'en pêche soixante sur la côte, et la question « je peux le
-   * garder ? » ne se pose jamais pour celles qu'on attendait. */
-  const bookBtn = button(`📖 Les ${catalog.count()} espèces des côtes normandes`, 'btn-sm', () => openSpeciesBook());
-  bookBtn.style.marginTop = '10px';
-  head.append(bookBtn);
-
-  /* ---- Avertissements --------------------------------------------------- */
+  /* ---- Avertissements ---------------------------------------------------
+   * Tout ne mérite pas un encadré. « Pas de météo à jour » est un défaut de
+   * donnée : c'est un avertissement, il reste en encadré. « Coefficient 101 :
+   * dérive rapide, plombées lourdes » est un CONSEIL DE PÊCHE déguisé en
+   * alerte — sa place est sous les conditions qu'il commente. Empilés, les
+   * deux repoussaient le plan sous la ligne de flottaison de l'écran. */
+  const notes = a.warnings || [];
   const warn = clear(refs.warn);
-  for (const w of a.warnings || []) {
-    warn.append(el('div', `banner ${w.level}`, w.text));
-  }
+  for (const w of notes.filter((w) => w.level !== 'info')) warn.append(noteBanner(w.text, w.level));
 
   /* ---- Conditions ------------------------------------------------------- */
   const cond = clear(refs.cond);
@@ -103,7 +102,13 @@ function render() {
     p.append(el('div', 'pill-val', c.value), el('div', 'pill-lbl', c.label));
     strip.append(p);
   }
-  cond.append(strip);
+  const stripWrap = el('div', 'strip-wrap');
+  stripWrap.append(strip);
+  cond.append(stripWrap);
+  for (const w of notes.filter((w) => w.level === 'info')) {
+    const line = el('div', 'cond-note', w.text);
+    cond.append(line);
+  }
 
   /* ---- Plan ------------------------------------------------------------- */
   const plan = clear(refs.plan);
@@ -115,23 +120,19 @@ function render() {
   if (!a.plan?.length) {
     planCard.append(el('div', 'empty', 'Aucune fenêtre exploitable dans les 14 prochaines heures.'));
   } else {
-    for (const p of a.plan) {
-      const item = el('button', 'list-item');
-      item.type = 'button';
-      item.style.borderRadius = '10px';
-      item.style.background = 'rgba(16,29,46,.5)';
-      item.style.marginBottom = '6px';
-
-      const main = el('div', 'list-main');
-      main.append(el('div', 'list-title', `${SPECIES_RULES[p.speciesId].emoji} ${p.title}`));
-      for (const line of p.lines) {
-        const l = el('div', 'list-sub', line);
-        l.style.whiteSpace = 'pre-wrap';
-        main.append(l);
-      }
-      item.append(main, scoreBadge(p.score));
-      item.addEventListener('click', () => showSpecies(p.speciesId));
-      planCard.append(item);
+    /* Le moteur sort volontiers six à huit fenêtres : au-delà de la troisième
+     * on ne planifie plus, on lit un tableau. Les trois premières tiennent
+     * dans l'écran, le reste part dans une feuille. */
+    for (const p of a.plan.slice(0, PLAN_VISIBLE)) planCard.append(planItem(p));
+    const rest = a.plan.slice(PLAN_VISIBLE);
+    if (rest.length) {
+      const more = button(`Voir les ${rest.length} autres fenêtres`, 'btn-sm btn-ghost', () => {
+        const body = el('div');
+        for (const p of a.plan) body.append(planItem(p));
+        openSheet('Plan de sortie', body);
+      });
+      more.style.marginTop = '4px';
+      planCard.append(more);
     }
   }
   plan.append(planCard);
@@ -141,6 +142,9 @@ function render() {
 
   /* ---- Pied ------------------------------------------------------------- */
   const foot = clear(refs.foot);
+  const bookBtn = button(`📖 Les ${catalog.count()} espèces des côtes normandes`, 'btn-sm', () => openSpeciesBook());
+  bookBtn.style.marginBottom = '12px';
+  foot.append(bookBtn);
   foot.append(el('div', null,
     `Réglementation ${REGULATION_META.year} · ${REGULATION_META.zone} · vérifiée le ${REGULATION_META.checked}. ` +
     'À reconfirmer auprès de la DIRM Manche Est – Mer du Nord avant chaque saison.'));
@@ -154,12 +158,72 @@ function render() {
   foot.append(logBtn);
 }
 
+/** Une fenêtre du plan : deux lignes, un score, le reste au tap. */
+function planItem(p) {
+  const item = el('button', 'list-item plan-item');
+  item.type = 'button';
+
+  const main = el('div', 'list-main');
+  main.append(el('div', 'list-title', `${SPECIES_RULES[p.speciesId].emoji} ${p.title}`));
+  for (const line of p.lines) main.append(el('div', 'list-sub', line));
+  item.append(main, scoreBadge(p.score));
+  item.addEventListener('click', () => showWindow(p));
+  return item;
+}
+
+/**
+ * Le détail d'une fenêtre. Ce qu'on veut ici, dans l'ordre : pourquoi cette
+ * heure-là, puis y aller, puis tout savoir de l'espèce — et la fiche espèce
+ * s'empile par-dessus, avec le bouton retour, pour ne pas perdre le plan.
+ */
+function showWindow(p) {
+  const body = el('div');
+  const rule = SPECIES_RULES[p.speciesId];
+
+  const hero = el('div', 'row');
+  const heroMain = el('div', 'list-main');
+  heroMain.append(el('div', 'list-title', `${rule.emoji} ${p.title}`));
+  hero.append(heroMain, scoreBadge(p.score));
+  body.append(hero);
+
+  for (const line of [...p.lines, ...(p.notes || [])]) {
+    const l = el('div', 'list-sub', line);
+    l.style.padding = '5px 0';
+    body.append(l);
+  }
+
+  if (p.spot?.spot?.lat != null) {
+    const go = button(`🧭 Naviguer vers ${p.spot.spot.name}`, 'btn-primary btn-lg', () => {
+      // startNav referme la feuille lui-même.
+      startNav({ lat: p.spot.spot.lat, lon: p.spot.spot.lon, name: p.spot.spot.name, kind: 'spot' });
+    });
+    go.style.marginTop = '12px';
+    body.append(go);
+  }
+
+  const more = button(`📖 Fiche ${rule.name}`, 'btn-sm', () => showSpecies(p.speciesId));
+  more.style.marginTop = '8px';
+  body.append(more);
+
+  openSheet('Fenêtre de pêche', body);
+}
+
 function renderGrid(scores, samples) {
-  const box = clear(refs.grid);
-  const head = el('div', 'card-head');
-  head.append(el('h3', null, 'ESPÈCES × HEURES'), el('div', 'spacer'));
-  head.append(el('span', 'tiny', 'touche une case'));
-  box.append(head);
+  const box = clear(refs.grid);    // le titre est porté par le repli
+
+  // Le sélecteur de jour vit ici : c'est le seul contenu qu'il change.
+  const seg = el('div', 'seg');
+  ['Aujourd’hui', 'Demain', 'J+2'].forEach((label, i) => {
+    const b = el('button', dayOffset === i ? 'on' : '', label);
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      dayOffset = i;
+      render();
+    });
+    seg.append(b);
+  });
+  box.append(seg);
+  box.append(el('div', 'tiny', 'Touche une case pour le détail de l’heure.'));
 
   if (!samples.length) {
     box.append(el('div', 'empty', 'Pas de données.'));

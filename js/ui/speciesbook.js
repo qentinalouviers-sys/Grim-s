@@ -27,7 +27,10 @@ export function openSpeciesBook(opts = {}) {
   const body = el('div');
   const state = { query: '', group: null };
 
-  /* ---- Recherche -------------------------------------------------------- */
+  /* ---- En-tête collant : recherche + filtres ---------------------------- *
+   * Il reste en haut quand la liste défile. Avant, filtrer au milieu de
+   * soixante espèces obligeait à remonter tout en haut de la feuille. */
+  const sticky = el('div', 'sheet-sticky');
   const field = el('div', 'field');
   const input = document.createElement('input');
   input.type = 'search';
@@ -35,35 +38,40 @@ export function openSpeciesBook(opts = {}) {
   input.autocapitalize = 'none';
   input.autocomplete = 'off';
   field.append(input);
-  body.append(field);
+  sticky.append(field);
 
-  /* ---- Filtres par groupe ----------------------------------------------- */
-  const filters = el('div', 'row wrap');
-  filters.style.marginBottom = '4px';
+  /* ---- Filtres par groupe, sur UNE ligne qui défile --------------------- */
+  const filters = el('div', 'filter-row');
   const chips = new Map();
   const mkFilter = (id, label) => {
     const b = el('button', 'chip chip-btn', label);
     b.type = 'button';
     b.addEventListener('click', () => {
-      state.group = state.group === id ? null : id;
+      state.group = state.group === id || id === null ? null : id;
       paintFilters();
       paint();
+      // On remonte en haut de liste : après un changement de filtre, rester à
+      // la même hauteur de défilement affiche un morceau arbitraire.
+      document.getElementById('sheet-body').scrollTop = 0;
     });
     chips.set(id, b);
     filters.append(b);
   };
+  mkFilter(null, 'Toutes');
   mkFilter('saison', '⏱ De saison');
-  for (const g of catalog.GROUPS) mkFilter(g.id, `${g.emoji} ${g.name}`);
+  for (const g of catalog.GROUPS) mkFilter(g.id, `${g.emoji} ${g.name.replace(/^Poissons /, '')}`);
   const paintFilters = () => {
     for (const [id, b] of chips) b.classList.toggle('good', state.group === id);
   };
-  body.append(filters);
+  sticky.append(filters);
 
   const countLine = el('div', 'tiny');
-  body.append(countLine);
+  countLine.style.padding = '4px 0 0';
+  sticky.append(countLine);
+  body.append(sticky);
 
   const list = el('div', 'card flush');
-  list.style.marginTop = '6px';
+  list.style.marginTop = '2px';
   body.append(list);
 
   body.append(el('p', 'tiny',
@@ -84,12 +92,25 @@ export function openSpeciesBook(opts = {}) {
     rows = [...rows].sort((a, b) => rank(a, now) - rank(b, now) || a.name.localeCompare(b.name, 'fr'));
 
     clear(list);
-    countLine.textContent = `${rows.length} espèce${rows.length > 1 ? 's' : ''}`;
+    countLine.textContent = state.query || state.group
+      ? `${rows.length} espèce${rows.length > 1 ? 's' : ''} sur ${catalog.count()}`
+      : `${catalog.count()} espèces des côtes normandes`;
     if (!rows.length) {
       list.append(el('div', 'empty', 'Rien sous ce nom. Essaie le nom local, ou le nom latin.'));
       return;
     }
-    for (const s of rows) list.append(row(s, now, opts));
+    /* Sections : soixante lignes d'affilée ne se parcourent pas, elles se
+       subissent. Le titre colle sous l'en-tête, donc on sait toujours dans
+       quelle famille on se trouve. */
+    let section = null;
+    for (const sp of rows) {
+      const label = sectionOf(sp, now);
+      if (label !== section) {
+        section = label;
+        list.append(el('div', 'list-section', label));
+      }
+      list.append(row(sp, now, opts));
+    }
   }
 
   input.addEventListener('input', () => {
@@ -100,6 +121,15 @@ export function openSpeciesBook(opts = {}) {
   paintFilters();
   paint();
   return openSheet(opts.title || 'Les espèces', body);
+}
+
+/** Intitulé de la section d'une espèce, dans l'ordre du tri. */
+function sectionOf(sp, now) {
+  if (sp.status === 'forbidden') return 'À relâcher — interdits';
+  const season = catalog.seasonAt(sp, now);
+  if (season === 'peak') return 'Pleine saison en ce moment';
+  if (season === 'present') return 'Présentes en ce moment';
+  return 'Hors saison';
 }
 
 /** De saison en premier, interdits en dernier. */
