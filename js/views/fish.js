@@ -25,6 +25,7 @@ import * as learning from '../fishing/learning.js';
 import * as tide from '../data/tide.js';
 import * as record from '../fishing/record.js';
 import { startNav } from '../ui/destination.js';
+import * as lurebox from '../ui/lurebox.js';
 
 /** Fenêtres du plan visibles sans ouvrir la feuille. */
 const PLAN_VISIBLE = 3;
@@ -40,6 +41,7 @@ export function mount(container) {
   refs.head = el('div', 'card');
   refs.warn = el('div');
   refs.cond = el('div', 'card tight');
+  refs.lure = el('div');
   refs.plan = el('div');
   refs.grid = el('div');
   refs.foot = el('div', 'tiny');
@@ -49,7 +51,7 @@ export function mount(container) {
    * 470 px qu'elle lui prenait. */
   const gridFold = collapsible('ESPÈCES × HEURES', refs.grid, { hint: 'la journée en un coup d’œil' });
 
-  root.append(refs.head, refs.warn, refs.cond, refs.plan, gridFold, refs.foot);
+  root.append(refs.head, refs.warn, refs.cond, refs.lure, refs.plan, gridFold, refs.foot);
 
   unsub = subscribe(['advice', 'scores', 'samples', 'weather', 'fix'], render);
   render();
@@ -109,6 +111,14 @@ function render() {
     const line = el('div', 'cond-note', w.text);
     cond.append(line);
   }
+
+  /* ---- Boîte à leurres ---------------------------------------------------
+   * Juste sous les conditions et juste au-dessus du plan, parce que c'est
+   * exactement l'ordre des questions : quel temps il fait, avec quoi je pêche,
+   * et où je vais. Le bar est l'espèce n°1 du secteur et « je mets quoi » est
+   * la question la plus posée d'un bateau — elle mérite d'être sur le chemin,
+   * pas dans un menu. */
+  clear(refs.lure).append(lurebox.card());
 
   /* ---- Plan ------------------------------------------------------------- */
   const plan = clear(refs.plan);

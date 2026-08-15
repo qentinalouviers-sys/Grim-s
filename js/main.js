@@ -27,6 +27,7 @@ import { distance, bearing } from './core/geo.js';
 
 import * as tide from './data/tide.js';
 import * as seabed from './data/seabed.js';
+import * as bathy from './data/bathy.js';
 import * as weatherApi from './data/weather.js';
 import * as stream from './data/stream.js';
 import { sunTimes } from './data/astro.js';
@@ -89,6 +90,7 @@ async function boot() {
   // La nature des fonds est facultative : si le fichier manque, tout le reste
   // fonctionne à l'identique. On ne bloque donc pas le démarrage dessus.
   seabed.init();
+  bathy.init();
   await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord()]);
 
   const settings = (await idb.get('kv', 'settings')) || {};

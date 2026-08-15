@@ -1156,6 +1156,75 @@ input[type=range]::-moz-range-thumb {
   overflow: hidden;
 }
 
+
+/* ══ Boîte à leurres ═══════════════════════════════════════════════════
+   Un choix de couleur se fait à l'œil, pas à la lecture : la pastille porte
+   l'information, le mot ne fait que la confirmer. D'où des pastilles larges
+   avec le libellé dessous, et jamais l'inverse. */
+.swatch-row {
+  display: flex; gap: 8px;
+  overflow-x: auto; scrollbar-width: none;
+  padding: 8px 0 2px;
+}
+.swatch-row::-webkit-scrollbar { display: none; }
+.swatch {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  width: 78px; min-height: 78px;
+  padding: 7px 4px;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+}
+.swatch-dot {
+  width: 34px; height: 34px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.swatch-lbl {
+  font-size: 10.5px; font-weight: 650; line-height: 1.2;
+  color: var(--txt-2); text-align: center;
+}
+.swatch.on { border-color: var(--cyan); background: rgba(34,211,238,.12); }
+.swatch.on .swatch-lbl { color: var(--txt); }
+
+/* La pastille du leurre est bicolore, coupée en biais : dos et ventre. C'est
+   comme ça qu'un leurre se vend et comme ça qu'on le reconnaît en boîte. */
+.lure-row {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+  width: 100%;
+}
+.lure-row:last-child { border-bottom: 0; }
+.lure-row.first .list-title { font-size: 17px; }
+.lure-chip {
+  flex: 0 0 auto;
+  width: 44px; height: 44px; border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.16);
+}
+.lure-chip.sm { width: 26px; height: 26px; border-radius: 8px; }
+.lure-trio { display: flex; gap: -6px; flex: 0 0 auto; }
+.lure-trio .lure-chip.sm:not(:first-child) { margin-left: -9px; }
+
+/* Viseur de l'appareil photo : le carré dit où l'app regarde, ce qui évite
+   de mesurer un bout de coque ou le reflet du ciel. */
+.cam-shell {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 4 / 3;
+}
+.cam-shell video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cam-target {
+  position: absolute; inset: 30% 30%;
+  border: 2px solid var(--cyan);
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.35);
+  pointer-events: none;
+}
+
 /* ══ Barre de saison ═══════════════════════════════════════════════════
    Douze cases, le mois courant encadré. Une saison se lit d'un coup d'œil ou
    ne se lit pas : « d'avril à octobre » oblige à situer le mois soi-même. */

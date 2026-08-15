@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.14.0';
+const VERSION = 'v1.15.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -46,6 +46,7 @@ const SHELL_FILES = [
   'js/data/stream.js',
   'js/data/seamarks.js',
   'js/data/seabed.js',
+  'js/data/bathy.js',
   'js/sensors/gps.js',
   'js/sensors/heading.js',
   'js/sensors/motion.js',
@@ -54,6 +55,8 @@ const SHELL_FILES = [
   'js/fishing/catalog.js',
   'js/fishing/engine.js',
   'js/fishing/spots.js',
+  'js/fishing/lures.js',
+  'js/ui/lurebox.js',
   'js/fishing/advisor.js',
   'js/fishing/learning.js',
   'js/fishing/record.js',
@@ -93,6 +96,8 @@ const DATA_FILES = [
   'data/zones-dieppe.json',
   'data/tide-dieppe.json',
   'data/seabed-dieppe.json',
+  'data/bathy-dieppe.json',
+  'data/wrecks-dieppe.json',
 ];
 
 // Leaflet est désormais dans le dépôt : il fait partie de la coque, précaché
