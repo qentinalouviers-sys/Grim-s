@@ -15,7 +15,7 @@
  "layer": "emodnet:wwshipwrecks",
  "endpoint": "https://ows.emodnet-humanactivities.eu/wfs",
  "licence": "CC-BY 4.0 — EMODnet Human Activities",
- "fetchedAt": "2026-08-15T15:51:02+00:00",
+ "fetchedAt": "2026-08-15T15:54:04+00:00",
  "port": {
   "lat": 49.9319,
   "lon": 1.0847
@@ -26,68 +26,50 @@
   {
    "lat": 49.93,
    "lon": 1.085,
-   "distNM": 0.1,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.1
   },
   {
    "lat": 49.93528,
    "lon": 1.08611,
-   "distNM": 0.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.2
   },
   {
    "lat": 49.92806,
    "lon": 1.08333,
-   "distNM": 0.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.2
   },
   {
    "lat": 49.92861,
    "lon": 1.08222,
-   "distNM": 0.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.2
   },
   {
    "lat": 49.93445,
    "lon": 1.07712,
    "distNM": 0.3,
-   "name": "n/a",
-   "depthM": 1.5,
-   "year": "n/a"
+   "depthM": 1.5
   },
   {
    "lat": 49.92778,
    "lon": 1.08111,
-   "distNM": 0.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.3
   },
   {
    "lat": 49.93733,
    "lon": 1.07783,
    "distNM": 0.4,
-   "name": "n/a",
-   "depthM": 4.2,
-   "year": "n/a"
+   "depthM": 4.2
   },
   {
    "lat": 49.93806,
    "lon": 1.08278,
    "distNM": 0.4,
-   "name": "n/a",
-   "depthM": 5.5,
-   "year": "n/a"
+   "depthM": 5.5
   },
   {
    "lat": 49.92556,
    "lon": 1.0875,
-   "distNM": 0.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 0.4
   },
   {
    "lat": 49.93782,
@@ -95,30 +77,24 @@
    "distNM": 0.5,
    "name": "RIVER TYNE",
    "depthM": 3.6,
-   "year": "19400610"
+   "year": "1940"
   },
   {
    "lat": 49.95278,
    "lon": 1.05306,
-   "distNM": 1.8,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 1.8
   },
   {
    "lat": 49.93177,
    "lon": 1.03,
    "distNM": 2.1,
-   "name": "n/a",
-   "depthM": 2.9,
-   "year": "n/a"
+   "depthM": 2.9
   },
   {
    "lat": 49.94048,
    "lon": 1.02448,
    "distNM": 2.4,
-   "name": "n/a",
-   "depthM": 4.0,
-   "year": "n/a"
+   "depthM": 4.0
   },
   {
    "lat": 49.94717,
@@ -126,23 +102,19 @@
    "distNM": 2.5,
    "name": "PIERRE LE DIEPPOIS",
    "depthM": 4.0,
-   "year": "19900328"
+   "year": "1990"
   },
   {
    "lat": 49.95108,
    "lon": 1.0188,
    "distNM": 2.8,
-   "name": "n/a",
-   "depthM": 6.0,
-   "year": "n/a"
+   "depthM": 6.0
   },
   {
    "lat": 49.97722,
    "lon": 1.0495,
    "distNM": 3.0,
-   "name": "n/a",
-   "depthM": 10.8,
-   "year": "n/a"
+   "depthM": 10.8
   },
   {
    "lat": 49.96167,
@@ -150,37 +122,30 @@
    "distNM": 3.1,
    "name": "GENERAL MUNTHE (POSSIBLY)",
    "depthM": 7.9,
-   "year": "19171219"
+   "year": "1917"
   },
   {
    "lat": 49.95667,
    "lon": 1.00533,
-   "distNM": 3.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 3.4
   },
   {
    "lat": 49.98806,
    "lon": 1.0695,
    "distNM": 3.4,
-   "name": "MARIE LOUISE",
-   "year": "n/a"
+   "name": "MARIE LOUISE"
   },
   {
    "lat": 49.99028,
    "lon": 1.06186,
    "distNM": 3.6,
-   "name": "n/a",
-   "depthM": 17.4,
-   "year": "n/a"
+   "depthM": 17.4
   },
   {
    "lat": 49.96158,
    "lon": 0.9958,
    "distNM": 3.9,
-   "name": "n/a",
-   "depthM": 14.6,
-   "year": "n/a"
+   "depthM": 14.6
   },
   {
    "lat": 49.99512,
@@ -188,7 +153,7 @@
    "distNM": 4.2,
    "name": "HMS BERKELEY (PART OF)",
    "depthM": 15.5,
-   "year": "19420719"
+   "year": "1942"
   },
   {
    "lat": 49.99528,
@@ -196,15 +161,14 @@
    "distNM": 4.2,
    "name": "HMS BERKELEY (PART OF)",
    "depthM": 8.7,
-   "year": "19420719"
+   "year": "1942"
   },
   {
    "lat": 50.00389,
    "lon": 1.0725,
    "distNM": 4.3,
    "name": "RAMSHOLM (POSSIBLY)",
-   "depthM": 13.0,
-   "year": "n/a"
+   "depthM": 13.0
   },
   {
    "lat": 50.005,
@@ -212,197 +176,161 @@
    "distNM": 4.4,
    "name": "RAMSHOLM (PROBABLY)",
    "depthM": 14.5,
-   "year": "19180307"
+   "year": "1918"
   },
   {
    "lat": 49.93667,
    "lon": 0.96617,
-   "distNM": 4.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 4.6
   },
   {
    "lat": 49.99538,
    "lon": 1.01302,
    "distNM": 4.7,
-   "name": "n/a",
-   "depthM": 15.6,
-   "year": "n/a"
+   "depthM": 15.6
   },
   {
    "lat": 49.9358,
    "lon": 0.952,
    "distNM": 5.1,
-   "name": "CAP LEVI",
-   "year": "n/a"
+   "name": "CAP LEVI"
   },
   {
    "lat": 49.93913,
    "lon": 0.95035,
    "distNM": 5.2,
-   "name": "HUGO",
-   "year": "n/a"
+   "name": "HUGO"
   },
   {
    "lat": 50.01833,
    "lon": 1.08436,
    "distNM": 5.2,
-   "name": "n/a",
-   "depthM": 18.7,
-   "year": "n/a"
+   "depthM": 18.7
   },
   {
    "lat": 49.92243,
    "lon": 0.94817,
    "distNM": 5.3,
-   "name": "PETIT PIERRE",
-   "year": "n/a"
+   "name": "PETIT PIERRE"
   },
   {
    "lat": 49.94917,
    "lon": 0.95144,
-   "distNM": 5.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 5.3
   },
   {
    "lat": 49.9408,
    "lon": 0.947,
    "distNM": 5.3,
    "name": "CLAUDE MICHEL",
-   "year": "19910731"
+   "year": "1991"
   },
   {
    "lat": 49.9387,
    "lon": 0.94545,
-   "distNM": 5.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 5.4
   },
   {
    "lat": 49.9377,
    "lon": 0.9465,
    "distNM": 5.4,
-   "name": "n/a",
-   "depthM": 1.2,
-   "year": "n/a"
+   "depthM": 1.2
   },
   {
    "lat": 49.9375,
    "lon": 0.94533,
    "distNM": 5.4,
-   "name": "LE BISON",
-   "year": "n/a"
+   "name": "LE BISON"
   },
   {
    "lat": 49.93575,
    "lon": 0.94363,
    "distNM": 5.5,
-   "name": "AR VOALEDEN",
-   "year": "n/a"
+   "name": "AR VOALEDEN"
   },
   {
    "lat": 49.93764,
    "lon": 0.94394,
    "distNM": 5.5,
-   "name": "PATRICK ELIZABETH",
-   "year": "n/a"
+   "name": "PATRICK ELIZABETH"
   },
   {
    "lat": 49.94083,
    "lon": 0.94133,
    "distNM": 5.6,
-   "name": "PORT-MANECH",
-   "year": "n/a"
+   "name": "PORT-MANECH"
   },
   {
    "lat": 49.9349,
    "lon": 0.9395,
    "distNM": 5.6,
-   "name": "LA BELLE ETOILE",
-   "year": "n/a"
+   "name": "LA BELLE ETOILE"
   },
   {
    "lat": 49.9388,
    "lon": 0.94102,
    "distNM": 5.6,
-   "name": "VIRGINIE",
-   "year": "n/a"
+   "name": "VIRGINIE"
   },
   {
    "lat": 49.95083,
    "lon": 0.94367,
-   "distNM": 5.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 5.6
   },
   {
    "lat": 50.02389,
    "lon": 1.10756,
    "distNM": 5.6,
-   "name": "n/a",
-   "depthM": 17.6,
-   "year": "n/a"
+   "depthM": 17.6
   },
   {
    "lat": 49.9403,
    "lon": 0.9348,
    "distNM": 5.8,
-   "name": "COTE D'EMERAUDE",
-   "year": "n/a"
+   "name": "COTE D'EMERAUDE"
   },
   {
    "lat": 49.926,
    "lon": 0.9328,
    "distNM": 5.9,
-   "name": "MARIE ROSE",
-   "year": "n/a"
+   "name": "MARIE ROSE"
   },
   {
    "lat": 50.02759,
    "lon": 1.04005,
    "distNM": 6.0,
-   "name": "n/a",
-   "depthM": 17.3,
-   "year": "n/a"
+   "depthM": 17.3
   },
   {
    "lat": 49.99028,
    "lon": 1.21283,
    "distNM": 6.1,
-   "name": "NEPTUNE",
-   "year": "n/a"
+   "name": "NEPTUNE"
   },
   {
    "lat": 50.03389,
    "lon": 1.08172,
    "distNM": 6.1,
    "name": "OIFJELD",
-   "year": "19161124"
+   "year": "1916"
   },
   {
    "lat": 49.9307,
    "lon": 0.923,
    "distNM": 6.2,
-   "name": "n/a",
-   "depthM": 8.9,
-   "year": "n/a"
+   "depthM": 8.9
   },
   {
    "lat": 49.9315,
    "lon": 0.9185,
    "distNM": 6.4,
-   "name": "n/a",
-   "depthM": 3.0,
-   "year": "n/a"
+   "depthM": 3.0
   },
   {
    "lat": 50.03783,
    "lon": 1.10867,
    "distNM": 6.4,
-   "name": "n/a",
-   "depthM": 10.7,
-   "year": "n/a"
+   "depthM": 10.7
   },
   {
    "lat": 50.04139,
@@ -410,52 +338,44 @@
    "distNM": 6.6,
    "name": "HMS DAFFODIL",
    "depthM": 8.7,
-   "year": "19450318"
+   "year": "1945"
   },
   {
    "lat": 50.04042,
    "lon": 1.12561,
    "distNM": 6.7,
-   "name": "n/a",
-   "depthM": 11.4,
-   "year": "n/a"
+   "depthM": 11.4
   },
   {
    "lat": 49.976,
    "lon": 0.92217,
    "distNM": 6.8,
-   "name": "n/a",
-   "depthM": 13.0,
-   "year": "n/a"
+   "depthM": 13.0
   },
   {
    "lat": 49.92583,
    "lon": 0.902,
    "distNM": 7.1,
-   "name": "n/a",
-   "year": "19881226"
+   "year": "1988"
   },
   {
    "lat": 50.05,
    "lon": 1.07917,
    "distNM": 7.1,
-   "name": "LEHEIN",
-   "year": "n/a"
+   "name": "LEHEIN"
   },
   {
    "lat": 49.92242,
    "lon": 0.89532,
    "distNM": 7.3,
    "name": "LES DEUX BEAUFS",
-   "year": "19910617"
+   "year": "1991"
   },
   {
    "lat": 49.93014,
    "lon": 0.89672,
    "distNM": 7.3,
-   "name": "n/a",
-   "depthM": 14.2,
-   "year": "n/a"
+   "depthM": 14.2
   },
   {
    "lat": 50.05557,
@@ -463,120 +383,94 @@
    "distNM": 7.5,
    "name": "SPERRBRECHER 178",
    "depthM": 7.6,
-   "year": "19411212"
+   "year": "1941"
   },
   {
    "lat": 50.06028,
    "lon": 1.05186,
    "distNM": 7.8,
-   "name": "n/a",
-   "depthM": 20.9,
-   "year": "n/a"
+   "depthM": 20.9
   },
   {
    "lat": 49.92472,
    "lon": 0.882,
    "distNM": 7.8,
-   "name": "n/a",
-   "depthM": 10.0,
-   "year": "n/a"
+   "depthM": 10.0
   },
   {
    "lat": 50.06583,
    "lon": 1.02867,
-   "distNM": 8.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 8.3
   },
   {
    "lat": 50.05935,
    "lon": 1.18618,
    "distNM": 8.6,
-   "name": "n/a",
-   "depthM": 14.1,
-   "year": "n/a"
+   "depthM": 14.1
   },
   {
    "lat": 49.96583,
    "lon": 0.86533,
-   "distNM": 8.7,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 8.7
   },
   {
    "lat": 50.06045,
    "lon": 1.19786,
    "distNM": 8.9,
-   "name": "n/a",
-   "depthM": 4.8,
-   "year": "n/a"
+   "depthM": 4.8
   },
   {
    "lat": 49.91111,
    "lon": 0.85417,
-   "distNM": 9.0,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 9.0
   },
   {
    "lat": 50.08611,
    "lon": 1.12061,
    "distNM": 9.4,
-   "name": "n/a",
-   "depthM": 18.0,
-   "year": "n/a"
+   "depthM": 18.0
   },
   {
    "lat": 49.93167,
    "lon": 0.83005,
-   "distNM": 9.8,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 9.8
   },
   {
    "lat": 50.06208,
    "lon": 1.24825,
    "distNM": 10.0,
    "name": "PINGOUIN (POSSIBLY)",
-   "depthM": 8.3,
-   "year": "n/a"
+   "depthM": 8.3
   },
   {
    "lat": 50.03424,
    "lon": 1.30284,
-   "distNM": 10.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 10.4
   },
   {
    "lat": 49.9625,
    "lon": 0.8175,
    "distNM": 10.5,
-   "name": "n/a",
-   "depthM": 13.0,
-   "year": "n/a"
+   "depthM": 13.0
   },
   {
    "lat": 50.11722,
    "lon": 1.08172,
    "distNM": 11.1,
    "name": "MARCHIONESS",
-   "year": "19161020"
+   "year": "1916"
   },
   {
    "lat": 49.98523,
    "lon": 0.81068,
    "distNM": 11.1,
-   "name": "ST SIMON (POSSIBLY)",
-   "year": "n/a"
+   "name": "ST SIMON (POSSIBLY)"
   },
   {
    "lat": 50.0675,
    "lon": 0.88533,
    "distNM": 11.2,
-   "name": "n/a",
-   "depthM": 15.0,
-   "year": "n/a"
+   "depthM": 15.0
   },
   {
    "lat": 49.88333,
@@ -590,7 +484,7 @@
    "lon": 0.79444,
    "distNM": 11.4,
    "name": "ORA",
-   "year": "19180829"
+   "year": "1918"
   },
   {
    "lat": 49.8955,
@@ -598,29 +492,25 @@
    "distNM": 11.4,
    "name": "ORA (POSSIBLY)",
    "depthM": 11.0,
-   "year": "19180829"
+   "year": "1918"
   },
   {
    "lat": 50.08889,
    "lon": 0.91922,
-   "distNM": 11.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 11.4
   },
   {
    "lat": 50.06439,
    "lon": 1.29887,
    "distNM": 11.5,
    "name": "L'AVENTURIER",
-   "year": "19910916"
+   "year": "1991"
   },
   {
    "lat": 50.1235,
    "lon": 1.05964,
    "distNM": 11.5,
-   "name": "n/a",
-   "depthM": 16.9,
-   "year": "n/a"
+   "depthM": 16.9
   },
   {
    "lat": 49.906,
@@ -628,7 +518,7 @@
    "distNM": 11.7,
    "name": "ORA (POSSIBLY)",
    "depthM": 13.0,
-   "year": "19180829"
+   "year": "1918"
   },
   {
    "lat": 50.08583,
@@ -642,46 +532,39 @@
    "lat": 50.13722,
    "lon": 1.06112,
    "distNM": 12.4,
-   "name": "n/a",
-   "depthM": 18.2,
-   "year": "n/a"
+   "depthM": 18.2
   },
   {
    "lat": 50.08611,
    "lon": 1.3,
    "distNM": 12.4,
-   "name": "STARLING",
-   "year": "n/a"
+   "name": "STARLING"
   },
   {
    "lat": 50.04483,
    "lon": 0.80983,
    "distNM": 12.6,
    "name": "GARRY LAURE",
-   "year": "19990315"
+   "year": "1999"
   },
   {
    "lat": 49.96177,
    "lon": 0.75383,
    "distNM": 12.9,
    "name": "AF 13",
-   "depthM": 17.5,
-   "year": "n/a"
+   "depthM": 17.5
   },
   {
    "lat": 50.14837,
    "lon": 1.08737,
    "distNM": 13.0,
-   "name": "n/a",
-   "depthM": 18.1,
-   "year": "n/a"
+   "depthM": 18.1
   },
   {
    "lat": 50.06165,
    "lon": 1.357,
    "distNM": 13.1,
-   "name": "OPALE",
-   "year": "n/a"
+   "name": "OPALE"
   },
   {
    "lat": 50.03408,
@@ -689,7 +572,7 @@
    "distNM": 13.1,
    "name": "OIJFELD",
    "depthM": 17.2,
-   "year": "19180518"
+   "year": "1918"
   },
   {
    "lat": 50.1488,
@@ -697,7 +580,7 @@
    "distNM": 13.1,
    "name": "JAQUES HENRI (POSSIBLY)",
    "depthM": 21.0,
-   "year": "19551023"
+   "year": "1955"
   },
   {
    "lat": 50.14663,
@@ -705,66 +588,54 @@
    "distNM": 13.2,
    "name": "LEEUWARDEN",
    "depthM": 16.0,
-   "year": "19460224"
+   "year": "1946"
   },
   {
    "lat": 50.108,
    "lon": 1.3065,
    "distNM": 13.6,
-   "name": "n/a",
-   "depthM": 15.3,
-   "year": "n/a"
+   "depthM": 15.3
   },
   {
    "lat": 50.06667,
    "lon": 1.36667,
-   "distNM": 13.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 13.6
   },
   {
    "lat": 49.89742,
    "lon": 0.73363,
    "distNM": 13.7,
    "name": "SANTE-BONHEUR",
-   "year": "19911030"
+   "year": "1991"
   },
   {
    "lat": 50.07778,
    "lon": 1.35833,
-   "distNM": 13.7,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 13.7
   },
   {
    "lat": 50.1245,
    "lon": 0.89217,
    "distNM": 13.7,
    "name": "NORMANDIE",
-   "depthM": 18.0,
-   "year": "n/a"
+   "depthM": 18.0
   },
   {
    "lat": 50.15667,
    "lon": 1.00667,
    "distNM": 13.8,
    "name": "LEE WARDEN",
-   "depthM": 11.9,
-   "year": "n/a"
+   "depthM": 11.9
   },
   {
    "lat": 50.1075,
    "lon": 1.316,
-   "distNM": 13.8,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 13.8
   },
   {
    "lat": 50.10067,
    "lon": 1.33183,
-   "distNM": 13.9,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 13.9
   },
   {
    "lat": 50.15667,
@@ -772,47 +643,37 @@
    "distNM": 14.0,
    "name": "PATRICK SYLVIE",
    "depthM": 5.0,
-   "year": "19770727"
+   "year": "1977"
   },
   {
    "lat": 50.14083,
    "lon": 1.25867,
    "distNM": 14.2,
-   "name": "n/a",
-   "depthM": 14.2,
-   "year": "n/a"
+   "depthM": 14.2
   },
   {
    "lat": 50.17222,
    "lon": 1.07222,
    "distNM": 14.4,
-   "name": "n/a",
-   "depthM": 13.0,
-   "year": "n/a"
+   "depthM": 13.0
   },
   {
    "lat": 49.89517,
    "lon": 0.71083,
    "distNM": 14.6,
-   "name": "n/a",
-   "depthM": 18.0,
-   "year": "n/a"
+   "depthM": 18.0
   },
   {
    "lat": 49.90333,
    "lon": 0.70983,
    "distNM": 14.6,
-   "name": "n/a",
-   "depthM": 12.0,
-   "year": "n/a"
+   "depthM": 12.0
   },
   {
    "lat": 49.90467,
    "lon": 0.7035,
    "distNM": 14.8,
-   "name": "n/a",
-   "depthM": 10.0,
-   "year": "n/a"
+   "depthM": 10.0
   },
   {
    "lat": 49.91733,
@@ -820,14 +681,12 @@
    "distNM": 14.9,
    "name": "COONAGH",
    "depthM": 12.0,
-   "year": "19170313"
+   "year": "1917"
   },
   {
    "lat": 50.12754,
    "lon": 1.33469,
-   "distNM": 15.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 15.2
   },
   {
    "lat": 50.13253,
@@ -835,53 +694,43 @@
    "distNM": 15.3,
    "name": "ARMADA",
    "depthM": 9.5,
-   "year": "19951129"
+   "year": "1995"
   },
   {
    "lat": 50.14292,
    "lon": 1.30922,
    "distNM": 15.3,
-   "name": "n/a",
-   "depthM": 11.4,
-   "year": "n/a"
+   "depthM": 11.4
   },
   {
    "lat": 50.03333,
    "lon": 0.71667,
    "distNM": 15.5,
    "name": "LA TYANEE",
-   "depthM": 4.0,
-   "year": "n/a"
+   "depthM": 4.0
   },
   {
    "lat": 50.12694,
    "lon": 0.80644,
    "distNM": 15.9,
    "name": "GERFER",
-   "depthM": 22.5,
-   "year": "n/a"
+   "depthM": 22.5
   },
   {
    "lat": 50.19267,
    "lon": 0.97283,
-   "distNM": 16.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 16.2
   },
   {
    "lat": 50.10167,
    "lon": 1.41394,
-   "distNM": 16.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 16.3
   },
   {
    "lat": 50.16294,
    "lon": 1.32892,
    "distNM": 16.8,
-   "name": "n/a",
-   "depthM": 7.7,
-   "year": "n/a"
+   "depthM": 7.7
   },
   {
    "lat": 50.21222,
@@ -889,54 +738,47 @@
    "distNM": 16.8,
    "name": "SALVE REGINA",
    "depthM": 21.5,
-   "year": "19880118"
+   "year": "1988"
   },
   {
    "lat": 50.1324,
    "lon": 0.782,
    "distNM": 16.8,
    "name": "LA REVANCHE",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.12733,
    "lon": 1.40683,
    "distNM": 17.1,
    "name": "HARDY",
-   "depthM": 4.5,
-   "year": "n/a"
+   "depthM": 4.5
   },
   {
    "lat": 50.13247,
    "lon": 0.76528,
    "distNM": 17.2,
-   "name": "n/a",
-   "depthM": 29.5,
-   "year": "n/a"
+   "depthM": 29.5
   },
   {
    "lat": 49.88267,
    "lon": 0.64033,
    "distNM": 17.4,
    "name": "R 180 (POSSIBLY)",
-   "depthM": 14.8,
-   "year": "n/a"
+   "depthM": 14.8
   },
   {
    "lat": 50.16585,
    "lon": 1.35678,
    "distNM": 17.5,
    "name": "VRAI PASTEUR",
-   "depthM": 10.0,
-   "year": "n/a"
+   "depthM": 10.0
   },
   {
    "lat": 50.17902,
    "lon": 1.34856,
    "distNM": 18.0,
-   "name": "n/a",
-   "year": "19871201"
+   "year": "1987"
   },
   {
    "lat": 50.09581,
@@ -944,70 +786,57 @@
    "distNM": 18.2,
    "name": "CRIN BLANC",
    "depthM": 20.0,
-   "year": "19790306"
+   "year": "1979"
   },
   {
    "lat": 49.93542,
    "lon": 0.6128,
    "distNM": 18.2,
-   "name": "n/a",
-   "depthM": 22.0,
-   "year": "n/a"
+   "depthM": 22.0
   },
   {
    "lat": 49.9925,
    "lon": 0.608,
    "distNM": 18.8,
-   "name": "n/a",
-   "depthM": 19.5,
-   "year": "n/a"
+   "depthM": 19.5
   },
   {
    "lat": 50.01067,
    "lon": 0.61133,
    "distNM": 18.9,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.16,
    "lon": 0.71167,
    "distNM": 19.9,
-   "name": "n/a",
-   "depthM": 13.0,
-   "year": "n/a"
+   "depthM": 13.0
   },
   {
    "lat": 50.19316,
    "lon": 1.4103,
    "distNM": 20.1,
-   "name": "n/a",
-   "depthM": 5.0,
-   "year": "n/a"
+   "depthM": 5.0
   },
   {
    "lat": 50.13081,
    "lon": 0.66528,
    "distNM": 20.1,
-   "name": "n/a",
-   "depthM": 28.0,
-   "year": "n/a"
+   "depthM": 28.0
   },
   {
    "lat": 50.19167,
    "lon": 1.415,
    "distNM": 20.1,
    "name": "ELORN",
-   "year": "19170301"
+   "year": "1917"
   },
   {
    "lat": 50.05747,
    "lon": 0.59028,
    "distNM": 20.5,
    "name": "PYLADES",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.24248,
@@ -1015,7 +844,7 @@
    "distNM": 20.5,
    "name": "KIA ORA",
    "depthM": 20.0,
-   "year": "19180208"
+   "year": "1918"
   },
   {
    "lat": 50.20802,
@@ -1023,141 +852,115 @@
    "distNM": 20.5,
    "name": "BRAGA",
    "depthM": 22.0,
-   "year": "19610207"
+   "year": "1961"
   },
   {
    "lat": 50.21583,
    "lon": 1.38533,
-   "distNM": 20.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 20.6
   },
   {
    "lat": 50.2361,
    "lon": 1.33342,
    "distNM": 20.6,
-   "name": "n/a",
-   "depthM": 14.0,
-   "year": "n/a"
+   "depthM": 14.0
   },
   {
    "lat": 50.22695,
    "lon": 1.377,
    "distNM": 21.0,
    "name": "NYTAAR (POSSIBLY)",
-   "year": "19171025"
+   "year": "1917"
   },
   {
    "lat": 50.22417,
    "lon": 1.3895,
-   "distNM": 21.1,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 21.1
   },
   {
    "lat": 50.16122,
    "lon": 0.67,
    "distNM": 21.1,
-   "name": "n/a",
-   "depthM": 28.0,
-   "year": "n/a"
+   "depthM": 28.0
   },
   {
    "lat": 49.90636,
    "lon": 0.53569,
    "distNM": 21.3,
    "name": "GRANVILLE",
-   "depthM": 17.5,
-   "year": "n/a"
+   "depthM": 17.5
   },
   {
    "lat": 50.21583,
    "lon": 1.41533,
    "distNM": 21.3,
-   "name": "n/a",
-   "year": "19820803"
+   "year": "1982"
   },
   {
    "lat": 50.21111,
    "lon": 1.43889,
-   "distNM": 21.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 21.6
   },
   {
    "lat": 49.90423,
    "lon": 0.52518,
    "distNM": 21.7,
-   "name": "GRANVILLE 3 (PART OF)",
-   "year": "n/a"
+   "name": "GRANVILLE 3 (PART OF)"
   },
   {
    "lat": 50.031,
    "lon": 0.5435,
    "distNM": 21.7,
-   "name": "n/a",
-   "depthM": 21.0,
-   "year": "n/a"
+   "depthM": 21.0
   },
   {
    "lat": 49.90215,
    "lon": 0.51915,
    "distNM": 21.9,
    "name": "GRANVILLE 2 (PART OF)",
-   "depthM": 18.0,
-   "year": "n/a"
+   "depthM": 18.0
   },
   {
    "lat": 50.23108,
    "lon": 1.41151,
    "distNM": 21.9,
    "name": "CALAISIEN",
-   "depthM": 7.0,
-   "year": "n/a"
+   "depthM": 7.0
   },
   {
    "lat": 50.22598,
    "lon": 1.42473,
    "distNM": 22.0,
-   "name": "n/a",
-   "depthM": 5.0,
-   "year": "n/a"
+   "depthM": 5.0
   },
   {
    "lat": 50.22778,
    "lon": 1.42167,
-   "distNM": 22.0,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 22.0
   },
   {
    "lat": 50.0217,
    "lon": 0.5283,
    "distNM": 22.1,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.22083,
    "lon": 1.45,
-   "distNM": 22.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 22.3
   },
   {
    "lat": 50.21667,
    "lon": 1.46806,
    "distNM": 22.6,
    "name": "ELISE 2",
-   "year": "19170301"
+   "year": "1917"
   },
   {
    "lat": 50.20083,
    "lon": 1.50278,
    "distNM": 22.8,
-   "name": "PRIMUS",
-   "year": "n/a"
+   "name": "PRIMUS"
   },
   {
    "lat": 50.0008,
@@ -1165,251 +968,194 @@
    "distNM": 23.0,
    "name": "ABRAHAM DUQUESNE (POSSIBLY).",
    "depthM": 20.0,
-   "year": "19550125"
+   "year": "1955"
   },
   {
    "lat": 50.02517,
    "lon": 0.5056,
    "distNM": 23.0,
-   "name": "n/a",
-   "depthM": 27.0,
-   "year": "n/a"
+   "depthM": 27.0
   },
   {
    "lat": 50.225,
    "lon": 1.47083,
-   "distNM": 23.0,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 23.0
   },
   {
    "lat": 50.0174,
    "lon": 0.50093,
    "distNM": 23.1,
-   "name": "n/a",
-   "depthM": 27.5,
-   "year": "n/a"
+   "depthM": 27.5
   },
   {
    "lat": 50.0165,
    "lon": 0.4975,
    "distNM": 23.2,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 49.844,
    "lon": 0.50167,
    "distNM": 23.2,
-   "name": "n/a",
-   "depthM": 6.0,
-   "year": "n/a"
+   "depthM": 6.0
   },
   {
    "lat": 49.93648,
    "lon": 0.48297,
    "distNM": 23.3,
    "name": "PYLADES",
-   "year": "19371112"
+   "year": "1937"
   },
   {
    "lat": 49.83217,
    "lon": 0.50167,
-   "distNM": 23.3,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 23.3
   },
   {
    "lat": 49.94912,
    "lon": 0.4805,
-   "distNM": 23.4,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 23.4
   },
   {
    "lat": 50.02823,
    "lon": 0.49625,
    "distNM": 23.4,
-   "name": "n/a",
-   "depthM": 26.5,
-   "year": "n/a"
+   "depthM": 26.5
   },
   {
    "lat": 50.02128,
    "lon": 0.49418,
    "distNM": 23.4,
-   "name": "n/a",
-   "depthM": 29.0,
-   "year": "n/a"
+   "depthM": 29.0
   },
   {
    "lat": 49.82753,
    "lon": 0.49042,
-   "distNM": 23.8,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 23.8
   },
   {
    "lat": 50.24056,
    "lon": 1.47083,
-   "distNM": 23.8,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 23.8
   },
   {
    "lat": 50.05547,
    "lon": 0.49628,
    "distNM": 23.9,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 50.20992,
    "lon": 1.53347,
-   "distNM": 24.0,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 24.0
   },
   {
    "lat": 50.054,
    "lon": 0.48917,
    "distNM": 24.1,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 50.0445,
    "lon": 0.48333,
-   "distNM": 24.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 24.2
   },
   {
    "lat": 49.81667,
    "lon": 0.48333,
    "distNM": 24.3,
    "name": "NENUPHAR",
-   "year": "19730126"
+   "year": "1973"
   },
   {
    "lat": 50.01582,
    "lon": 0.4652,
    "distNM": 24.4,
    "name": "SAINT FLORENT",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.19233,
    "lon": 0.59833,
    "distNM": 24.4,
    "name": "EZEL",
-   "year": "19170908"
+   "year": "1917"
   },
   {
    "lat": 50.05633,
    "lon": 0.4775,
    "distNM": 24.6,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 50.00615,
    "lon": 0.4594,
    "distNM": 24.6,
-   "name": "n/a",
-   "depthM": 27.5,
-   "year": "n/a"
+   "depthM": 27.5
   },
   {
    "lat": 50.0524,
    "lon": 0.4729,
    "distNM": 24.7,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 49.89957,
    "lon": 0.448,
    "distNM": 24.7,
-   "name": "n/a",
-   "depthM": 22.0,
-   "year": "n/a"
+   "depthM": 22.0
   },
   {
    "lat": 50.04267,
    "lon": 0.4688,
    "distNM": 24.7,
-   "name": "n/a",
-   "depthM": 28.0,
-   "year": "n/a"
+   "depthM": 28.0
   },
   {
    "lat": 50.01958,
    "lon": 0.4539,
    "distNM": 24.9,
-   "name": "n/a",
-   "depthM": 32.0,
-   "year": "n/a"
+   "depthM": 32.0
   },
   {
    "lat": 50.15017,
    "lon": 0.5361,
-   "distNM": 24.9,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 24.9
   },
   {
    "lat": 50.0754,
    "lon": 0.474,
    "distNM": 25.1,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.06015,
    "lon": 0.46483,
    "distNM": 25.1,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 50.24167,
    "lon": 1.525,
-   "distNM": 25.2,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 25.2
   },
   {
    "lat": 50.0215,
    "lon": 0.4455,
    "distNM": 25.3,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   },
   {
    "lat": 50.05683,
    "lon": 0.46,
    "distNM": 25.3,
-   "name": "n/a",
-   "depthM": 24.0,
-   "year": "n/a"
+   "depthM": 24.0
   },
   {
    "lat": 50.0084,
    "lon": 0.43688,
    "distNM": 25.4,
-   "name": "n/a",
-   "depthM": 28.0,
-   "year": "n/a"
+   "depthM": 28.0
   },
   {
    "lat": 50.21465,
@@ -1417,44 +1163,38 @@
    "distNM": 25.4,
    "name": "EZEL (POSSIBLY)",
    "depthM": 29.0,
-   "year": "19170908"
+   "year": "1917"
   },
   {
    "lat": 50.25,
    "lon": 1.52222,
    "distNM": 25.5,
    "name": "GAZELLE",
-   "year": "19170302"
+   "year": "1917"
   },
   {
    "lat": 50.02073,
    "lon": 0.43667,
    "distNM": 25.6,
-   "name": "n/a",
-   "depthM": 32.0,
-   "year": "n/a"
+   "depthM": 32.0
   },
   {
    "lat": 50.0599,
    "lon": 0.4529,
-   "distNM": 25.6,
-   "name": "n/a",
-   "year": "n/a"
+   "distNM": 25.6
   },
   {
    "lat": 49.84167,
    "lon": 0.43889,
    "distNM": 25.6,
    "name": "AUDAUX",
-   "year": "19181004"
+   "year": "1918"
   },
   {
    "lat": 50.0217,
    "lon": 0.4283,
    "distNM": 25.9,
-   "name": "n/a",
-   "depthM": 20.0,
-   "year": "n/a"
+   "depthM": 20.0
   }
  ]
 }
