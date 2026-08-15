@@ -39,18 +39,26 @@
 <!-- ═══ Vues ═══════════════════════════════════════════════════════════ -->
 <main id="main">
   <section class="view" id="view-nav" data-view="nav"></section>
+  <section class="view" id="view-pilot" data-view="pilot" hidden></section>
   <section class="view" id="view-map" data-view="map" hidden></section>
+  <section class="view" id="view-horizon" data-view="horizon" hidden></section>
   <section class="view" id="view-fish" data-view="fish" hidden></section>
   <section class="view" id="view-log" data-view="log" hidden></section>
 </main>
 
-<!-- ═══ Navigation principale ══════════════════════════════════════════ -->
+<!-- ═══ Navigation principale ══════════════════════════════════════════
+     Le premier onglet bascule de NAV à PILOTE dès qu'une route est armée :
+     un cinquième onglet permanent volerait de la largeur aux quatre autres
+     pour un écran qui ne sert que pendant une traversée. -->
 <nav class="tabbar" id="tabbar" role="tablist" aria-label="Modes">
-  <button class="tab active" data-goto="nav" role="tab" aria-selected="true">
+  <button class="tab active" id="tab-nav" data-goto="nav" role="tab" aria-selected="true">
     <span class="tab-ico">🧭</span><span class="tab-lbl">NAV</span>
   </button>
   <button class="tab" data-goto="map" role="tab" aria-selected="false">
     <span class="tab-ico">🗺️</span><span class="tab-lbl">CARTE</span>
+  </button>
+  <button class="tab" data-goto="horizon" role="tab" aria-selected="false">
+    <span class="tab-ico">🔦</span><span class="tab-lbl">HORIZON</span>
   </button>
   <button class="tab" data-goto="fish" role="tab" aria-selected="false">
     <span class="tab-ico">🐟</span><span class="tab-lbl">PÊCHE</span>
@@ -82,6 +90,8 @@
       <li><b>Position &amp; vitesse</b> — route fond, dérive, veille de mouillage</li>
       <li><b>Compas</b> — cap magnétique, contrôle croisé avec la route GPS</li>
       <li><b>Centrale inertielle</b> — état de la mer ressenti sous la coque</li>
+      <li><b>Navigation GPS</b> — cap à tenir corrigé de la dérive, heure d’arrivée, alerte d’arrivée</li>
+      <li><b>Horizon</b> — identification des feux et des bouées autour de toi</li>
     </ul>
     <p class="gate-note">
       Tout reste sur ton téléphone. Aucun compte, aucun serveur, aucune donnée envoyée.

@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.7.0';
+const VERSION = 'v1.8.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -42,6 +42,7 @@ const SHELL_FILES = [
   'js/data/tide.js',
   'js/data/weather.js',
   'js/data/stream.js',
+  'js/data/seamarks.js',
   'js/sensors/gps.js',
   'js/sensors/heading.js',
   'js/sensors/motion.js',
@@ -52,10 +53,14 @@ const SHELL_FILES = [
   'js/fishing/advisor.js',
   'js/fishing/learning.js',
   'js/fishing/record.js',
+  'js/nav/route.js',
   'js/ui/dom.js',
   'js/ui/widgets.js',
+  'js/ui/destination.js',
   'js/views/nav.js',
+  'js/views/pilot.js',
   'js/views/map.js',
+  'js/views/horizon.js',
   'js/views/fish.js',
   'js/views/log.js',
   'vendor/leaflet/leaflet.js',
@@ -124,6 +129,7 @@ self.addEventListener('fetch', (e) => {
     url.hostname.includes('tile.openstreetmap.org') ||
     url.hostname.includes('tiles.openseamap.org') ||
     url.hostname.includes('open-meteo.com') ||
+    url.hostname.includes('overpass') ||
     url.hostname.includes('shom.fr')
   ) {
     return;

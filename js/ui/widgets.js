@@ -386,6 +386,108 @@ export class Compass extends Canvas {
 }
 
 /* ==========================================================================
+ * Indicateur d'écart de route (CDI)
+ * --------------------------------------------------------------------------
+ * L'instrument que tout GPS de passerelle possède et qu'aucune app grand
+ * public n'affiche : où est la ROUTE par rapport au bateau. Pas le relèvement
+ * du but — l'écart latéral à la ligne qu'on s'est fixée.
+ *
+ * Convention respectée à la lettre : l'aiguille montre où est la route, donc
+ * on barre VERS l'aiguille. C'est l'inverse de l'intuition « je suis à droite
+ * donc je vais à gauche », et c'est justement pour ça qu'il faut suivre la
+ * convention des instruments de bord : à trois heures du matin, on applique un
+ * réflexe, on ne fait pas une conversion mentale.
+ *
+ * L'échelle est adaptative — ±30 m près du but, ±300 m en route — sinon
+ * l'aiguille reste collée en butée pendant toute la traversée puis devient
+ * inutilisable au moment de l'atterrissage.
+ * ========================================================================== */
+export class CDI extends Canvas {
+  constructor(parent, opts = {}) {
+    super(parent, opts.height || 56);
+    this.xte = 0;
+    this.scale = 100;
+    this.resize();
+  }
+
+  /** @param {number} xteM écart latéral en mètres (positif = bateau à droite) */
+  set(xteM, scaleM = null) {
+    this.xte = Number.isFinite(xteM) ? xteM : null;
+    if (scaleM) this.scale = scaleM;
+    else {
+      const need = Math.max(30, Math.abs(this.xte || 0) * 1.6);
+      const steps = [30, 60, 100, 200, 300, 600, 1000];
+      this.scale = steps.find((s) => need <= s) || 1852;
+    }
+    this.draw();
+  }
+
+  draw() {
+    const { ctx, w, h } = this;
+    this.clearAll();
+    const font = getComputedStyle(document.body).fontFamily;
+    const cx = w / 2;
+    const mid = h / 2 - 3;
+    const half = w / 2 - 16;
+
+    // Piste graduée
+    ctx.strokeStyle = 'rgba(28,47,71,.9)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - half, mid);
+    ctx.lineTo(cx + half, mid);
+    ctx.stroke();
+
+    for (let i = -4; i <= 4; i++) {
+      const x = cx + (i / 4) * half;
+      const major = i === 0;
+      ctx.beginPath();
+      ctx.moveTo(x, mid - (major ? 12 : 6));
+      ctx.lineTo(x, mid + (major ? 12 : 6));
+      ctx.strokeStyle = major ? 'rgba(163,230,53,.85)' : 'rgba(100,128,157,.5)';
+      ctx.lineWidth = major ? 2.4 : 1.2;
+      ctx.stroke();
+    }
+
+    // Aiguille : position de la ROUTE vue du bateau.
+    if (this.xte != null) {
+      const clamped = Math.max(-1, Math.min(1, -this.xte / this.scale));
+      const x = cx + clamped * half;
+      const off = Math.abs(this.xte);
+      const color = off < 15 ? '#a3e635' : off < 60 ? '#fbbf24' : '#fb5a72';
+      ctx.beginPath();
+      ctx.moveTo(x, mid - 15);
+      ctx.lineTo(x, mid + 15);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3.4;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.moveTo(x - 6, mid - 15);
+      ctx.lineTo(x + 6, mid - 15);
+      ctx.lineTo(x, mid - 6);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
+    ctx.font = `700 9px ${font}`;
+    ctx.fillStyle = '#64809d';
+    ctx.textBaseline = 'alphabetic';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${this.scale} m`, 2, h - 2);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${this.scale} m`, w - 2, h - 2);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText('ROUTE', cx, h - 2);
+  }
+}
+
+/* ==========================================================================
  * Courbe de marée
  * ========================================================================== */
 export class TideChart extends Canvas {
@@ -588,6 +690,228 @@ export class StreamProfile extends Canvas {
       ctx.stroke();
       ctx.setLineDash([]);
     }
+  }
+}
+
+/* ==========================================================================
+ * Bandeau d'horizon
+ * --------------------------------------------------------------------------
+ * Ce que le compas ne montre pas : ce qu'il y a DEVANT. Le bandeau reprend le
+ * champ visuel réel autour du cap (±65°, soit à peu près ce qu'on embrasse
+ * depuis la barre sans tourner la tête) et y pose les marques du balisage à
+ * leur relèvement, dessinées comme sur la carte : bandes de couleur, voyant,
+ * point lumineux à la couleur du feu.
+ *
+ * Le geste visé est celui-ci : on lève les yeux, on voit un éclat rouge un peu
+ * sur bâbord, on baisse les yeux, l'app a mis un point rouge au même endroit
+ * du bandeau avec un nom dessous. Aucune conversion mentale, aucune recherche
+ * sur une carte à l'échelle 1/50 000 avec une lampe frontale.
+ * ========================================================================== */
+export class HorizonStrip extends Canvas {
+  constructor(parent, opts = {}) {
+    super(parent, opts.height || 190);
+    this.span = opts.span || 65; // demi-champ, en degrés
+    this.heading = 0;
+    this.items = [];
+    this.resize();
+  }
+
+  /**
+   * @param {number} heading cap vrai du bateau
+   * @param {{bearingDeg:number, colours:string[], topmark:string|null,
+   *          label:string, sub:string, lit:string|null, dim:boolean}[]} items
+   */
+  set(heading, items = []) {
+    if (Number.isFinite(heading)) this.heading = norm360(heading);
+    this.items = items;
+    this.draw();
+  }
+
+  draw() {
+    const { ctx, w, h } = this;
+    this.clearAll();
+    const font = getComputedStyle(document.body).fontFamily;
+    const cx = w / 2;
+    const horizon = h - 44;
+    const half = w / 2;
+
+    // Ciel et mer : deux aplats très sourds, juste assez pour donner le haut
+    // et le bas d'un coup d'œil.
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, 'rgba(16,29,46,.55)');
+    sky.addColorStop(1, 'rgba(16,29,46,0)');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, horizon);
+    ctx.fillStyle = 'rgba(10,20,33,.75)';
+    ctx.fillRect(0, horizon, w, h - horizon);
+
+    ctx.beginPath();
+    ctx.moveTo(0, horizon);
+    ctx.lineTo(w, horizon);
+    ctx.strokeStyle = 'rgba(100,128,157,.45)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const toX = (deg) => {
+      const rel = angleDiff(deg, this.heading);
+      if (Math.abs(rel) > this.span) return null;
+      return { x: cx + (rel / this.span) * half, rel };
+    };
+
+    /* --- Ruban de relèvements ------------------------------------------- */
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    for (let d = 0; d < 360; d += 5) {
+      const p = toX(d);
+      if (!p) continue;
+      const major = d % 30 === 0;
+      ctx.beginPath();
+      ctx.moveTo(p.x, h - 20);
+      ctx.lineTo(p.x, h - 20 + (major ? 8 : 4));
+      ctx.strokeStyle = major ? 'rgba(159,180,204,.8)' : 'rgba(60,90,125,.7)';
+      ctx.lineWidth = major ? 1.6 : 1;
+      ctx.stroke();
+      if (major) {
+        ctx.fillStyle = d % 90 === 0 ? '#22d3ee' : '#9fb4cc';
+        ctx.font = `700 10px ${font}`;
+        ctx.fillText({ 0: 'N', 90: 'E', 180: 'S', 270: 'O' }[d] ?? String(d), p.x, h - 2);
+      }
+    }
+
+    // Ligne de foi : le cap, au centre.
+    ctx.beginPath();
+    ctx.moveTo(cx, 2);
+    ctx.lineTo(cx, h - 20);
+    ctx.strokeStyle = 'rgba(251,90,114,.5)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (!this.items.length) {
+      ctx.fillStyle = '#64809d';
+      ctx.font = `600 12px ${font}`;
+      ctx.fillText('Aucune marque dans le champ', cx, horizon - 18);
+      return;
+    }
+
+    /* --- Marques ---------------------------------------------------------- *
+     * Dessinées de la plus lointaine à la plus proche : ce qui est près
+     * recouvre ce qui est loin, comme dehors. */
+    const placed = [];
+    const sorted = [...this.items].sort((a, b) => (b.distanceNm || 0) - (a.distanceNm || 0));
+
+    for (const it of sorted) {
+      const p = toX(it.bearingDeg);
+      if (!p) continue;
+      const near = 1 - Math.min(1, (it.distanceNm || 0) / 10);
+      const size = 16 + near * 16;
+      const baseY = horizon - 6 - near * 26;
+
+      // Étage d'étiquette : trois niveaux, choisis pour ne pas se marcher dessus.
+      let level = 0;
+      while (level < 3 && placed.some((q) => q.level === level && Math.abs(q.x - p.x) < 62)) level++;
+      placed.push({ x: p.x, level });
+
+      ctx.globalAlpha = it.dim ? 0.42 : 1;
+      drawMarkGlyph(ctx, p.x, baseY, size, it);
+
+      ctx.font = `700 10px ${font}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = it.dim ? '#64809d' : '#e8f1fa';
+      const ly = baseY + 12 + level * 11;
+      ctx.fillText(clip(it.label, 16), p.x, ly);
+      if (it.sub) {
+        ctx.font = `600 9px ${font}`;
+        ctx.fillStyle = '#64809d';
+        ctx.fillText(clip(it.sub, 20), p.x, ly + 9);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+const clip = (s, n) => (s && s.length > n ? `${s.slice(0, n - 1)}…` : s || '');
+
+/**
+ * Glyphe de marque : fût à bandes, voyant AISM, point lumineux.
+ * Le voyant est ce qui identifie une cardinale de jour ; le dessiner
+ * approximativement serait pire que ne pas le dessiner.
+ */
+function drawMarkGlyph(ctx, x, baseY, size, it) {
+  const wBody = size * 0.42;
+  const hBody = size * 0.8;
+  const colours = it.colours?.length ? it.colours : ['#94a3b8'];
+
+  // Fût : une bande par couleur, du haut vers le bas.
+  const bandH = hBody / colours.length;
+  colours.forEach((c, i) => {
+    ctx.fillStyle = c;
+    ctx.fillRect(x - wBody / 2, baseY - hBody + i * bandH, wBody, bandH + 0.5);
+  });
+  // Contour clair : une bouée à bande noire — les cardinales le sont toutes —
+  // disparaîtrait purement et simplement sur un fond de nuit.
+  ctx.strokeStyle = 'rgba(232,241,250,.45)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - wBody / 2, baseY - hBody, wBody, hBody);
+
+  // Voyant
+  const ty = baseY - hBody - 2;
+  const s = size * 0.2;
+  ctx.fillStyle = it.topmarkColour || '#0f172a';
+  ctx.strokeStyle = 'rgba(232,241,250,.55)';
+  const cone = (cyTop, up) => {
+    ctx.beginPath();
+    if (up) {
+      ctx.moveTo(x, cyTop - s);
+      ctx.lineTo(x - s * 0.8, cyTop);
+      ctx.lineTo(x + s * 0.8, cyTop);
+    } else {
+      ctx.moveTo(x, cyTop);
+      ctx.lineTo(x - s * 0.8, cyTop - s);
+      ctx.lineTo(x + s * 0.8, cyTop - s);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  };
+  const ball = (cy) => {
+    ctx.beginPath();
+    ctx.arc(x, cy, s * 0.62, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  switch (it.topmark) {
+    case 'north':   cone(ty, true); cone(ty - s - 1, true); break;
+    case 'south':   cone(ty, false); cone(ty - s - 1, false); break;
+    case 'east':    cone(ty, false); cone(ty - s - 1, true); break;   // base à base
+    case 'west':    cone(ty, true); cone(ty - s - 1, false); break;   // pointe à pointe
+    case 'sphere':  ball(ty - s * 0.6); break;
+    case '2 spheres': ball(ty - s * 0.6); ball(ty - s * 2); break;
+    case 'cylinder': ctx.fillRect(x - s * 0.6, ty - s * 1.4, s * 1.2, s * 1.4); ctx.strokeRect(x - s * 0.6, ty - s * 1.4, s * 1.2, s * 1.4); break;
+    case 'cone, point up': cone(ty, true); break;
+    case 'x-shape': {
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.7, ty - s * 1.4); ctx.lineTo(x + s * 0.7, ty);
+      ctx.moveTo(x + s * 0.7, ty - s * 1.4); ctx.lineTo(x - s * 0.7, ty);
+      ctx.strokeStyle = it.topmarkColour || '#facc15';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      break;
+    }
+    default: break;
+  }
+
+  // Feu
+  if (it.lit) {
+    ctx.beginPath();
+    ctx.arc(x, baseY - hBody - s * 2.6, 3.4, 0, TAU);
+    ctx.fillStyle = it.lit;
+    ctx.shadowColor = it.lit;
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
   }
 }
 

@@ -44,6 +44,10 @@
   --safe-r: env(safe-area-inset-right, 0px);
 
   --tabbar-h: 62px;
+  /* Valeur de démarrage seulement : main.js mesure la barre réelle et écrase
+     celle-ci dès la première frame. Écrite en dur, elle plaçait le bandeau
+     d'alerte SOUS la barre d'état sur tout téléphone à encoche — message
+     invisible et bouton inatteignable. */
   --topbar-h: 78px;
   /* Hauteur réelle des bandeaux d'alerte, mesurée en JS. Sans ça un bandeau
      de trois lignes recouvre la première jauge — et c'est justement quand il
@@ -198,7 +202,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   height: calc(var(--tabbar-h) + var(--safe-b));
   padding-bottom: var(--safe-b);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: rgba(8,16,27,.96);
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
@@ -210,8 +214,18 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   position: relative;
   transition: color .15s;
 }
-.tab-ico { font-size: 21px; line-height: 1; filter: grayscale(1) opacity(.65); transition: filter .15s; }
-.tab-lbl { font-size: 10px; font-weight: 750; letter-spacing: .1em; }
+.tab-ico { font-size: 20px; line-height: 1; filter: grayscale(1) opacity(.65); transition: filter .15s; }
+/* Cinq onglets tiennent sur 320 px de large : le libellé perd son interlettrage
+   plutôt que d'être tronqué, parce qu'un onglet « JOURN… » ne se lit pas d'un
+   coup d'œil et que c'est tout ce qu'on lui demande. */
+.tab-lbl { font-size: 9.5px; font-weight: 750; letter-spacing: .04em; }
+@media (min-width: 380px) { .tab-lbl { font-size: 10px; letter-spacing: .08em; } }
+
+/* Onglet de pilotage : une route est armée, ça doit se voir depuis n'importe
+   quel autre écran sans avoir à y aller. */
+.tab-live { color: var(--lime); }
+.tab-live .tab-ico { filter: none; animation: livePulse 2.6s infinite; }
+@keyframes livePulse { 50% { opacity: .5; } }
 .tab.active { color: var(--cyan); }
 .tab.active .tab-ico { filter: none; }
 .tab.active::before {
@@ -388,12 +402,25 @@ canvas { display: block; max-width: 100%; }
 
 /* ══ Carte ═════════════════════════════════════════════════════════════ */
 #leaflet { position: absolute; inset: 0; background: #0a1421; }
+
+/* Le `max-width: 100%` posé plus haut sur TOUS les canvas visait les cadrans,
+   qui doivent se plier à la largeur de leur carte. Il attrapait aussi le canvas
+   vectoriel de Leaflet — et celui-là vit dans un calque en `position:absolute`
+   de largeur nulle. Résultat : `max-width: 0`, canvas large de zéro pixel, et
+   TOUT ce qu'on dessine en vecteur sur la carte devenait invisible : la
+   trajectoire de dérive, son cône d'incertitude, les marques, le champ de
+   courant, le cercle de précision GPS. Les couches existaient, le canvas était
+   peint, rien ne s'affichait. */
+.leaflet-pane canvas { max-width: none; }
 .map-overlay {
   position: absolute; z-index: 500;
   pointer-events: none;
 }
 .map-overlay > * { pointer-events: auto; }
-.map-top { top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+/* Le relevé du haut est plafonné à deux lignes : au-delà il recouvre le
+   marqueur de destination, c'est-à-dire exactement ce qu'on est venu voir. */
+.map-top { top: 8px; left: 8px; right: 58px; display: flex; gap: 6px; flex-wrap: wrap; }
+.map-top .map-panel { max-height: 3.4em; overflow: hidden; line-height: 1.35; }
 .map-bottom {
   bottom: 8px; left: 8px;
   /* Dégagement pour le bouton de prise, qui vit dans le coin bas-droit :
@@ -448,8 +475,13 @@ canvas { display: block; max-width: 100%; }
 .leaflet-bar a { background: var(--bg-1) !important; color: var(--txt) !important; border-color: var(--line) !important; }
 
 .boat-marker { will-change: transform; }
-.spot-label {
-  background: rgba(8,16,27,.85);
+
+/* La feuille de style de Leaflet est injectée à l'ouverture de la carte, donc
+   APRÈS celle-ci : à spécificité égale c'est elle qui gagnait, et toutes les
+   étiquettes de marques sortaient en blanc sur blanc — illisibles de jour,
+   éblouissantes de nuit. On repasse devant en qualifiant le sélecteur. */
+.leaflet-tooltip.spot-label {
+  background: rgba(8,16,27,.88);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 1px 5px;
@@ -457,7 +489,12 @@ canvas { display: block; max-width: 100%; }
   font-weight: 650;
   white-space: nowrap;
   color: var(--txt);
+  box-shadow: 0 2px 8px rgba(0,0,0,.45);
 }
+.leaflet-tooltip-top.spot-label::before    { border-top-color: rgba(8,16,27,.88); }
+.leaflet-tooltip-bottom.spot-label::before { border-bottom-color: rgba(8,16,27,.88); }
+.leaflet-tooltip-left.spot-label::before   { border-left-color: rgba(8,16,27,.88); }
+.leaflet-tooltip-right.spot-label::before  { border-right-color: rgba(8,16,27,.88); }
 
 /* ══ Feuille modale ════════════════════════════════════════════════════ */
 .sheet-backdrop {
@@ -486,15 +523,23 @@ canvas { display: block; max-width: 100%; }
 .sheet-body { overflow-y: auto; padding: 0 14px 18px; -webkit-overflow-scrolling: touch; }
 
 /* ══ Accueil ═══════════════════════════════════════════════════════════ */
+/* Centrage vertical SANS piège de débordement. `place-items: center` sur un
+   conteneur défilant coupe le haut du contenu dès qu'il dépasse la hauteur de
+   l'écran, et cette partie-là devient inatteignable : sur un iPhone SE, le
+   titre et la première ligne d'explication disparaissaient purement et
+   simplement. Les marges automatiques d'un enfant flex, elles, sont ramenées à
+   zéro quand l'espace libre devient négatif — le contenu se colle en haut et
+   tout redevient accessible au défilement. */
 .gate {
   position: fixed; inset: 0; z-index: 80;
   background: radial-gradient(120% 80% at 50% 0%, #0d2033 0%, #050b14 65%);
-  display: grid; place-items: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   padding: calc(var(--safe-t) + 20px) 22px calc(var(--safe-b) + 20px);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .gate[hidden] { display: none; }
-.gate-inner { max-width: 380px; width: 100%; text-align: center; }
+.gate-inner { max-width: 380px; width: 100%; text-align: center; margin: auto 0; flex: 0 0 auto; }
 .gate-logo { font-size: 50px; margin-bottom: 6px; }
 .gate h1 { font-size: 26px; letter-spacing: -0.02em; }
 .gate-sub { color: var(--txt-2); font-size: 14px; margin: 4px 0 20px; }
@@ -638,6 +683,103 @@ canvas { display: block; max-width: 100%; }
 .species-tile .tag { position: absolute; top: 5px; right: 5px; }
 .species-tile--add { border-left-color: var(--line); border-style: dashed; }
 .species-tile--add .species-emoji { color: var(--txt-3); }
+
+/* ══ Mode pilotage ═════════════════════════════════════════════════════
+   Trois contraintes, et elles se contredisent : tout doit tenir sans
+   défilement, tout doit se lire à bout de bras, et l'écran doit rester
+   utilisable d'une main sur un bateau qui tape. On sacrifie donc la densité
+   partout sauf sur les trois chiffres qui décident de la manœuvre. */
+.pilot-head { display: flex; align-items: center; gap: 10px; }
+.pilot-head .list-title { font-size: 16px; }
+
+.pilot-cap { display: flex; align-items: flex-end; gap: 10px; margin-top: 2px; }
+.pilot-cap .metric-val { font-size: 36px; }
+/* L'ordre de barre est du TEXTE (« 12° à droite »), pas un nombre : à la taille
+   du cap il déborderait de l'écran. Il garde la couleur — c'est elle qui porte
+   l'urgence — et prend la taille d'une phrase. */
+.pilot-cap .metric-val.sm { font-size: 19px; line-height: 1.15; max-width: 46vw; }
+
+.pilot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.pilot-grid .card { margin-bottom: 0; padding: 8px 4px; }
+.pilot-grid .metric-val { font-size: 21px; }
+.pilot-grid .metric-lbl { font-size: 9px; letter-spacing: .07em; }
+
+.pilot-speed { display: flex; align-items: center; gap: 10px; }
+.pilot-speed .gauge-wrap { flex: 0 0 auto; }
+
+/* Panneau d'arrivée : franc, une seule fois, sans clignotement — on manœuvre
+   au milieu des casiers, ce n'est pas le moment de faire vibrer l'écran. */
+.arrival-card {
+  margin-bottom: 8px;
+  padding: 16px 14px;
+  border-radius: var(--r);
+  text-align: center;
+  background: linear-gradient(180deg, rgba(163,230,53,.18), rgba(163,230,53,.06));
+  border: 1px solid var(--lime);
+  animation: arrivalIn .3s cubic-bezier(.2,.9,.3,1);
+}
+@keyframes arrivalIn { from { opacity: 0; transform: scale(.94); } }
+.arrival-ico { font-size: 40px; line-height: 1; }
+.arrival-card h2 { font-size: 19px; letter-spacing: .04em; color: var(--lime); margin: 6px 0 4px; }
+
+/* ══ Saisie de coordonnées ═════════════════════════════════════════════
+   Le pavé numérique du téléphone, et rien d'autre. Trois champs séparés
+   plutôt qu'une chaîne à composer : on ne tape pas de symbole ° ni ′ avec des
+   doigts mouillés, et une case par grandeur rend la faute de frappe visible. */
+.ddm-row { display: flex; align-items: center; gap: 6px; }
+.ddm-row input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px 8px;
+  min-height: 52px;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  min-width: 0;
+}
+.ddm-row input:focus { outline: 2px solid var(--cyan); outline-offset: -1px; }
+.ddm-deg { flex: 0 0 74px; }
+.ddm-min { flex: 1 1 auto; }
+.ddm-sym { color: var(--txt-3); font-size: 15px; font-weight: 700; flex: 0 0 auto; }
+.ddm-hemi {
+  flex: 0 0 54px;
+  min-height: 52px;
+  border-radius: var(--r-sm);
+  background: rgba(34,211,238,.14);
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-size: 19px; font-weight: 800;
+}
+.ddm-hemi:active { background: rgba(34,211,238,.28); }
+.coord-preview {
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px; font-weight: 650;
+}
+.coord-preview .chip { margin-top: 6px; }
+
+/* ══ Mode horizon ══════════════════════════════════════════════════════ */
+.tap-tempo {
+  width: 100%;
+  min-height: 74px;
+  border-radius: var(--r);
+  background: rgba(167,139,250,.12);
+  border: 1px solid rgba(167,139,250,.45);
+  color: var(--violet);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  transition: transform .08s ease, background .12s ease;
+}
+.tap-tempo:active { transform: scale(.985); background: rgba(167,139,250,.24); }
+.tap-tempo.on { border-color: var(--lime); color: var(--lime); background: rgba(163,230,53,.12); }
+.tap-main { font-size: 15px; font-weight: 800; letter-spacing: .08em; }
+.tap-sub { font-size: 11.5px; font-weight: 600; opacity: .85; font-variant-numeric: tabular-nums; }
 
 /* ══ Marqueur de prise sur la carte ════════════════════════════════════ */
 .catch-marker {

@@ -18,10 +18,12 @@
  *    affiché comme un trait fin est un mensonge graphique.
  * ========================================================================== */
 
-import { state, subscribe, set, on } from '../core/store.js';
+import { state, subscribe, set, on, emit } from '../core/store.js';
 import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
-import { distance, bearing, toGPX } from '../core/geo.js';
+import { distance, bearing, destination as project, toGPX } from '../core/geo.js';
+import * as route from '../nav/route.js';
+import { openDestinationPicker, startNav } from '../ui/destination.js';
 import * as stream from '../data/stream.js';
 import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
@@ -166,6 +168,7 @@ export async function mount(container) {
   ).addTo(map);
 
   layers.track = L.polyline([], { color: '#22d3ee', weight: 2.5, opacity: 0.75 }).addTo(map);
+  layers.route = L.layerGroup().addTo(map);
   layers.drift = L.layerGroup().addTo(map);
   layers.vectors = L.layerGroup();
   layers.spots = L.layerGroup().addTo(map);
@@ -219,7 +222,7 @@ export async function mount(container) {
     }
   });
 
-  unsub = subscribe(['fix', 'weather', 'waypoint', 'mob', 'anchor'], onState);
+  unsub = subscribe(['fix', 'weather', 'waypoint', 'mob', 'anchor', 'nav'], onState);
   // Le cap a son propre abonnement : redessiner tout le calque bateau à la
   // cadence du magnétomètre serait absurde, alors qu'une rotation de l'icône
   // suffit — et sans elle, l'étrave reste figée quand on pivote au mouillage.
@@ -271,6 +274,7 @@ function buildOverlay() {
 
   /* --- Colonne de boutons --- */
   const right = el('div', 'map-overlay map-right');
+  refs.btnNav = mapBtn('🎯', navButton, 'Naviguer vers…');
   refs.btnFollow = mapBtn('◎', () => setFollow(!ui.follow), 'Recentrer / suivre');
   refs.btnSea = mapBtn('⚓', () => {
     ui.seamarks = !ui.seamarks;
@@ -297,8 +301,9 @@ function buildOverlay() {
   refs.btnDl = mapBtn('⤓', downloadZone, 'Précharger la zone');
   refs.btnDrift = mapBtn('⏱', recordDrift, 'Relever une dérive');
   refs.btnGpx = mapBtn('📤', exportGPX, 'Exporter en GPX');
-  right.append(refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch,
+  right.append(refs.btnNav, refs.btnFollow, refs.btnSea, refs.btnVec, refs.btnCatch,
                refs.btnMark, refs.btnDrift, refs.btnDl, refs.btnGpx);
+  refs.btnNav.classList.toggle('on', !!state.nav);
   refs.btnSea.classList.add('on');
   refs.btnCatch.classList.add('on');
   refs.btnFollow.classList.add('on');
@@ -390,10 +395,72 @@ function setFollow(v) {
 function onState() {
   if (!map) return;
   drawBoat();
+  drawRoute();
   drawDrift();
   if (gps.track.length > 1) {
     layers.track.setLatLngs(gps.track.map((p) => [p.lat, p.lon]));
   }
+}
+
+/* ==========================================================================
+ * Route active
+ * --------------------------------------------------------------------------
+ * Deux traits, et ils ne se superposent pas : en vert la route voulue, en
+ * cyan le CAP À TENIR. L'écart entre les deux EST la correction de dérive —
+ * c'est la seule représentation qui rende évident, d'un coup d'œil, pourquoi
+ * l'app demande de viser à côté du but. Un chiffre de correction dans un coin
+ * ne convainc personne ; deux traits qui divergent, si.
+ * ========================================================================== */
+function drawRoute() {
+  const g = layers.route;
+  if (!g) return;
+  g.clearLayers();
+  const nav = state.nav;
+  if (!nav) return;
+
+  const dest = [nav.lat, nav.lon];
+  const sol = route.solve();
+
+  if (nav.origin) {
+    L.polyline([[nav.origin.lat, nav.origin.lon], dest], {
+      color: '#a3e635', weight: 2, opacity: 0.55, dashArray: '8 6', interactive: false,
+    }).addTo(g);
+  }
+
+  if (state.fix && sol?.ok) {
+    // Route directe restante
+    L.polyline([[state.fix.lat, state.fix.lon], dest], {
+      color: '#a3e635', weight: 3, opacity: 0.9, interactive: false,
+    }).addTo(g);
+
+    // Cap à tenir, sur un mille : au-delà on encombre la carte pour rien.
+    const end = project(state.fix, sol.ctsDeg, Math.min(1852, Math.max(300, sol.distanceM)));
+    L.polyline([[state.fix.lat, state.fix.lon], [end.lat, end.lon]], {
+      color: '#22d3ee', weight: 2.5, opacity: 0.95, dashArray: '2 6', interactive: false,
+    }).addTo(g);
+  }
+
+  // Cercles d'approche et d'arrivée
+  L.circle(dest, {
+    radius: route.APPROACH_M, color: '#a3e635', weight: 1, opacity: 0.35,
+    dashArray: '3 7', fillOpacity: 0.03, interactive: false,
+  }).addTo(g);
+  L.circle(dest, {
+    radius: Math.max(nav.arrivalRadiusM, 8), color: '#a3e635', weight: 2,
+    fillOpacity: 0.15, interactive: false,
+  }).addTo(g);
+
+  // Un point saisi au clavier porte ses coordonnées comme nom : les répéter à
+  // côté du marqueur, sur la carte où il est déjà posé, n'apprend rien et cache
+  // le fond.
+  const posTxt = fmt.posDDM(nav);
+  const label = (nav.name === posTxt ? '' : `${nav.name} `) + (sol?.ok ? fmt.dist(sol.distanceM) : '');
+  L.marker(dest, {
+    icon: L.divIcon({ className: '', html: '<div style="font-size:24px">🎯</div>', iconSize: [24, 24], iconAnchor: [12, 12] }),
+  }).addTo(g).bindTooltip(
+    label.trim() || nav.name,
+    { permanent: true, className: 'spot-label', direction: 'top', offset: [0, -12] },
+  );
 }
 
 /** Rotation seule de l'étrave — quelques microsecondes, pas de redessin. */
@@ -598,7 +665,18 @@ function updateReadout() {
   const pos = fix || spots.getPort();
   const st = stream.tidalStream(now, pos);
   const parts = [];
-  if (fix) parts.push(`${fmt.latDDM(fix.lat)} ${fmt.lonDDM(fix.lon)}`);
+  /* En navigation, la première information n'est plus la position mais le but.
+   * Le relevé reste à deux lignes : ce bandeau flotte au-dessus de la carte, et
+   * une ligne de plus recouvre justement le marqueur de destination. La
+   * position exacte, elle, ne se lit pas ici — elle est dans la pastille GPS,
+   * en haut, d'un seul toucher. */
+  const sol = state.nav ? route.solve(now) : null;
+  if (sol?.ok) {
+    parts.push(`🎯 ${state.nav.name} · ${fmt.dist(sol.distanceM)} · cap ${fmt.heading(sol.ctsDeg)}`
+      + (sol.etaT ? ` · ${fmt.hhmm(sol.etaT)}` : ''));
+  } else if (fix) {
+    parts.push(`${fmt.latDDM(fix.lat)} ${fmt.lonDDM(fix.lon)}`);
+  }
   parts.push(`${fmt.num(fix?.speedKn, 1)} nd / ${fmt.heading(fix?.cogDeg)}`);
   parts.push(`Courant ${fmt.num(st.spd, 1)} nd ${fmt.cardinal(st.dir)}`);
   if (wx) parts.push(`Vent ${fmt.cardinal(wx.windDirDeg)} ${Math.round(wx.windSpeedKn)}`);
@@ -609,10 +687,60 @@ function updateReadout() {
  * Interactions
  * ========================================================================== */
 
+/**
+ * Bouton 🎯 de la carte. Une route en cours ne s'arrête pas par le même geste
+ * qui l'a lancée : on montre d'abord où on en est, et l'arrêt est une décision
+ * séparée. Sur un bateau, un appui involontaire ne doit jamais annuler une
+ * navigation en cours.
+ */
+function navButton() {
+  if (!state.nav) return void openDestinationPicker();
+
+  const sol = route.solve();
+  const body = el('div');
+  body.append(el('div', 'list-title', state.nav.name));
+  body.append(el('div', 'list-sub', fmt.posDDM(state.nav)));
+  if (sol?.ok) {
+    const strip = el('div', 'strip');
+    strip.style.marginTop = '8px';
+    strip.append(pillOf(fmt.dist(sol.distanceM), 'DISTANCE'));
+    strip.append(pillOf(fmt.heading(sol.ctsDeg), 'CAP À TENIR'));
+    strip.append(pillOf(sol.etaT ? fmt.hhmm(sol.etaT) : '—', 'ARRIVÉE'));
+    strip.append(pillOf(sol.ttgMs != null ? fmt.duration(sol.ttgMs) : '—', 'RESTANT'));
+    body.append(strip);
+    body.append(el('p', 'tiny', route.xteLabel(sol.xteM)));
+  }
+  const acts = el('div', 'btn-row');
+  acts.append(
+    button('🎯 Piloter', 'btn-primary', () => {
+      closeSheet();
+      emit('goto', 'pilot');
+    }),
+    button('Changer de but', '', () => openDestinationPicker()),
+  );
+  body.append(acts);
+  const stop = button('Arrêter la navigation', 'btn-ghost btn-lg', () => {
+    route.stop();
+    closeSheet();
+    toast('Navigation arrêtée');
+  });
+  stop.style.marginTop = '8px';
+  body.append(stop);
+  openSheet('Navigation en cours', body);
+}
+
 function onLongPress(latlng) {
   const body = el('div');
   body.append(el('p', 'muted', `${fmt.latDDM(latlng.lat)} ${fmt.lonDDM(latlng.lng)}`));
-  body.append(button('🏁 Router vers ce point', 'btn-primary btn-lg', () => {
+  if (state.fix) {
+    const d = distance(state.fix, { lat: latlng.lat, lon: latlng.lng });
+    const b = bearing(state.fix, { lat: latlng.lat, lon: latlng.lng });
+    body.append(el('p', 'tiny', `${fmt.dist(d)} au ${fmt.heading(b)} depuis ta position`));
+  }
+  body.append(button('🎯 Naviguer vers ce point', 'btn-primary btn-lg', () => {
+    startNav({ lat: latlng.lat, lon: latlng.lng, name: 'Point carte', kind: 'coord' });
+  }));
+  body.append(button('🏁 Poser un waypoint (sans piloter)', 'btn-lg', () => {
     set({ waypoint: { lat: latlng.lat, lon: latlng.lng, name: 'Point carte' } });
     closeSheet();
     drawBoat();
@@ -694,6 +822,51 @@ function newSpotForm(pos) {
   openSheet('Nouvelle marque', body);
 }
 
+/**
+ * Édition d'une marque existante. Un repère qu'on ne peut plus renommer se
+ * fige sur le nom donné à la va-vite le jour où on l'a posé — et six mois plus
+ * tard « Marque 12/04 » ne dit plus rien à personne.
+ */
+function editSpotForm(s) {
+  const body = el('div');
+  const mk = (label, node) => {
+    const f = el('div', 'field');
+    f.append(el('label', null, label), node);
+    body.append(f);
+    return node;
+  };
+
+  const name = document.createElement('input');
+  name.type = 'text';
+  name.value = s.name || '';
+  mk('Titre', name);
+
+  const note = document.createElement('textarea');
+  note.rows = 4;
+  note.value = s.note || '';
+  note.placeholder = 'Ce qui marche, quand, avec quoi, la sonde, le fond…';
+  mk('Description', note);
+
+  const depth = document.createElement('input');
+  depth.type = 'number';
+  depth.inputMode = 'decimal';
+  depth.value = Array.isArray(s.depthM) ? String(s.depthM[0]) : '';
+  depth.placeholder = 'Sonde en mètres (carte)';
+  mk('Profondeur', depth);
+
+  body.append(button('Enregistrer', 'btn-primary btn-lg', async () => {
+    await spots.updateSpot(s.id, {
+      name: name.value.trim() || s.name,
+      note: note.value.trim(),
+      depthM: depth.value ? [Number(depth.value), Number(depth.value)] : s.depthM,
+    });
+    closeSheet();
+    drawSpots();
+    toast('Marque mise à jour', 'good');
+  }));
+  openSheet('Modifier la marque', body);
+}
+
 function showSpot(s) {
   const now = Date.now();
   const wx = state.weather?.hourly?.length ? weather.interp(state.weather.hourly, now) : null;
@@ -728,12 +901,10 @@ function showSpot(s) {
   body.append(el('div', 'hr'));
   const acts = el('div', 'btn-row');
   acts.append(
-    button('🏁 Router', 'btn-primary', () => {
-      set({ waypoint: { lat: s.lat, lon: s.lon, name: s.name } });
-      closeSheet();
-      drawBoat();
+    button('🎯 Naviguer', 'btn-primary', () => {
+      startNav({ lat: s.lat, lon: s.lon, name: s.name, note: s.note, id: s.id, kind: 'spot' });
     }),
-    button('🎯 Dérive vers', '', () => {
+    button('⤵ Dérive vers', '', () => {
       ui.target = { lat: s.lat, lon: s.lon };
       ui.mode = 'reverse';
       closeSheet();
@@ -741,6 +912,10 @@ function showSpot(s) {
     }),
   );
   body.append(acts);
+
+  const edit = button('✎ Renommer / éditer la note', 'btn-sm', () => editSpotForm(s));
+  edit.style.marginTop = '8px';
+  if (!s.seed) body.append(edit);
 
   if (!s.seed) {
     const del = button('Supprimer la marque', 'btn-ghost btn-sm', async () => {
@@ -981,7 +1156,15 @@ function showCatch(c, info) {
 
   const acts = el('div', 'btn-row');
   acts.append(
-    button('🎯 Dérive vers ici', 'btn-primary', () => {
+    button('🎯 Y retourner', 'btn-primary', () => {
+      startNav({
+        lat: c.lat,
+        lon: c.lon,
+        name: `${info.name} ${new Date(c.t).toLocaleDateString('fr-FR')}`,
+        kind: 'catch',
+      });
+    }),
+    button('⤵ Dérive vers ici', '', () => {
       ui.target = { lat: c.lat, lon: c.lon };
       ui.mode = 'reverse';
       closeSheet();
@@ -1007,6 +1190,41 @@ function showCatch(c, info) {
 
 /* Rafraîchit les prises quand on en enregistre une, depuis n'importe quel écran. */
 on('catches:changed', () => map && drawCatches());
+
+/* ==========================================================================
+ * Arrivée : la carte prend du recul
+ * --------------------------------------------------------------------------
+ * Pendant la route, la carte est serrée sur le bateau — c'est ce qu'on veut
+ * quand on suit un cap. À l'arrivée, la question change du tout au tout : on
+ * ne demande plus « où vais-je » mais « qu'est-ce qu'il y a autour de moi » —
+ * les casiers, le haut-fond, les autres bateaux, la place pour manœuvrer.
+ * On dézoome donc sur la zone d'arrivée, et on coupe le suivi automatique pour
+ * que la carte arrête de fuir sous le doigt pendant la manœuvre.
+ * ========================================================================== */
+on('nav:arrived', () => {
+  if (!map || !state.nav) return;
+  setFollow(false);
+  const pts = [[state.nav.lat, state.nav.lon]];
+  if (state.fix) pts.push([state.fix.lat, state.fix.lon]);
+  map._programmaticMove = true;
+  map.flyToBounds(L.latLngBounds(pts).pad(1.2), {
+    maxZoom: 15,
+    padding: [60, 60],
+    duration: 1.1,
+  });
+  setTimeout(() => (map._programmaticMove = false), 1600);
+});
+
+on('nav:start', () => {
+  if (!map) return;
+  refs.btnNav?.classList.add('on');
+  drawRoute();
+});
+on('nav:stop', () => {
+  if (!map) return;
+  refs.btnNav?.classList.remove('on');
+  drawRoute();
+});
 
 /* Rafraîchit les marques quand elles changent ailleurs (import GPX, journal). */
 on('spots:changed', () => map && drawSpots());

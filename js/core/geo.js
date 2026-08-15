@@ -132,6 +132,41 @@ export function crossTrack(p, from, to) {
 }
 
 /**
+ * Triangle des vitesses : quel cap tenir pour que la ROUTE FOND soit celle
+ * qu'on veut, alors qu'une dérive pousse le bateau en travers.
+ *
+ * On projette la dérive sur la perpendiculaire à la route voulue ; le bateau
+ * doit produire exactement l'opposé de cette composante :
+ *
+ *      sin(α) = − dérive·sin(θ) / V         θ = direction dérive − route
+ *      cap à tenir = route + α
+ *      vitesse fond = V·cos(α) + dérive·cos(θ)
+ *
+ * Isolée ici parce qu'elle est pure : aucune dépendance à l'état, donc
+ * vérifiable en une ligne par le contrôle de cohérence (scripts/selftest.py).
+ *
+ * @param {{bearingDeg:number, driftDirDeg:number, driftKn:number, stwKn:number}} p
+ * @returns {{ctsDeg:number, driftAngleDeg:number, sogKn:number, holdable:boolean}}
+ *   holdable=false quand la composante travers dépasse ce que le bateau peut
+ *   compenser : la route ne peut alors pas être tenue, et l'afficher quand même
+ *   serait un mensonge dangereux.
+ */
+export function courseToSteer({ bearingDeg, driftDirDeg, driftKn, stwKn }) {
+  const v = Math.max(0.01, stwKn);
+  const theta = angleDiff(driftDirDeg, bearingDeg);
+  const across = (driftKn || 0) * Math.sin(toRad(theta));
+  const ratio = across / v;
+  const holdable = Math.abs(ratio) < 0.98;
+  const driftAngleDeg = -toDeg(Math.asin(Math.max(-1, Math.min(1, ratio))));
+  return {
+    ctsDeg: norm360(bearingDeg + driftAngleDeg),
+    driftAngleDeg,
+    sogKn: v * Math.cos(toRad(driftAngleDeg)) + (driftKn || 0) * Math.cos(toRad(theta)),
+    holdable,
+  };
+}
+
+/**
  * CPA / TCPA entre deux mobiles supposés à vitesse constante.
  * Utilisé pour l'alerte de rapprochement sur un danger fixe (spd2 = 0)
  * ou sur une bouée dérivante. Retourne { cpaM, tcpaS } — tcpaS négatif
@@ -191,6 +226,80 @@ export function declination(date = new Date()) {
 export const magToTrue = (m, date) => norm360(m + declination(date));
 /** Cap vrai → cap magnétique. */
 export const trueToMag = (t, date) => norm360(t - declination(date));
+
+/* --------------------------------------------------------------------------
+ * Saisie de position
+ * --------------------------------------------------------------------------
+ * Un point se transmet à la VHF, se lit sur une carte papier, se copie depuis
+ * un SMS ou un message de groupe. Chacun l'écrit à sa façon, et refuser une
+ * forme parce qu'elle n'est pas la nôtre, c'est obliger quelqu'un à retaper des
+ * chiffres sur un pont qui bouge — le geste qui produit les fautes de frappe.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Analyse une position écrite sous à peu près n'importe quelle forme :
+ *   49.9319 1.0847              degrés décimaux
+ *   49°55.94'N 001°04.98'E      degrés-minutes décimales (forme marine)
+ *   49 55.94 N 1 4.98 E         idem, sans symboles
+ *   49°55'56"N 1°05'05"W        degrés-minutes-secondes
+ *   001°04.98'E 49°55.94'N      ordre inversé
+ * @returns {{lat:number, lon:number}|null}
+ */
+export function parseLatLon(input) {
+  if (input == null) return null;
+  const s = String(input)
+    .toUpperCase()
+    .replace(/[’′]/g, "'")
+    .replace(/[”″]/g, '"')
+    .replace(/(\d)[,](\d)/g, '$1.$2')
+    .replace(/W/g, 'O');
+
+  const nums = (s.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+  if (nums.length < 2) return null;
+
+  // 2 nombres = décimal, 4 = degrés+minutes, 6 = degrés+minutes+secondes.
+  const per = nums.length >= 6 ? 3 : nums.length >= 4 ? 2 : 1;
+  const first = nums.slice(0, per);
+  const second = nums.slice(per, per * 2);
+  if (second.length < per) return null;
+
+  const toDec = (parts) =>
+    Math.sign(parts[0] || 1) * (Math.abs(parts[0]) + (parts[1] || 0) / 60 + (parts[2] || 0) / 3600);
+
+  let a = toDec(first);
+  let b = toDec(second);
+
+  const hemis = s.match(/[NSEO]/g) || [];
+  // Une lettre de longitude en tête signale l'ordre inversé.
+  if (hemis[0] === 'E' || hemis[0] === 'O') [a, b] = [b, a];
+
+  const latH = hemis.find((h) => h === 'N' || h === 'S');
+  const lonH = hemis.find((h) => h === 'E' || h === 'O');
+  let lat = latH ? Math.abs(a) * (latH === 'S' ? -1 : 1) : a;
+  let lon = lonH ? Math.abs(b) * (lonH === 'O' ? -1 : 1) : b;
+
+  // Sans lettre, une « latitude » hors bornes ne peut être qu'une longitude.
+  if (!latH && !lonH && Math.abs(lat) > 90 && Math.abs(lon) <= 90) [lat, lon] = [lon, lat];
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
+}
+
+/** Degrés + minutes décimales + hémisphère → degrés décimaux. */
+export function ddmToDec(deg, minutes, hemi) {
+  const d = Math.abs(Number(deg) || 0) + (Number(minutes) || 0) / 60;
+  return hemi === 'S' || hemi === 'O' || hemi === 'W' ? -d : d;
+}
+
+/** Degrés décimaux → {deg, minutes, hemi} pour préremplir un formulaire. */
+export function decToDDM(value, axis = 'lat') {
+  const v = Number(value) || 0;
+  const hemi = axis === 'lat' ? (v < 0 ? 'S' : 'N') : v < 0 ? 'O' : 'E';
+  const a = Math.abs(v);
+  const deg = Math.floor(a);
+  return { deg, minutes: Number(((a - deg) * 60).toFixed(3)), hemi };
+}
 
 /* --------------------------------------------------------------------------
  * GPX

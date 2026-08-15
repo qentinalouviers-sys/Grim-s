@@ -12,7 +12,7 @@
  *   5. les actions d'urgence — mouillage, retour, MOB
  * ========================================================================== */
 
-import { state, subscribe, set, emit } from '../core/store.js';
+import { state, subscribe, emit } from '../core/store.js';
 import { APP_VERSION } from '../core/build.js';
 import { el, pill, button, toast, openSheet, clear } from '../ui/dom.js';
 import { Gauge, Compass, TideChart, StreamProfile, CurrentRose } from '../ui/widgets.js';
@@ -24,6 +24,8 @@ import * as weather from '../data/weather.js';
 import * as gps from '../sensors/gps.js';
 import * as compass from '../sensors/heading.js';
 import * as spots from '../fishing/spots.js';
+import * as route from '../nav/route.js';
+import { openDestinationPicker } from '../ui/destination.js';
 import { sunTimes, moonPhase } from '../data/astro.js';
 
 const HOUR = 3600000;
@@ -135,7 +137,13 @@ export function mount(container) {
   head.append(el('h3', null, 'ACTIONS'));
   actions.append(head);
 
+  // La navigation GPS est l'action la plus lourde de conséquences de cet
+  // écran : elle occupe toute la largeur, seule, et se lit sans chercher.
+  refs.btnGo = button('🎯 Naviguer vers…', 'btn-primary btn-lg', () => openDestinationPicker());
+  actions.append(refs.btnGo);
+
   const row1 = el('div', 'btn-row');
+  row1.style.marginTop = '8px';
   refs.btnAnchor = button('⚓ Mouillage', '', toggleAnchor);
   refs.btnTrip = button('▶︎ Sortie', '', toggleTrip);
   row1.append(refs.btnAnchor, refs.btnTrip);
@@ -144,8 +152,7 @@ export function mount(container) {
   row2.style.marginTop = '8px';
   refs.btnHome = button('🏠 Retour port', '', () => {
     const p = spots.getPort();
-    set({ waypoint: { lat: p.lat, lon: p.lon, name: p.name } });
-    toast(`Route sur ${p.name}`, 'good');
+    route.start({ lat: p.lat, lon: p.lon, name: p.name, kind: 'port' });
   });
   refs.btnDrift = button('⏱ Relever dérive', '', () => emit('drift:record'));
   row2.append(refs.btnHome, refs.btnDrift);

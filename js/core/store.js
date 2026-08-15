@@ -32,6 +32,7 @@ export const state = {
   advice: null,
 
   /* Navigation */
+  nav: null,          // route active : {lat, lon, name, origin, phase, arrivalRadiusM…}
   waypoint: null,     // {lat, lon, name}
   trip: null,         // {startedAt, distanceM, maxSpeedKn}
   anchor: null,       // {lat, lon, radiusM, armed}

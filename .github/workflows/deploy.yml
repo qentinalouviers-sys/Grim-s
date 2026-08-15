@@ -2,7 +2,7 @@ name: Déploiement GitHub Pages
 
 on:
   push:
-    branches: [main, claude/grims-compagnon-fishing-app-f3qa6n]
+    branches: [main, claude/grims-compagnon-fishing-app-f3qa6n, claude/gps-navigation-mode-4qvlxe]
   workflow_dispatch:
 
 permissions:

@@ -28,10 +28,12 @@ date. Elle ne fait jamais semblant.
 
 ---
 
-## Les quatre modes
+## Les modes
 
 Accessibles en un geste par la barre du bas — pensée pour le pouce, à une main,
-sur un bateau qui bouge.
+sur un bateau qui bouge. Le premier onglet devient **PILOTE** dès qu'une route
+est armée : un écran qui ne sert qu'en traversée n'a pas à voler de la place au
+reste le temps qu'on est au mouillage.
 
 ### 🧭 NAV
 Vitesse fond et vent en jauges, compas demi-cercle à ligne de foi fixe (le
@@ -42,6 +44,88 @@ jusant sur la journée, conseil du guide en une ligne.
 Actions : veille de mouillage avec alarme de dérapage, enregistrement de
 sortie, retour au port, relevé de dérive. Bouton **MOB** en permanence dans la
 barre d'état — un seul appui, sans confirmation, position figée et alarme.
+
+### 🎯 PILOTE — navigation GPS
+
+Armé depuis n'importe où : bouton **🎯 Naviguer vers…** du mode NAV, bouton 🎯
+de la carte, appui long sur la carte, fiche d'une marque, fiche d'une prise, ou
+fiche d'une bouée du mode HORIZON.
+
+**Choisir un but**, quatre entrées :
+
+- **Chiffres** — pavé numérique, en degrés-minutes décimales, une case par
+  grandeur et un bouton N/S · E/O. On ne tape pas de symbole `°` avec des
+  doigts mouillés. Un champ de collage accepte aussi n'importe quelle écriture
+  reçue par message (décimal, DDM, DMS, ordre inversé) et remplit les cases.
+- **Marques** — le carnet personnel, trié par distance.
+- **Prises** — là où ça a mordu, avec l'espèce et la date. Y retourner est la
+  première chose qu'on veut faire à la sortie suivante.
+- **Repères** — port d'attache, MOB, mouillage, dernier waypoint.
+
+**Ce que le mode pilotage calcule**, et qui le distingue d'une flèche « tout
+droit » :
+
+- **Cap à tenir** — le triangle des vitesses est résolu à chaque fix. Le bateau
+  avance dans une eau qui bouge : mettre l'étrave sur le relèvement du but fait
+  décrire une banane à la route fond et finit par un dernier mille à remonter
+  le courant. On calcule l'angle de correction `sin α = − dérive·sin θ / V` et
+  on affiche le cap corrigé. Sur la carte, la route voulue (vert) et le cap à
+  tenir (cyan) sont deux traits distincts : l'écart entre eux *est* la
+  correction, et ça se comprend sans lire un chiffre.
+- **Route intenable** — si la composante travers de la dérive dépasse la
+  vitesse du bateau, aucun cap ne tient la route. C'est dit, au lieu d'afficher
+  un cap impossible.
+- **Ordre de barre** — « 12° à droite », pas un écart à interpréter.
+- **Écart de route (CDI)** — l'instrument de contrôle, à échelle adaptative
+  (±30 m près du but, ±300 m en route), à la convention des instruments de
+  bord : on barre vers l'aiguille.
+- **Heure d'arrivée** — sur la VMG mesurée quand le bateau bouge, sur la
+  vitesse fond *prévue par le triangle* sinon. Une ETA existe donc avant même
+  d'avoir quitté le corps-mort.
+- **Ce qu'on trouvera sur le point** — hauteur d'eau et courant à l'heure
+  d'arrivée, pas à l'heure du départ. Avertissement si l'arrivée tombe après le
+  coucher du soleil.
+
+**L'arrivée** en trois temps : à 200 m l'app passe en approche (« réduis, prends
+la veille visuelle »), au rayon d'arrivée (10 m par défaut) elle vibre, sonne,
+affiche un panneau franc — et la carte **dézoome** sur la zone en coupant le
+suivi automatique, parce que la question change : on ne demande plus « où
+vais-je » mais « qu'est-ce qu'il y a autour de moi ». L'arrivée se déclenche
+aussi au **passage du travers** du point : avec de la mer, on peut passer à 12 m
+du but sans jamais entrer dans un cercle de 10 m.
+
+### 🔦 HORIZON — veille visuelle et identification des feux
+
+Le mode qui répond à la question qu'on se pose vraiment de nuit, et qu'aucune
+app grand public ne traite : **c'est quoi, ce feu, là-bas ?**
+
+Les données viennent d'**OpenStreetMap via l'API Overpass** — libre, gratuite,
+sans clé. La même source que la surcouche OpenSeaMap de la carte, sauf qu'ici on
+ne récupère pas des *images* de bouées : on récupère les bouées, avec leur nom,
+leur catégorie, la couleur de leur feu, son rythme, sa période, sa portée
+nominale et sa hauteur. Une requête couvre 30 km et se garde un mois : on
+télécharge au port, on s'en sert au large.
+
+- **Bandeau d'horizon** — le champ visuel réel autour du cap (±65°), avec les
+  marques posées à leur relèvement et dessinées comme sur la carte : bandes de
+  couleur, voyant AISM (les deux cônes d'une cardinale, le cylindre d'une
+  latérale bâbord), point lumineux à la couleur du feu. On lève les yeux, on
+  baisse les yeux, c'est au même endroit.
+- **Portée réelle** — un feu de 12 milles à 9 mètres de haut ne se voit pas à
+  12 milles depuis un cockpit à 2 mètres : il se voit à 8,9. On croise portée
+  nominale, **portée géographique** `D = 2,03 (√h_œil + √h_feu)` et visibilité
+  météo, et on dit **lequel des trois limite**. La hauteur d'œil est réglable.
+- **Identificateur** — on décrit ce qu'on voit : couleur, rythme, relèvement
+  pointé au compas, et surtout la **période, mesurée en tapant l'écran en
+  cadence avec les éclats**. Compter « vingt-et-un, vingt-deux » sur un pont qui
+  bouge est le meilleur moyen de se tromper d'une seconde ; la médiane de quatre
+  intervalles, non. Les candidats sont classés avec **le détail de ce qui
+  concorde** — un verdict qu'on ne peut pas discuter n'est pas utilisable pour
+  une décision de nuit.
+
+Chaque marque est un but de navigation en un tap, ou devient un repère du
+carnet. Donnée contributive : à confirmer sur la carte officielle, et l'écran le
+dit.
 
 ### 🗺️ CARTE
 OpenStreetMap + **balisage maritime OpenSeaMap**, tuiles mises en cache
@@ -63,8 +147,14 @@ La **dérive prédictive**, dans les deux sens :
 Le tracé est encadré d'un **cône d'incertitude** qui s'élargit avec le temps.
 Un modèle de courant affiché comme un trait fin est un mensonge graphique.
 
-Aussi : champ de vecteurs de courant, marques personnelles, import/export GPX,
-waypoints, cercle de mouillage.
+Aussi : champ de vecteurs de courant, import/export GPX, waypoints, cercle de
+mouillage, et la **route active** avec son cercle d'arrivée.
+
+Les **marques personnelles** ont un titre et une description libre, éditables
+après coup (un repère qu'on ne peut plus renommer se fige sur le nom donné à la
+va-vite, et six mois plus tard « Marque 12/04 » ne dit plus rien). Elles se
+créent par appui long sur la carte, depuis la position courante, depuis une
+prise, depuis une bouée du mode HORIZON, ou depuis un point saisi au clavier.
 
 ### 🎣 ENREGISTRER UNE PRISE — en un geste
 
@@ -282,12 +372,13 @@ vendor/
   leaflet/    Leaflet 1.9.4, embarqué (BSD-2-Clause) — pas de CDN
 js/
   core/       geo, formatage marin, store réactif, IndexedDB, réseau tolérant
-  data/       astro, harmoniques, marée, météo, courant & dérive
+  data/       astro, harmoniques, marée, météo, courant & dérive, balisage
   sensors/    GPS, compas, centrale inertielle
   fishing/    courbes, espèces & réglementation, moteur, postes, guide,
               enregistrement des prises, apprentissage
-  ui/         fabrique DOM, instruments canvas
-  views/      nav, map, fish, log
+  nav/        moteur de navigation : cap à tenir, écart de route, arrivée
+  ui/         fabrique DOM, instruments canvas, sélecteur de destination
+  views/      nav, pilot, map, horizon, fish, log
 data/
   harmonics-dieppe.json     constantes de marée (ajustées automatiquement)
   zones-dieppe.json         secteurs types et nœuds de courant
@@ -308,6 +399,13 @@ par le fitter sont relues par le moteur dans la même convention.
 
 `scripts/selftest.py` exécute les deux moteurs sur les mêmes instants et
 compare — écart constaté : 6 × 10⁻¹⁵ m. Toute divergence fait échouer la CI.
+
+Le même fichier vérifie aussi la navigation, pour la même raison : une erreur y
+serait **invisible à l'écran**. Un point mal lu reste un point plausible, et un
+cap à tenir faux de dix degrés ressemble à un cap à tenir. Le contrôle recompose
+donc le triangle des vitesses — cap calculé + dérive doit redonner *exactement*
+la route fond demandée — et relit une même position écrite de cinq façons
+différentes.
 
 ---
 
@@ -369,6 +467,12 @@ au lieu de la subir.
   captures qui les réajuste.
 - La **réglementation** est datée (`lastCheckedISO`) et périmera. À revérifier
   chaque année auprès de la **DIRM Manche Est – Mer du Nord**.
+- Le **balisage du mode HORIZON** vient d'OpenStreetMap : contributif, donc
+  parfois incomplet ou périmé. Une identification proposée est une **hypothèse à
+  confirmer à la carte**, jamais un verdict. Et le cap à tenir du mode PILOTE
+  vaut ce que vaut le modèle de courant qui le nourrit : il ne dispense ni de la
+  veille visuelle, ni de vérifier que la route ne passe pas sur un danger — le
+  moteur trace une droite, il ne connaît pas les hauts-fonds.
 
 ---
 
@@ -380,7 +484,9 @@ Toutes gratuites, sans clé ni inscription.
 - **Open-Meteo Forecast** — vent, rafales, pression, visibilité, nébulosité
 - **Open-Meteo Marine** — houle, mer du vent, température de surface, courant résiduel
 - **OpenStreetMap** — fond de carte (moteur Leaflet embarqué, BSD-2-Clause)
-- **OpenSeaMap** — balisage maritime
+- **OpenSeaMap** — balisage maritime (tuiles)
+- **OpenStreetMap via Overpass API** — attributs du balisage : catégorie, voyant,
+  couleur, rythme et portée des feux (mode HORIZON)
 - Soleil et lune : calculés localement (NOAA / série lunaire tronquée)
 
 ## Vie privée

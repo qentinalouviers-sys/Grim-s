@@ -38,13 +38,27 @@ import * as learning from './fishing/learning.js';
 import * as record from './fishing/record.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
+// Importé pour son effet de bord autant que pour son API : le module abonne la
+// machine d'arrivée au flux GPS dès son chargement. Sans cet import, une route
+// armée depuis la carte ne détecterait jamais qu'on est arrivé.
+import * as route from './nav/route.js';
+
 import * as navView from './views/nav.js';
+import * as pilotView from './views/pilot.js';
 import * as mapView from './views/map.js';
+import * as horizonView from './views/horizon.js';
 import * as fishView from './views/fish.js';
 import * as logView from './views/log.js';
 
 const HOUR = 3600000;
-const VIEWS = { nav: navView, map: mapView, fish: fishView, log: logView };
+const VIEWS = {
+  nav: navView,
+  pilot: pilotView,
+  map: mapView,
+  horizon: horizonView,
+  fish: fishView,
+  log: logView,
+};
 
 let current = null;
 let slowTimer = 0;
@@ -56,6 +70,7 @@ let wakeLock = null;
  * ========================================================================== */
 async function boot() {
   dom.initSheet();
+  measureChrome();
   wireChrome();
   registerServiceWorker();
 
@@ -72,6 +87,7 @@ async function boot() {
   document.body.classList.toggle('night', !!settings.nightMode);
 
   record.mountFab();
+  syncNavTab();
   showView(location.hash.replace('#', '') || 'nav');
   slowTick();
   fastTimer = setInterval(fastTick, 1000);
@@ -84,6 +100,57 @@ async function boot() {
     document.getElementById('gate').hidden = true;
     startSensors(false);
   }
+}
+
+/* ==========================================================================
+ * Mesure de la coque d'écran
+ * --------------------------------------------------------------------------
+ * La hauteur de la barre d'état était écrite en dur (78 px). Elle ne l'est
+ * jamais : elle vaut le retrait haut de l'appareil (47 px sur un iPhone à
+ * encoche, 0 sur un vieux modèle) plus la ligne d'actions plus la ligne de
+ * pastilles, qui passe à deux lignes dès qu'il y a beaucoup d'informations.
+ * Sur un smartphone récent le total dépasse 115 px.
+ *
+ * Conséquence, et c'était le défaut signalé : le bandeau d'alerte, calé sur
+ * `top: var(--topbar-h)`, se dessinait SOUS la barre d'état. Le message
+ * « touche l'écran pour autoriser le compas » était invisible et, pire, son
+ * bouton était inatteignable — la barre le recouvrait et captait le toucher.
+ * On mesure donc les deux barres pour de bon, et on remesure à chaque
+ * changement (rotation, clavier, pastille qui apparaît).
+ * ========================================================================== */
+function measureChrome() {
+  const topbar = document.getElementById('topbar');
+  const css = document.documentElement.style;
+
+  // On ne mesure QUE la barre d'état. La barre d'onglets, elle, tire sa
+  // hauteur de --tabbar-h : la mesurer pour réécrire la variable dont elle
+  // dépend créerait une boucle qui la ferait grandir à chaque frame.
+  const apply = () => {
+    const th = Math.round(topbar.getBoundingClientRect().height);
+    if (th > 0) css.setProperty('--topbar-h', `${th}px`);
+  };
+
+  apply();
+
+  /* Observation en BORDER-BOX, et c'est le point qui compte : les retraits de
+   * sécurité de l'appareil — l'encoche — sont posés en PADDING sur la barre. Un
+   * ResizeObserver par défaut ne regarde que la boîte de contenu : il ne voit
+   * pas un padding qui change, donc pas les 47 px d'encoche qui apparaissent au
+   * moment où l'app passe en plein écran ou tourne. */
+  const ro = new ResizeObserver(apply);
+  try {
+    ro.observe(topbar, { box: 'border-box' });
+  } catch {
+    ro.observe(topbar); // navigateurs antérieurs à l'option box
+  }
+  ro.observe(document.getElementById('status-chips'));
+
+  // Filet de sécurité : la barre grandit quand les pastilles passent à deux
+  // lignes, et le retrait de sécurité n'est parfois appliqué qu'après la
+  // première frame utile.
+  for (const d of [300, 1200, 3000]) setTimeout(apply, d);
+  window.addEventListener('orientationchange', () => setTimeout(apply, 260));
+  window.visualViewport?.addEventListener('resize', apply);
 }
 
 /* ==========================================================================
@@ -226,6 +293,12 @@ function renderStatusChips() {
     { txt: `${fmt.num(st.spd, 1)} nd ${fmt.cardinal(st.dir)}`, cls: st.sense === 'slack' ? '' : 'good' },
     state.weather?.stale ? { txt: `Météo ${fmt.age(state.weather.fetchedAt)}`, cls: 'warn' } : null,
     !state.online ? { txt: 'Hors ligne', cls: 'warn' } : null,
+    state.nav
+      ? {
+          txt: `🎯 ${state.nav.name}${state.fix ? ` ${fmt.dist(distance(state.fix, state.nav))}` : ''}`,
+          cls: 'good',
+        }
+      : null,
     state.anchor?.armed ? { txt: '⚓ Veille', cls: 'good' } : null,
     state.trip ? { txt: `⏱ ${fmt.dist(state.trip.distanceM)}`, cls: '' } : null,
   ].filter(Boolean);
@@ -333,12 +406,79 @@ function showView(name) {
     tab.classList.toggle('active', on);
     tab.setAttribute('aria-selected', String(on));
   }
-  record.setFabVisible(name !== 'log');
+  /* Le bouton de prise disparaît sur les écrans de conduite. En pilotage il
+   * recouvrait l'heure d'arrivée — exactement le chiffre qu'on vient chercher.
+   * En mode HORIZON c'est pire : il chevauche la moitié droite du bouton de
+   * cadence, et un doigt qui vise le rythme d'un feu enregistrerait un poisson
+   * qu'on n'a pas pris. Dans les deux cas on ne pêche pas, on navigue. */
+  record.setFabVisible(!['log', 'pilot', 'horizon'].includes(name));
   history.replaceState(null, '', `#${name}`);
   set({ view: name });
 }
 
 on('goto', showView);
+
+/* ==========================================================================
+ * Mode pilotage
+ * --------------------------------------------------------------------------
+ * Armer une route bascule l'app en pilotage : c'est le seul écran qui compte
+ * tant qu'on fait route, et le chercher dans un menu pendant qu'on sort du
+ * chenal n'a aucun sens. Le premier onglet change de nom plutôt que d'ajouter
+ * un cinquième bouton permanent — la place en bas d'écran est comptée, et un
+ * onglet qui ne sert qu'en traversée n'a pas à voler de la largeur au reste.
+ * ========================================================================== */
+function syncNavTab() {
+  const tab = document.getElementById('tab-nav');
+  const on = !!state.nav;
+  tab.dataset.goto = on ? 'pilot' : 'nav';
+  tab.querySelector('.tab-ico').textContent = on ? '🎯' : '🧭';
+  tab.querySelector('.tab-lbl').textContent = on ? 'PILOTE' : 'NAV';
+  tab.classList.toggle('tab-live', on);
+}
+
+on('nav:start', (nav) => {
+  syncNavTab();
+  dom.dismissBanner('arrived');
+  showView('pilot');
+  dom.toast(`Route sur ${nav.name}`, 'good');
+});
+
+on('nav:stop', () => {
+  syncNavTab();
+  dom.dismissBanner('arrived');
+  if (current === 'pilot') showView('nav');
+});
+
+on('nav:approach', (a) => {
+  navigator.vibrate?.([60, 60, 60]);
+  dom.toast(`Approche de ${a.name} — ${Math.round(a.distanceM)} m`, '', 4000);
+});
+
+/**
+ * L'arrivée. Vibration longue, bip, et un bandeau qui reste : à ce moment-là
+ * le regard est dehors, sur l'eau, pas sur l'écran — un toast de deux secondes
+ * serait raté neuf fois sur dix.
+ */
+on('nav:arrived', (a) => {
+  navigator.vibrate?.([200, 100, 200, 100, 500]);
+  dom.toast(
+    a.passed ? `${a.name} — passage au plus près (${Math.round(a.distanceM)} m)` : `Arrivé sur ${a.name}`,
+    'good',
+    6000,
+  );
+  dom.dismissBanner('arrived');
+  dom.banner(
+    `🎯 Arrivé à destination — ${a.name}, à ${Math.round(a.distanceM)} m.`,
+    'info',
+    { id: 'arrived' },
+  );
+  if (current !== 'pilot' && current !== 'map') showView('pilot');
+});
+
+on('nav:offcourse', (o) => {
+  navigator.vibrate?.([40, 80, 40]);
+  dom.toast(`Écart de route : ${Math.round(o.xteM)} m`, '', 3500);
+});
 
 /* ==========================================================================
  * Habillage : onglets, boutons, alarmes
