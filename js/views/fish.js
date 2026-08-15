@@ -17,7 +17,7 @@ import { el, clear, card, button, toast, openSheet, closeSheet, collapsible, not
 import * as fmt from '../core/fmt.js';
 import { SPECIES_RULES, SPECIES_ORDER, getRegulationStatus, REGULATION_META } from '../fishing/species.js';
 import * as catalog from '../fishing/catalog.js';
-import { openSpeciesBook } from '../ui/speciesbook.js';
+import { openSpeciesBook, openSheetFor } from '../ui/speciesbook.js';
 import { findWindows } from '../fishing/engine.js';
 import * as spots from '../fishing/spots.js';
 import * as weather from '../data/weather.js';
@@ -26,6 +26,7 @@ import * as tide from '../data/tide.js';
 import * as record from '../fishing/record.js';
 import { startNav } from '../ui/destination.js';
 import * as lurebox from '../ui/lurebox.js';
+import * as live from '../fishing/live.js';
 
 /** Fenêtres du plan visibles sans ouvrir la feuille. */
 const PLAN_VISIBLE = 3;
@@ -39,6 +40,7 @@ export function mount(container) {
   root = clear(container);
 
   refs.head = el('div', 'card');
+  refs.top4 = el('div');
   refs.warn = el('div');
   refs.cond = el('div', 'card tight');
   refs.lure = el('div');
@@ -51,7 +53,7 @@ export function mount(container) {
    * 470 px qu'elle lui prenait. */
   const gridFold = collapsible('ESPÈCES × HEURES', refs.grid, { hint: 'la journée en un coup d’œil' });
 
-  root.append(refs.head, refs.warn, refs.cond, refs.lure, refs.plan, gridFold, refs.foot);
+  root.append(refs.head, refs.top4, refs.warn, refs.cond, refs.lure, refs.plan, gridFold, refs.foot);
 
   unsub = subscribe(['advice', 'scores', 'samples', 'weather', 'fix'], render);
   render();
@@ -84,6 +86,13 @@ function render() {
   }
   head.append(el('h2', 'list-title', a.headline));
   head.append(el('div', 'list-sub', a.subline));
+
+  /* ---- Les quatre du moment ----------------------------------------------
+   * En tête d'écran, tout de suite, et sur les SOIXANTE-DEUX espèces — pas
+   * seulement les sept modélisées. C'est la première question qu'on se pose en
+   * ouvrant l'onglet : « qu'est-ce qui marche là, maintenant ». Elle mérite
+   * d'être la première chose qu'on lit, pas le résultat d'un défilement. */
+  renderTop4();
 
   /* ---- Avertissements ---------------------------------------------------
    * Tout ne mérite pas un encadré. « Pas de météo à jour » est un défaut de
@@ -166,6 +175,62 @@ function render() {
   const logBtn = button('🎣 Enregistrer une prise', 'btn-lime btn-lg', () => record.openQuickRecord());
   logBtn.style.marginTop = '10px';
   foot.append(logBtn);
+}
+
+/**
+ * Les quatre espèces les mieux classées à cet instant, sur tout le catalogue.
+ *
+ * Deux natures de chiffre cohabitent et l'app ne les confond jamais : les sept
+ * espèces modélisées répondent à « est-ce que ça mord », les autres à « est-ce
+ * que c'est là ». Le libellé sous le nom le dit à chaque ligne.
+ */
+function renderTop4() {
+  const box = clear(refs.top4);
+  const top = live.ranking({ limit: 4 });
+  if (!top.length) return;
+
+  const card = el('div', 'card');
+  const h = el('div', 'card-head');
+  h.append(el('h3', null, 'EN CE MOMENT'), el('div', 'spacer'));
+  const b = live.basis();
+  h.append(el('span', 'tiny', `${b.total} espèces pêchables`));
+  card.append(h);
+
+  const row = el('div', 'top4-row');
+  for (const s of top) {
+    const cell = el('button', 'top4');
+    cell.type = 'button';
+    const dot = el('span', 'top4-dot', s.emoji || '🐟');
+    dot.style.background = s.color || 'var(--bg-2)';
+    cell.append(dot);
+    cell.append(el('span', 'top4-name', s.name));
+    const sc = el('span', 'top4-score', String(s.score));
+    sc.style.color = s.score >= 70 ? 'var(--lime)' : s.score >= 45 ? 'var(--amber)' : 'var(--txt-3)';
+    cell.append(sc);
+    // La nature du chiffre, sous le chiffre. Sans ça, une estimation de
+    // présence passerait pour une prévision de touche.
+    cell.append(el('span', 'top4-kind', s.modelled ? 'modèle complet' : 'estimation'));
+    if (s.noKill) cell.append(el('span', 'top4-kind', 'à relâcher'));
+    // Une espèce modélisée a une fiche de score détaillée ; les autres ont la
+    // fiche du catalogue. On ouvre celle qui a réellement quelque chose à dire.
+    cell.addEventListener('click', () => {
+      if (s.modelled) showSpecies(s.id);
+      else openSheetFor(s.sp);
+    });
+    row.append(cell);
+  }
+  card.append(row);
+
+  const bits = [];
+  if (b.positioned) bits.push('sous ta position');
+  if (b.seabed.length) bits.push(`fond ${b.seabed.slice(0, 2).join(', ')}`);
+  if (Number.isFinite(b.depthM)) bits.push(`${b.depthM} m`);
+  card.append(el('div', 'tiny',
+    `Classement recalculé en continu${bits.length ? ` — ${bits.join(' · ')}` : ''}. `
+    + `${b.modelledCount} espèces ont un modèle horaire complet — marée, courant, lumière, clarté. `
+    + `Les autres sont estimées sur la saison, le fond, la profondeur et le courant : c'est une probabilité de PRÉSENCE, pas de touche. `
+    + `Les espèces interdites et les périodes fermées sont retirées du classement, pas décotées.`));
+  box.append(card);
 }
 
 /** Une fenêtre du plan : deux lignes, un score, le reste au tap. */

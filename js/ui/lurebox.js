@@ -52,7 +52,9 @@ function autoContext() {
     }),
     depthM: Number.isFinite(depth) && depth > 1 ? Math.round(depth) : 12,
     depthKnown: Number.isFinite(depth) && depth > 1,
-    currentKn: Number.isFinite(st?.speedKn) ? Math.round(st.speedKn * 10) / 10 : 1,
+    // `spd`, pas `speedKn` — même faute que dans live.js, et elle faisait
+    // calculer toutes les plombées à 1 nœud quel que soit le courant réel.
+    currentKn: Number.isFinite(st?.spd) ? Math.round(st.spd * 10) / 10 : 1,
     turbidity: turb,
     cloudCover: wx?.cloudCover ?? null,
   };

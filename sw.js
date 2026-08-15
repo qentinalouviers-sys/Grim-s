@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.19.0';
+const VERSION = 'v1.20.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -58,6 +58,7 @@ const SHELL_FILES = [
   'js/fishing/engine.js',
   'js/fishing/spots.js',
   'js/fishing/lures.js',
+  'js/fishing/live.js',
   'js/ui/lurebox.js',
   'js/fishing/advisor.js',
   'js/fishing/learning.js',
