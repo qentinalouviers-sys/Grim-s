@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.35.0';
+const VERSION = 'v1.36.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -42,6 +42,12 @@ const SHELL_FILES = [
   'js/core/net.js',
   'js/core/anchorwatch.js',
   'js/core/wxalert.js',
+  // sync et account manquaient : la coque se chargeait sans eux, et le
+  // premier lancement hors ligne cassait sur un import introuvable dès que
+  // le JOURNAL s'ouvrait. Un audit des imports contre cette liste les a
+  // trouvés — ils étaient les deux seuls.
+  'js/core/sync.js',
+  'js/ui/account.js',
   'js/data/astro.js',
   'js/data/harmonics.js',
   'js/data/tide.js',

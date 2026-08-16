@@ -22,6 +22,7 @@ import * as presence from './core/presence.js';
 import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
+import * as account from './ui/account.js';
 import * as anchorwatch from './core/anchorwatch.js';
 import * as wxalert from './core/wxalert.js';
 import * as install from './ui/install.js';
@@ -483,6 +484,24 @@ async function checkWxAlerts(pos, hourly) {
     },
   });
 }
+
+/* Session expirée : le jeton n'est plus accepté. `sync.js` a déjà effacé la
+ * session ; il reste à le DIRE. Sans ce bandeau, l'app affichait « connecté »
+ * pendant que chaque synchro échouait en silence toutes les cinq minutes —
+ * quelqu'un pouvait pêcher un mois en croyant ses prises sauvegardées. */
+on('account:expired', () => {
+  const b = dom.banner(
+    'Session expirée — tes données restent sur ce téléphone, mais elles ne partent plus vers ton compte.',
+    'warn',
+    { id: 'authexpired' },
+  );
+  b?.querySelector('span')?.after(
+    dom.button('Se reconnecter', 'btn-sm', () => {
+      dom.dismissBanner('authexpired');
+      account.openAccount();
+    }),
+  );
+});
 
 on('data:refresh', (o) => slowTick(o || { force: true }));
 

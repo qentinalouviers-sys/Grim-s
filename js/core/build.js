@@ -10,4 +10,4 @@
  * renouvellement des caches.
  * ========================================================================== */
 
-export const APP_VERSION = 'v1.35.0';
+export const APP_VERSION = 'v1.36.0';

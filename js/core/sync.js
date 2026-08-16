@@ -71,6 +71,16 @@ async function api(path, { method = 'GET', body = null } = {}) {
     let data = null;
     try { data = await res.json(); } catch { /* réponse vide */ }
     if (!res.ok) {
+      /* 401 SUR UNE ROUTE AUTHENTIFIÉE : la session est morte — jeton expiré,
+       * révoqué, ou compte supprimé. Sans ce traitement, l'app restait
+       * « connectée » à l'écran pendant que chaque synchro échouait en
+       * silence toutes les cinq minutes. L'utilisateur voyait « connecté » et
+       * perdait ses données sans le savoir : c'est le pire des deux mondes.
+       * On efface la session et on le DIT. */
+      if (res.status === 401 && auth?.token && !path.startsWith('/api/auth/')) {
+        await persistAuth(null);
+        emit('account:expired');
+      }
       const err = new Error(data?.error || `HTTP ${res.status}`);
       err.code = data?.error;
       err.status = res.status;
@@ -115,8 +125,29 @@ export async function login(email, password) {
 }
 
 export async function logout() {
+  /* On prévient le serveur pour qu'il invalide le jeton — mais on ne fait pas
+   * dépendre la déconnexion locale de sa réponse : quelqu'un qui veut se
+   * déconnecter dans un parking sans réseau doit pouvoir le faire. */
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* sans effet */ }
   await persistAuth(null);
   set({ lastSyncAt: null });
+}
+
+/**
+ * Demande de réinitialisation du mot de passe.
+ *
+ * @returns {Promise<{ok:boolean, unsupported?:boolean}>} `unsupported` quand le
+ *   serveur n'expose pas encore la route : l'écran le dit alors franchement au
+ *   lieu d'afficher « erreur » et de laisser croire à une faute de frappe.
+ */
+export async function requestPasswordReset(email) {
+  try {
+    await api('/api/auth/forgot', { method: 'POST', body: { email } });
+    return { ok: true };
+  } catch (e) {
+    if (e?.status === 404 || e?.status === 501) return { ok: false, unsupported: true };
+    throw e;
+  }
 }
 
 /* ==========================================================================
