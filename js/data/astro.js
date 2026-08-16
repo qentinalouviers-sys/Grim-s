@@ -115,6 +115,52 @@ export function sunTimes(date, lat, lon) {
   };
 }
 
+/**
+ * Événements solaires du jour local qui contient `t` — quelle que soit l'HEURE
+ * de `t`.
+ *
+ * ── POURQUOI CETTE FONCTION EXISTE ────────────────────────────────────────
+ * `sunTimes()` choisit son jour solaire par `Math.round(jours − 0.5)` : le
+ * découpage se fait autour de MIDI, pas de minuit. Lui passer un instant du
+ * matin renvoie donc, selon la longitude, le lever et le coucher de la VEILLE.
+ * L'erreur est silencieuse — les valeurs sont plausibles, juste décalées d'un
+ * jour — et elle a réellement mordu : un test « cette heure est-elle de jour ? »
+ * comparait mardi 08 h au coucher du LUNDI, concluait « nuit », et une fenêtre
+ * de beau temps de sept heures n'était jamais annoncée.
+ *
+ * On normalise donc sur midi local avant d'appeler. Tout code qui demande le
+ * soleil d'un JOUR doit passer par ici ; `sunTimes()` reste pour qui sait ce
+ * qu'il fait.
+ */
+export function sunTimesOfDay(t, lat, lon) {
+  const day0 = new Date(t);
+  day0.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(day0);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  /* Viser midi ne suffit PAS, et c'est le piège qui a coûté deux passes :
+   * `Math.round(jours − 0.5 − lon/360)` bascule exactement à midi solaire. À
+   * midi UTC et par longitude est faible — Dieppe, 1.08° E — l'argument vaut
+   * N − 0.503, qui s'arrondit à N − 1. On tombe pile du mauvais côté, et on
+   * récupère la veille en croyant viser le bon jour.
+   *
+   * Plutôt que de décaler la sonde d'une heure au jugé — ce qui déplace le
+   * problème vers un autre fuseau ou une autre longitude — on VÉRIFIE : le
+   * passage au méridien doit tomber dans la journée locale visée. Sinon on
+   * décale la sonde d'un jour et on recommence. Trois essais couvrent tous les
+   * fuseaux, de UTC−12 à UTC+14. */
+  let fallback = null;
+  for (const shift of [0, 1, -1]) {
+    const probe = new Date(day0.getTime() + (12 + shift * 24) * 3600000);
+    const s = sunTimes(probe, lat, lon);
+    if (s.transit >= day0.getTime() && s.transit < dayEnd.getTime()) return s;
+    fallback ??= s;
+  }
+  // Aux latitudes polaires il n'y a ni lever ni coucher : on rend le premier
+  // essai plutôt que rien, et l'appelant voit des champs nuls comme prévu.
+  return fallback;
+}
+
 /** Série de `days` jours d'événements solaires, au format attendu par la brique pêche. */
 export function sunSeries(fromDate, days, lat, lon) {
   const out = [];

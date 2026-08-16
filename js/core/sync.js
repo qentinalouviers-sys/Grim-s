@@ -198,6 +198,20 @@ const COLLECTIONS = {
       await idb.put('kv', 'driftObs', deleted ? [] : data);
     },
   },
+  /* Les alertes météo. Elles montent pour être LUES PAR LE SERVEUR, et pas
+   * seulement pour suivre l'utilisateur d'un téléphone à l'autre : c'est
+   * l'outil de fond qui les relit pour envoyer les mails. Elles redescendent
+   * comme le reste — régler une alerte sur le téléphone et la retrouver sur la
+   * tablette est le comportement attendu de n'importe quel réglage. */
+  wxAlerts: {
+    kind: 'blob',
+    blobId: 'wxAlerts',
+    load: async () => (await idb.get('kv', 'wxAlerts')) || [],
+    updatedAtOf: async () => (await idb.get('kv', 'wxAlertsAt')) || 0,
+    apply: async (id, data, deleted) => {
+      await idb.put('kv', 'wxAlerts', deleted ? [] : data);
+    },
+  },
 };
 
 /* ==========================================================================

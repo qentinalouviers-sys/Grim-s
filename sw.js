@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.30.1';
+const VERSION = 'v1.31.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -41,6 +41,7 @@ const SHELL_FILES = [
   'js/core/presence.js',
   'js/core/net.js',
   'js/core/anchorwatch.js',
+  'js/core/wxalert.js',
   'js/data/astro.js',
   'js/data/harmonics.js',
   'js/data/tide.js',
@@ -79,6 +80,7 @@ const SHELL_FILES = [
   'js/ui/speciesbook.js',
   'js/ui/compassdiag.js',
   'js/ui/forecast.js',
+  'js/ui/wxalertform.js',
   'js/views/nav.js',
   'js/views/pilot.js',
   'js/views/drive.js',

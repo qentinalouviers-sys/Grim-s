@@ -40,7 +40,7 @@ import * as tide from '../data/tide.js';
 import * as stream from '../data/stream.js';
 import * as seabed from '../data/seabed.js';
 import * as weather from '../data/weather.js';
-import { sunTimes, sunAltitude, moonPhase, lightPhaseAt } from '../data/astro.js';
+import { sunTimesOfDay, sunAltitude, moonPhase, lightPhaseAt } from '../data/astro.js';
 import * as learning from './learning.js';
 
 const HOUR = 3600000;
@@ -139,7 +139,9 @@ export function buildSnapshot(t = Date.now(), speciesId = null) {
   const cfg = stream.config();
 
   /* --- Astro ----------------------------------------------------------- */
-  const sun = sunTimes(new Date(t), pos.lat, pos.lon);
+  // Le soleil du JOUR de la prise : une prise notée à 05 h se voyait sinon
+  // attribuer le lever et le coucher de la veille.
+  const sun = sunTimesOfDay(t, pos.lat, pos.lon);
   const moon = moonPhase(new Date(t));
 
   /* --- Poste le plus proche -------------------------------------------- */

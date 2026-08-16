@@ -33,11 +33,13 @@ import * as spots from '../fishing/spots.js';
 import * as route from '../nav/route.js';
 import { openDestinationPicker } from '../ui/destination.js';
 import { openForecast } from '../ui/forecast.js';
+import { openAlerts } from '../ui/wxalertform.js';
+import * as wxalert from '../core/wxalert.js';
 import { openDriveChooser, helmIcon } from './drive.js';
 import { openFishChooser } from './fishmode.js';
 import * as places from '../data/places.js';
 import * as anchorwatch from '../core/anchorwatch.js';
-import { sunTimes, moonPhase } from '../data/astro.js';
+import { sunTimesOfDay, moonPhase } from '../data/astro.js';
 
 const HOUR = 3600000;
 
@@ -257,6 +259,9 @@ function renderWeather(wx, place) {
 
   if (!wx) {
     box.append(el('p', 'muted', 'Prévision indisponible — pas encore de réseau depuis l’ouverture. Le reste de l’écran, marée et courant compris, est calculé à bord et reste juste.'));
+    // Les commandes restent : c'est justement le moment où l'on veut poser une
+    // alerte pour être prévenu quand la prévision arrivera.
+    box.append(weatherActions(place, 0));
     return;
   }
 
@@ -343,16 +348,34 @@ function renderWeather(wx, place) {
       week.append(row);
     });
     box.append(week);
-
-    const more = button('📅 Heure par heure · 7 jours', 'btn-sm',
-      () => openForecast({ hourly: state.weather.hourly, place, dayIndex: 0 }));
-    more.style.marginTop = '8px';
-    more.style.width = '100%';
-    box.append(more);
   }
+
+  box.append(weatherActions(place, days.length));
 
   box.append(el('div', 'tiny',
     `Pour ${place ? place.name : 'la position'} · vent, pression et visibilité : Open-Meteo. Mer, houle et température de l’eau : Open-Meteo Marine. Deux modèles distincts, affichés séparément.`));
+}
+
+/**
+ * Les deux commandes de la carte météo. Rendues dans TOUS les cas, y compris
+ * quand la prévision manque : c'est justement le moment où l'on veut poser une
+ * alerte pour être prévenu quand elle arrivera. Les deux écrans qu'elles
+ * ouvrent savent se présenter sans données.
+ */
+function weatherActions(place, dayCount) {
+  const acts = el('div', 'btn-row');
+  acts.style.marginTop = dayCount > 1 ? '8px' : '10px';
+  acts.append(
+    button('📅 Heure par heure', 'btn-sm',
+      () => openForecast({ hourly: state.weather?.hourly || [], place, dayIndex: 0 })),
+    /* L'alerte se règle DEPUIS la météo, pas depuis un écran de réglages :
+     * l'envie de se faire prévenir naît en regardant une semaine ventée, pas
+     * en fouillant un menu. Le compteur dit combien veillent, pour qu'on
+     * n'oublie pas une alerte réglée trois mois plus tôt. */
+    button(`🔔 M’alerter${wxalert.enabledCount() ? ` · ${wxalert.enabledCount()}` : ''}`,
+      'btn-sm', () => openAlerts()),
+  );
+  return acts;
 }
 
 /** « Auj. », « Demain », puis « mer. 19 » — comme on en parle à bord. */
@@ -422,7 +445,7 @@ function render() {
 
   /* ---- Bandeau --------------------------------------------------------- */
   const strip = clear(refs.strip);
-  const sun = sunTimes(new Date(now), pos.lat, pos.lon);
+  const sun = sunTimesOfDay(now, pos.lat, pos.lon);
   const moon = moonPhase(new Date(now));
 
   strip.append(pill(wx?.seaTempC != null ? `${fmt.num(wx.seaTempC, 1)}°` : '—', '🌡 EAU'));

@@ -23,6 +23,7 @@ import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
 import * as anchorwatch from './core/anchorwatch.js';
+import * as wxalert from './core/wxalert.js';
 import * as install from './ui/install.js';
 import * as fmt from './core/fmt.js';
 import { distance, bearing } from './core/geo.js';
@@ -34,7 +35,7 @@ import * as wrecks from './data/wrecks.js';
 import * as weatherApi from './data/weather.js';
 import * as places from './data/places.js';
 import * as stream from './data/stream.js';
-import { sunTimes } from './data/astro.js';
+import { sunTimesOfDay } from './data/astro.js';
 
 import * as gps from './sensors/gps.js';
 import * as compass from './sensors/heading.js';
@@ -113,6 +114,9 @@ async function boot() {
     // déchargée par le système pendant qu'on mouillait, elle doit repartir
     // armée, pas rester silencieuse.
     anchorwatch.init(),
+    // Les alertes météo doivent être en mémoire avant le premier tour lent :
+    // c'est lui qui les évalue contre la prévision qui vient d'arriver.
+    wxalert.init(),
   ]);
 
   const settings = (await idb.get('kv', 'settings')) || {};
@@ -389,6 +393,11 @@ async function slowTick(opts = {}) {
     }
 
     recompute(pos, wx.hourly);
+
+    // Les alertes météo, sur la prévision qui vient d'arriver. Le tour est
+    // local : il ne remplace pas le mail, il fait en sorte que l'alerte
+    // fonctionne dès aujourd'hui, sans attendre le serveur d'envoi.
+    checkWxAlerts(pos, wx.hourly).catch(() => {});
   } catch (e) {
     console.error('[slowTick]', e);
   } finally {
@@ -404,7 +413,7 @@ function recompute(pos, hourly) {
 
   const samples = engine.buildSamples({ from, to, stepMinutes: 30, pos, hourly });
   const scores = engine.scoreAll(samples, SPECIES_ORDER);
-  const sun = sunTimes(new Date(now), pos.lat, pos.lon);
+  const sun = sunTimesOfDay(now, pos.lat, pos.lon);
   const advice = advisor.brief({
     now, samples, scores, hourly, pos, tideInfo: tide.info(now), sun,
   });
@@ -420,6 +429,50 @@ function recompute(pos, hourly) {
       { id: 'provisional' },
     );
   }
+}
+
+/* ==========================================================================
+ * Alertes météo — le tour local
+ * --------------------------------------------------------------------------
+ * Ce que le serveur fera par mail, l'app le fait déjà par notification quand
+ * elle tourne. C'est volontairement redondant : une alerte qui n'existe que
+ * sur un serveur pas encore branché n'alerte personne, et une fonction qu'on
+ * annonce doit marcher le jour où on l'annonce.
+ * ========================================================================== */
+async function checkWxAlerts(pos, hourly) {
+  if (!hourly?.length) return;
+  // sunTimesOfDay et non sunTimes : le second découpe ses jours autour de
+  // MIDI et renverrait le soleil de la veille pour une heure du matin.
+  const sunFor = (t) => sunTimesOfDay(t, pos.lat, pos.lon);
+
+  await wxalert.evaluate({
+    hourly,
+    sunFor,
+    notify: async (rule, win) => {
+      const quand = `${fmt.hhmmDay(win.start)} → ${fmt.hhmm(win.end)}`;
+      const corps = `${quand} · ${win.hours} h · vent ${Math.round(win.windMaxKn)} nd max`
+        + (win.waveMaxM != null ? ` · mer ${win.waveMaxM.toFixed(1)} m` : '');
+
+      // Le bandeau reste à l'écran : un toast de trois secondes sur une bonne
+      // nouvelle qu'on attendait depuis dix jours serait raté une fois sur deux.
+      dom.banner(`🌤 ${rule.name || 'Fenêtre météo'} — ${corps}`, 'info', { id: `wxa-${rule.id}` });
+      navigator.vibrate?.([60, 60, 60]);
+
+      if (!rule.channels?.push) return;
+      try {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        const reg = await navigator.serviceWorker?.getRegistration?.();
+        const opts = {
+          body: corps,
+          tag: `wxa-${rule.id}`,
+          icon: 'assets/icon-180.png',
+          badge: 'assets/icon-180.png',
+        };
+        if (reg?.showNotification) await reg.showNotification(`🌤 ${rule.name || 'Bonne météo'}`, opts);
+        else new Notification(`🌤 ${rule.name || 'Bonne météo'}`, opts);
+      } catch { /* notifications refusées : le bandeau reste */ }
+    },
+  });
 }
 
 on('data:refresh', (o) => slowTick(o || { force: true }));

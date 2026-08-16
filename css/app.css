@@ -1605,6 +1605,104 @@ input[type=range]::-moz-range-thumb {
 .fc-sea { flex: 0 0 62px; text-align: right; color: #7dd3fc; font-size: 11.5px; }
 .fc-air { flex: 0 0 52px; text-align: right; font-size: 11.5px; }
 
+/* Un bandeau dans une FEUILLE n'a pas les contraintes de celui qui coiffe
+   l'écran : il n'y a pas de barre au-dessus, et le texte y est explicatif
+   plutôt qu'urgent. Il peut donc passer à la ligne, et son bouton d'action
+   descendre en dessous sur toute la largeur — collé à droite d'un texte de
+   sept lignes, « Se connecter » débordait de la boîte. */
+.sheet-body .banner { flex-wrap: wrap; }
+.sheet-body .banner > span:first-child { flex: 1 1 100%; }
+.sheet-body .banner > .btn { flex: 1 1 100%; margin-top: 8px; }
+
+/* ══ ALERTES MÉTÉO ═════════════════════════════════════════════════════
+   Un formulaire sans un seul champ de saisie : rien que des pastilles. Sur un
+   téléphone, un clavier numérique recouvre l'écran, le doigt rate, et une
+   valeur absurde s'enregistre sans que personne la voie. Les valeurs
+   proposées couvrent ce qu'un pêcheur côtier utilise réellement. */
+.wxa-sec { display: flex; align-items: center; gap: 7px; margin: 14px 0 2px; }
+.wxa-sec-i { font-size: 16px; }
+.wxa-sec-t { font-size: 12px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; color: var(--txt); }
+.wxa-sec-h { font-size: 11px; color: var(--txt-3); margin-bottom: 7px; line-height: 1.35; }
+
+.wxa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wxa-chip {
+  flex: 1 1 auto; min-width: 58px; min-height: 44px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font: inherit; font-size: 14px; font-weight: 700; color: var(--txt-2);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.wxa-chip.on { background: rgba(34,211,238,.16); border-color: var(--cyan); color: var(--cyan); }
+
+/* Les options en tuiles icône + mot : on les reconnaît à l'image avant de
+   lire, et une tuile de 44 px se touche sur un pont qui bouge. */
+.wxa-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wxa-opt {
+  flex: 1 1 88px; min-height: 56px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 6px 4px;
+  font: inherit; color: var(--txt-3);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.wxa-opt-i { font-size: 19px; line-height: 1; }
+.wxa-opt-l { font-size: 10.5px; font-weight: 700; text-align: center; }
+.wxa-opt.on { background: rgba(34,211,238,.16); border-color: var(--cyan); color: var(--cyan); }
+
+.wxa-days { display: flex; gap: 5px; }
+.wxa-day {
+  flex: 1; min-height: 44px;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm);
+  font: inherit; font-size: 14px; font-weight: 750; color: var(--txt-3);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.wxa-day.on { background: rgba(163,230,53,.16); border-color: var(--lime); color: var(--lime); }
+
+/* L'aperçu — la pièce maîtresse. Sans lui on règle à l'aveugle : on met la
+   barre trop haut, on n'est jamais prévenu, et on croit l'alerte cassée. */
+.wxa-preview {
+  margin-top: 14px; padding: 11px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-left: 3px solid var(--cyan);
+  border-radius: var(--r-sm);
+}
+.wxa-prev-h { font-size: 14px; font-weight: 750; color: var(--txt); }
+.wxa-prev-s { font-size: 11.5px; color: var(--txt-3); margin-top: 4px; line-height: 1.4; }
+.wxa-prev-w { font-size: 12px; color: var(--lime); margin-top: 5px; font-weight: 650; }
+
+/* La liste des alertes */
+.wxa-card {
+  background: var(--bg-1); border: 1px solid var(--line-soft);
+  border-radius: var(--r); padding: 11px; margin-bottom: 8px;
+}
+.wxa-card.off { opacity: .55; }
+.wxa-head { display: flex; align-items: center; gap: 8px; }
+.wxa-name { font-size: 14.5px; font-weight: 750; color: var(--txt); }
+.wxa-desc { font-size: 11.5px; color: var(--txt-2); margin-top: 3px; line-height: 1.4; }
+.wxa-where { display: flex; gap: 8px; font-size: 10.5px; color: var(--txt-3); margin-top: 6px; }
+.wxa-next { font-size: 11.5px; color: var(--txt-3); margin-top: 6px; }
+.wxa-next.hit { color: var(--lime); font-weight: 650; }
+
+/* L'interrupteur. 44 px de haut pour la zone touchable, même si le rail n'en
+   fait que 24 : la cible se mesure au doigt, pas au dessin. */
+.wxa-sw {
+  position: relative;                 /* repère du bouton, qui est en absolu */
+  flex: 0 0 auto; width: 46px; height: 44px;
+  display: grid; place-items: center;
+  background: none; border: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.wxa-sw::before {
+  content: ''; width: 40px; height: 23px; border-radius: 999px;
+  background: var(--line); transition: background .15s;
+}
+.wxa-sw .wxa-sw-k {
+  position: absolute; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--txt-3); transform: translateX(-8px); transition: transform .15s, background .15s;
+}
+.wxa-sw.on::before { background: rgba(163,230,53,.35); }
+.wxa-sw.on .wxa-sw-k { background: var(--lime); transform: translateX(8px); }
+
 /* ══ MODE NAVIGATION ═══════════════════════════════════════════════════════
    Un mode, pas un écran. L'isolement se joue ici, sur le body : ce qu'on
    masque — la barre d'onglets, les bandeaux, les pastilles d'état — vit HORS

@@ -45,7 +45,7 @@ import { distance, bearing, crossTrack, angleDiff, toRad, courseToSteer, trueToM
 import * as stream from '../data/stream.js';
 import * as weather from '../data/weather.js';
 import * as tide from '../data/tide.js';
-import { sunTimes } from '../data/astro.js';
+import { sunTimesOfDay } from '../data/astro.js';
 
 const MS_PER_KN = 0.5144444;
 
@@ -247,7 +247,11 @@ let stwFilter = null;
  */
 function environmentAt(t, dest) {
   const st = stream.tidalStream(t, dest);
-  const sun = sunTimes(new Date(t), dest.lat, dest.lon);
+  // sunTimesOfDay : `sunTimes` découpe ses jours autour du midi solaire et
+  // rend la veille pour une heure du matin. Ici le décalage n'était pas
+  // cosmétique — « arrivée de nuit ? » se serait comparé au coucher de la
+  // veille, et une arrivée de 06 h aurait été annoncée dans le noir.
+  const sun = sunTimesOfDay(t, dest.lat, dest.lon);
   return {
     t,
     tideM: tide.height(t),

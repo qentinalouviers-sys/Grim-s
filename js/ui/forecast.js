@@ -28,7 +28,7 @@ import { el, clear, openSheet } from './dom.js';
 import { Meteogram } from './widgets.js';
 import * as fmt from '../core/fmt.js';
 import * as weather from '../data/weather.js';
-import { sunTimes } from '../data/astro.js';
+import { sunTimesOfDay } from '../data/astro.js';
 
 const JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const JOURS_COURT = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
@@ -119,7 +119,9 @@ export function openForecast({ hourly, place, dayIndex = 0 } = {}) {
     const d = days[sel];
     const now = Date.now();
     const conf = weather.confidence(d.start, now);
-    const sun = place ? sunTimes(new Date(d.start + 12 * 3600000), place.lat, place.lon) : null;
+    // Le décalage de midi qui traînait ici est maintenant dans la fonction :
+    // c'est le genre de correction qu'on oublie de recopier au site suivant.
+    const sun = place ? sunTimesOfDay(d.start, place.lat, place.lon) : null;
 
     /* En-tête du jour */
     const head = el('div', 'fc-head');
