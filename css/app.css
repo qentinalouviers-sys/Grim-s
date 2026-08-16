@@ -1605,6 +1605,60 @@ input[type=range]::-moz-range-thumb {
 .fc-sea { flex: 0 0 62px; text-align: right; color: #7dd3fc; font-size: 11.5px; }
 .fc-air { flex: 0 0 52px; text-align: right; font-size: 11.5px; }
 
+/* ══ BANDES HORIZONTALES — le confort du glissé ════════════════════════
+   Toutes les bandes qui défilent de droite à gauche, réunies ici parce
+   qu'elles souffraient toutes des trois mêmes choses.
+
+   1. `touch-action` NE S'HÉRITE PAS. Il était posé sur `body`, donc chaque
+      bande retombait sur `auto` : le navigateur devait attendre de savoir si
+      le geste était un balayage ou un double-tap avant de bouger quoi que ce
+      soit. C'est ce délai qu'on sentait — la bande partait en retard, puis
+      d'un coup. `manipulation` supprime l'attente et garde le pincement.
+
+   2. Sans `overscroll-behavior-x: contain`, arriver au bout d'une bande
+      passe la main au parent : la page saute latéralement, ou le navigateur
+      croit à un geste « page précédente » et amorce un retour arrière. Le
+      geste qu'on faisait pour voir la dernière pastille fermait l'écran.
+
+   3. `-webkit-overflow-scrolling: touch` rend l'inertie sur les moteurs qui
+      la réclament encore. Sans elle, la bande s'arrête pile où le doigt
+      s'arrête — c'est jouable, mais ça ne ressemble à rien de connu. */
+.topbar-row.secondary,
+.strip,
+.heat-scroll,
+.filter-row,
+.swatch-row,
+.fm-panel,
+.fm-swatches,
+.fc-rail-wrap {
+  touch-action: manipulation;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Les vues et les feuilles défilent verticalement : même problème d'attente,
+   même remède. Sans ça, chaque début de défilement coûtait le délai du
+   double-tap, et c'est ce qui donnait à toute l'app son toucher « mou ». */
+.view,
+.sheet-body,
+.btn,
+.tab { touch-action: manipulation; }
+
+/* L'accrochage est en `proximity`, jamais `mandatory` : on garde le droit de
+   s'arrêter entre deux cartes si on le veut, la bande se contente de tomber
+   juste quand on la lâche près d'un bord. `mandatory` reprend la main sur le
+   doigt et donne exactement la sensation de lutte qu'on cherche à éliminer.
+   La table du tableau de pêche est exclue — on n'accroche pas des colonnes. */
+.strip,
+.swatch-row,
+.fm-swatches,
+.fc-rail-wrap { scroll-snap-type: x proximity; }
+
+.strip > *,
+.swatch-row > *,
+.fm-swatches > *,
+.fc-rail > * { scroll-snap-align: start; }
+
 /* Un bandeau dans une FEUILLE n'a pas les contraintes de celui qui coiffe
    l'écran : il n'y a pas de barre au-dessus, et le texte y est explicatif
    plutôt qu'urgent. Il peut donc passer à la ligne, et son bouton d'action

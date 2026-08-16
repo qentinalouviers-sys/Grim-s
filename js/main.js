@@ -793,13 +793,63 @@ function registerServiceWorker() {
 window.addEventListener('error', (e) => console.error('[erreur]', e.error || e.message));
 window.addEventListener('unhandledrejection', (e) => console.error('[promesse]', e.reason));
 
-// Empêche le zoom par double-tap : sur un bateau qui bouge, un doigt qui
-// rebondit ne doit pas déclencher un zoom sur le tableau de bord.
-let lastTouch = 0;
+/* ==========================================================================
+ * Le garde anti-double-tap
+ * --------------------------------------------------------------------------
+ * Sur un bateau qui bouge, un doigt qui rebondit ne doit pas déclencher un
+ * zoom sur le tableau de bord. D'où ce garde.
+ *
+ * ── CE QU'IL CASSAIT, ET C'ÉTAIT LE DÉFAUT SIGNALÉ ────────────────────────
+ * Il annulait TOUT relâché survenant moins de 320 ms après le précédent, sans
+ * regarder si le doigt avait bougé. Or c'est exactement ce que fait un
+ * balayage : on pousse la bande, on repose le doigt, on repousse. Le deuxième
+ * relâché était annulé, et sur un moteur tactile un `preventDefault` sur le
+ * relâché coupe l'inertie — la bande s'arrête net au lieu de continuer. Les
+ * bandes horizontales — pastilles d'état, bandeau d'infos, jours de la
+ * prévision, filtres du catalogue — étaient toutes touchées.
+ *
+ * Un double-tap, ce n'est pas deux relâchés rapprochés : c'est deux touchers
+ * rapprochés ET IMMOBILES ET AU MÊME ENDROIT. On mesure donc les trois. Le
+ * zoom accidentel reste bloqué, le balayage garde son élan.
+ *
+ * (`touch-action: manipulation` en CSS fait le même travail nativement et sans
+ * écouteur ; ce garde reste pour les moteurs qui ne l'honorent pas partout.)
+ * ========================================================================== */
+const TAP_SLOP = 14;    // px — au-delà, c'est un glissé, pas un tap
+const TAP_GAP = 320;    // ms — au-delà, deux gestes distincts
+
+let lastTap = { t: 0, x: 0, y: 0 };
+let touchStart = null;
+
+document.addEventListener('touchstart', (e) => {
+  const t = e.changedTouches[0];
+  touchStart = t ? { x: t.clientX, y: t.clientY } : null;
+}, { passive: true });
+
 document.addEventListener('touchend', (e) => {
+  const t = e.changedTouches[0];
+  if (!t) return;
   const now = Date.now();
-  if (now - lastTouch < 320) e.preventDefault();
-  lastTouch = now;
+  const bougé = touchStart
+    ? Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) > TAP_SLOP
+    : true;
+
+  // Un glissé n'est jamais un tap : il ne peut ni être annulé, ni compter
+  // comme la première moitié d'un double-tap.
+  if (bougé) {
+    lastTap = { t: 0, x: 0, y: 0 };
+    touchStart = null;
+    return;
+  }
+
+  const proche = Math.hypot(t.clientX - lastTap.x, t.clientY - lastTap.y) <= TAP_SLOP * 2;
+  if (now - lastTap.t < TAP_GAP && proche) {
+    e.preventDefault();
+    lastTap = { t: 0, x: 0, y: 0 };   // pas de triple-tap en chaîne
+  } else {
+    lastTap = { t: now, x: t.clientX, y: t.clientY };
+  }
+  touchStart = null;
 }, { passive: false });
 
 boot();
