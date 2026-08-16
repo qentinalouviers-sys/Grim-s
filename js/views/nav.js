@@ -105,12 +105,12 @@ export function mount(container) {
 
   // La navigation GPS est l'action la plus lourde de conséquences de cet
   // écran : elle occupe toute la largeur, seule, et se lit sans chercher.
-  /* Le mode conduite passe DEVANT « Naviguer vers… », et ce n'est pas une
+  /* Le mode navigation passe DEVANT « Naviguer vers… », et ce n'est pas une
    * promotion arbitraire : « naviguer vers » demande déjà de savoir où l'on
    * va, alors que la plupart des sorties commencent sans but — on largue les
    * amarres, on verra sur l'eau. Le mode conduite accepte les deux, et c'est
    * lui qui pose la question. */
-  refs.btnDrive = button('Mode conduite', 'btn-primary btn-lg', openDriveChooser);
+  refs.btnDrive = button('Mode navigation', 'btn-primary btn-lg', openDriveChooser);
   refs.btnDrive.prepend(helmIcon(21));
   actions.append(refs.btnDrive);
 

@@ -57,22 +57,31 @@ let lock = null;
 /**
  * La barre à roue, dessinée. Le même signe que l'onglet NAV, et pour la même
  * raison : c'est le geste de CONDUIRE le bateau qu'on désigne, pas celui de
- * chercher le nord. Aucun émoji ne représente une barre — ☸ est une roue du
- * dharma et n'a pas de poignées, 🛞 est un pneu de voiture. Alors on la
- * dessine, une fois, et tous les boutons du mode s'en servent.
+ * chercher le nord.
  *
- * @param {number} px Taille en pixels. Le trait s'épaissit avec elle pour que
- *   la roue garde le même poids visuel qu'un émoji de la même hauteur.
+ * ── CE QUI FAIT QU'ON LA RECONNAÎT ────────────────────────────────────────
+ * La première version n'avait qu'un moyeu et huit rayons s'arrêtant dans le
+ * vide : ça ne se lisait pas comme une barre, ça se lisait comme une roue —
+ * un pneu, une étoile, un soleil. Ce qui fait une barre à roue, ce sont les
+ * POIGNÉES qui dépassent de la jante. Il faut donc les trois : une jante
+ * fermée, un moyeu plein, et huit poignées qui la traversent et sortent.
+ * Comparé à six et à dix poignées, à 19, 21 et 23 px : huit est le seul
+ * compte qui reste lisible sans devenir une pelote.
+ *
+ * @param {number} px Taille en pixels.
  */
 export function helmIcon(px = 19) {
   const span = el('span', 'helm-ico');
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
-      stroke="currentColor" stroke-width="${(1.9 * 19 / px).toFixed(2)}" stroke-linecap="round">
-      <circle cx="12" cy="12" r="4.1"/>
-      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
-      <path d="M12 7.9V2.7M12 16.1v5.2M7.9 12H2.7M16.1 12h5.2
-               M9.1 9.1 5.4 5.4M14.9 9.1 18.6 5.4M9.1 14.9 5.4 18.6M14.9 14.9l3.7 3.7"/>
+  // Le trait est donné en unités du viewBox : pour que l'épaisseur RENDUE
+  // reste la même à 19 comme à 23 px, il faut la diviser par la taille.
+  const sw = (1.7 * 22 / px).toFixed(2);
+  span.innerHTML = `<svg viewBox="0 0 24 24" width="${px}" height="${px}">
+      <g fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round">
+        <circle cx="12" cy="12" r="6.4"/>
+        <path d="M12 8.6V1.8M14.4 9.6 19.21 4.79M15.4 12H22.2M14.4 14.4 19.21 19.21M12 15.4V22.2M9.6 14.4 4.79 19.21M8.6 12H1.8M9.6 9.6 4.79 4.79"/>
+      </g>
+      <circle cx="12" cy="12" r="1.7" fill="currentColor"/>
     </svg>`;
   return span;
 }
@@ -84,7 +93,7 @@ export function helmIcon(px = 19) {
 export function openDriveChooser() {
   const body = el('div');
   body.append(el('p', 'muted',
-    'Le mode conduite masque les onglets et les menus. Il ne reste que les instruments, le bouton de prise et la sortie.'));
+    'Le mode navigation masque les onglets et les menus. Il ne reste que les instruments, le bouton de prise et la sortie.'));
 
   const libre = button('🧭 Navigation libre', 'btn-primary btn-lg', () => {
     // « Libre » veut dire SANS BUT. Entrer en libre avec une route encore
@@ -123,7 +132,7 @@ export function openDriveChooser() {
     body.append(suite);
   }
   body.append(libre, vers);
-  return openSheet('Mode conduite', body);
+  return openSheet('Mode navigation', body);
 }
 
 /* ==========================================================================
@@ -211,7 +220,7 @@ function build() {
   const out = el('button', 'drive-exit', '');
   out.type = 'button';
   out.append(el('span', 'drive-exit-ico', '⤺'), el('span', null, 'QUITTER'));
-  out.setAttribute('aria-label', 'Quitter le mode conduite');
+  out.setAttribute('aria-label', 'Quitter le mode navigation');
   out.addEventListener('click', leave);
   head.append(who, out);
   box.append(head);
@@ -313,7 +322,7 @@ function build() {
     acts.append(button('🎯 Autre but', '', () => openDestinationPicker()));
     acts.append(button('✕ Route', '', () => {
       route.stop();
-      toast('Navigation arrêtée — conduite libre', 'good');
+      toast('Route abandonnée — navigation libre', 'good');
     }));
   } else {
     acts.append(button('🎯 Choisir un but', 'btn-primary', () => openDestinationPicker()));
