@@ -22,6 +22,7 @@ import * as presence from './core/presence.js';
 import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
 import * as sos from './ui/sos.js';
+import * as anchorwatch from './core/anchorwatch.js';
 import * as install from './ui/install.js';
 import * as fmt from './core/fmt.js';
 import { distance, bearing } from './core/geo.js';
@@ -31,6 +32,7 @@ import * as seabed from './data/seabed.js';
 import * as bathy from './data/bathy.js';
 import * as wrecks from './data/wrecks.js';
 import * as weatherApi from './data/weather.js';
+import * as places from './data/places.js';
 import * as stream from './data/stream.js';
 import { sunTimes } from './data/astro.js';
 
@@ -100,7 +102,18 @@ async function boot() {
   bathy.init();
   wrecks.init();
   presence.init();
-  await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord(), traces.init()]);
+  await Promise.all([
+    tide.init(), spots.init(), learning.init(), record.initRecord(), traces.init(),
+    // Le port retenu doit être connu AVANT le premier tour lent : c'est lui qui
+    // décide de quelle côte on télécharge la météo quand le GPS n'a encore rien
+    // dit — c'est-à-dire pendant les dix à trente premières secondes, celles où
+    // l'écran se remplit.
+    places.init(),
+    // La veille de mouillage se restaure avant l'affichage : si l'app a été
+    // déchargée par le système pendant qu'on mouillait, elle doit repartir
+    // armée, pas rester silencieuse.
+    anchorwatch.init(),
+  ]);
 
   const settings = (await idb.get('kv', 'settings')) || {};
   set({ settings, nightMode: !!settings.nightMode });
@@ -359,9 +372,14 @@ async function slowTick(opts = {}) {
   if (slowRunning) return;
   slowRunning = true;
   try {
+    /* Sans GPS, on se rabat sur le port CHOISI dans la cabine avant le port
+     * d'attache : quelqu'un qui a réglé Saint-Vaast la veille au soir veut la
+     * météo de Saint-Vaast, pas celle de Dieppe, et il n'aura pas de fix tant
+     * qu'il n'est pas dehors. */
+    const home = places.current() || spots.getPort();
     const pos = state.fix
       ? { lat: state.fix.lat, lon: state.fix.lon }
-      : { lat: spots.getPort().lat, lon: spots.getPort().lon };
+      : { lat: home.lat, lon: home.lon };
 
     const wx = await weatherApi.load(pos.lat, pos.lon, { force: !!opts.force });
     set({ weather: wx });
@@ -405,6 +423,13 @@ function recompute(pos, hourly) {
 }
 
 on('data:refresh', (o) => slowTick(o || { force: true }));
+
+// Changer de port change la côte : on retélécharge tout de suite, et la cabine
+// se redessine avec ce qu'elle a en attendant la réponse.
+on('place:changed', () => {
+  slowTick({ force: true });
+  if (current === 'nav') VIEWS.nav.refresh?.();
+});
 
 // Une position significativement différente change le champ de courant et les
 // postes accessibles : on recalcule, mais pas à chaque fix (ce serait 1 Hz).
@@ -476,7 +501,7 @@ function syncNavTab() {
   // L'icône n'est plus réécrite ici : la barre à roue est un SVG, et lui
   // affecter du texte l'aurait effacée sans retour. Les deux dessins sont dans
   // le document, `tab-live` choisit lequel se montre.
-  tab.querySelector('.tab-lbl').textContent = on ? 'PILOTE' : 'NAV';
+  tab.querySelector('.tab-lbl').textContent = on ? 'PILOTE' : 'CABINE';
   tab.classList.toggle('tab-live', on);
 }
 
@@ -658,7 +683,9 @@ on('alarm', (a) => {
     dom.alarm(
       '⚓ DÉRAPAGE',
       `${Math.round(a.distanceM)} m du point de mouillage (rayon ${a.radiusM} m)`,
-      () => gps.weighAnchor(),
+      // Par anchorwatch et non gps.weighAnchor : celui-ci ne vide que la
+      // mémoire, et la veille serait ressuscitée au prochain lancement.
+      () => { gps.weighAnchor(); anchorwatch.disarm(); },
     );
   } else if (a.kind === 'mob') {
     navigator.vibrate?.([200, 80, 200, 80, 600]);

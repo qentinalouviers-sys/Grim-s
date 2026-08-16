@@ -1,5 +1,5 @@
 /* ==========================================================================
- * views/drive.js — MODE CONDUITE
+ * views/drive.js — MODE NAVIGATION
  * --------------------------------------------------------------------------
  * Un cockpit. Pas un écran de plus dans une application à onglets : un mode
  * ISOLÉ, dans lequel on entre en décidant d'y entrer et dont on sort par un
@@ -41,6 +41,7 @@ import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
 import { norm360 } from '../core/geo.js';
 import { openDestinationPicker } from '../ui/destination.js';
+import { openCompassDiag } from '../ui/compassdiag.js';
 
 let root;
 let unsubs = [];
@@ -231,6 +232,12 @@ function build() {
    * instrument qui se déplace entre deux coups d'œil oblige à le chercher, et
    * on cherche mal quand ça bouge. */
   const cap = el('div', 'drive-card');
+  /* Le cadran ouvre son propre diagnostic. C'était le geste depuis toujours —
+   * le bandeau « compas silencieux » le dit encore — sauf que le compas n'est
+   * plus sur la page d'accueil : il est ici. Le geste devait suivre, sinon la
+   * consigne renvoyait vers un cadran qui n'existe plus. */
+  cap.addEventListener('click', openCompassDiag);
+  cap.style.cursor = 'pointer';
   const cWrap = el('div');
   cap.append(cWrap);
   // Un peu plus court avec un but : le compas porte alors deux relèvements et

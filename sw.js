@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.28.0';
+const VERSION = 'v1.29.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -40,10 +40,12 @@ const SHELL_FILES = [
   'js/core/idb.js',
   'js/core/presence.js',
   'js/core/net.js',
+  'js/core/anchorwatch.js',
   'js/data/astro.js',
   'js/data/harmonics.js',
   'js/data/tide.js',
   'js/data/weather.js',
+  'js/data/places.js',
   'js/data/stream.js',
   'js/data/seamarks.js',
   'js/data/seabed.js',
@@ -75,6 +77,7 @@ const SHELL_FILES = [
   'js/ui/fleet.js',
   'js/ui/seabedlayer.js',
   'js/ui/speciesbook.js',
+  'js/ui/compassdiag.js',
   'js/views/nav.js',
   'js/views/pilot.js',
   'js/views/drive.js',
@@ -235,4 +238,29 @@ async function shellStrategy(req) {
 /** Purge déclenchée depuis l'écran Réglages. */
 self.addEventListener('message', (e) => {
   if (e.data === 'skipWaiting') self.skipWaiting();
+});
+
+/* ==========================================================================
+ * Toucher une notification
+ * --------------------------------------------------------------------------
+ * Sans ce gestionnaire, toucher l'alerte de dérapage ne fait RIEN sur Android :
+ * la notification se ferme et l'app reste au fond de la pile. Or l'alerte n'a
+ * de valeur que si elle amène devant l'écran qui montre où l'on a dérivé.
+ *
+ * On réutilise un onglet ouvert plutôt que d'en ouvrir un second : deux
+ * instances de l'app, c'est deux veilles de mouillage qui se contredisent.
+ * ========================================================================== */
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of list) {
+      if ('focus' in c) {
+        // La carte : c'est là qu'on voit le cercle de garde et la trace.
+        if ('navigate' in c) await c.navigate('index.html#map').catch(() => {});
+        return c.focus();
+      }
+    }
+    return self.clients.openWindow('index.html#map');
+  })());
 });

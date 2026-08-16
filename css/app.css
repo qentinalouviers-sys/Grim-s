@@ -271,13 +271,13 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   height: 23px; display: grid; place-items: center;
   filter: grayscale(1) opacity(.65); transition: filter .15s;
 }
-/* Barre à roue quand on prépare, cible quand on pilote. */
+/* Timonerie quand on prépare, cible quand on pilote. */
 .tab-ico .ico-pilot { display: none; }
-.tab-live .tab-ico .ico-helm { display: none; }
+.tab-live .tab-ico .ico-cabin { display: none; }
 .tab-live .tab-ico .ico-pilot { display: block; }
 /* Le SVG suit la couleur de l'onglet : gris au repos, cyan actif, vert en
    pilotage — sans une seule règle de couleur en plus. */
-.tab-ico .ico-helm { display: grid; place-items: center; color: currentColor; }
+.tab-ico .ico-cabin { display: grid; place-items: center; color: currentColor; }
 /* Cinq onglets tiennent sur 320 px de large : le libellé perd son interlettrage
    plutôt que d'être tronqué, parce qu'un onglet « JOURN… » ne se lit pas d'un
    coup d'œil et que c'est tout ce qu'on lui demande. */
@@ -1442,7 +1442,75 @@ input[type=range]::-moz-range-thumb {
 }
 .catch-marker span { transform: rotate(-45deg); font-size: 13px; line-height: 1; }
 
-/* ══ MODE CONDUITE ═════════════════════════════════════════════════════
+/* ══ CABINE ════════════════════════════════════════════════════════════
+   Le haut de la page d'accueil : où l'on va, et le temps qu'il y fait.
+
+   Le port est un BOUTON qui a l'air d'une carte, et pas une carte avec un
+   petit bouton dans un coin. C'est la première chose qu'on lit et la première
+   qu'on veut changer — sur un pont qui bouge, viser une pastille de trente
+   pixels avec un doigt mouillé rate une fois sur trois, viser toute la largeur
+   de l'écran ne rate jamais. */
+.place-card {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  font: inherit; color: inherit;
+  background: var(--bg-1);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.place-card:active { background: var(--bg-2); }
+.place-main { flex: 1; min-width: 0; }
+.place-name {
+  font-size: 21px; font-weight: 750; letter-spacing: -.01em;
+  color: var(--txt);
+  /* Un nom de port qui déborde se coupe proprement : « Saint-Vaast-la-Ho… »
+     se reconnaît, une deuxième ligne pousse la météo hors de l'écran. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.place-sub { font-size: 11.5px; color: var(--txt-3); margin-top: 2px; }
+.place-change {
+  flex: 0 0 auto;
+  font-size: 10px; font-weight: 750; letter-spacing: .1em;
+  color: var(--cyan);
+  border: 1px solid var(--cyan); border-radius: 999px;
+  padding: 5px 9px;
+}
+
+/* Le vent en premier et en gros : c'est lui qui décide si l'on sort. */
+.wx-hero { display: flex; align-items: baseline; gap: 10px; }
+.wx-hero-v {
+  font-size: 44px; font-weight: 780; line-height: 1;
+  letter-spacing: -.03em; color: var(--txt);
+}
+.wx-hero-u { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: var(--txt-3); }
+.wx-hero-f { font-size: 12.5px; font-weight: 650; color: var(--txt-2); margin-top: 2px; }
+.wx-from { font-size: 13.5px; font-weight: 650; color: var(--cyan); margin: 6px 0 10px; }
+
+/* Le reste en grille auto : les cases se posent d'elles-mêmes selon la largeur,
+   et une donnée absente ne laisse pas de trou — elle n'est simplement pas là. */
+.wx-grid {
+  display: grid; gap: 7px;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+.wx-cell {
+  background: var(--bg-2); border-radius: var(--r-sm);
+  padding: 7px 8px;
+}
+.wx-cell-v { font-size: 16px; font-weight: 700; color: var(--txt); line-height: 1.15; }
+/* 10 px, pas 9 : le reste de l'app ne descend pas sous 10.5 px, et un
+   téléphone posé sur un tableau de bord se lit à bout de bras. C'est
+   l'INTERLETTRAGE qui a été réduit — à .07em, « MER TOTALE » passait à la
+   ligne dans une case de 88 px, et une grille dont les cases n'ont pas toutes
+   le même nombre de lignes se lit mal : l'œil y croit à une hiérarchie qui
+   n'existe pas. Mesuré à 320 px de large, où les cases sont les plus
+   étroites. */
+.wx-cell-l { font-size: 10px; font-weight: 700; letter-spacing: .03em; color: var(--txt-3); margin-top: 2px; }
+
+/* Le mode pêche a sa couleur, comme la navigation a la sienne : à bord, on
+   reconnaît un bouton à sa teinte avant de lire son texte. */
+.act-fish { border-color: rgba(163,230,53,.45); color: var(--lime); }
+
+/* ══ MODE NAVIGATION ═══════════════════════════════════════════════════════
    Un mode, pas un écran. L'isolement se joue ici, sur le body : ce qu'on
    masque — la barre d'onglets, les bandeaux, les pastilles d'état — vit HORS
    de la vue, et c'est exactement ce qui distingue un mode d'un écran.
