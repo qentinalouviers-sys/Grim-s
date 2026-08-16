@@ -199,7 +199,16 @@ function renderLogin(body) {
     const btn = creating ? secondary : primary;
     const label = btn.textContent;
     btn.disabled = true;
-    btn.textContent = creating ? 'Création…' : 'Connexion…';
+
+    /* Le mot de passe est étiré sur l'appareil avant de partir (`core/kdf.js`).
+     * Sur un téléphone ancien c'est plusieurs secondes, pendant lesquelles rien
+     * ne circule encore : afficher « Connexion… » ferait chercher un problème
+     * de réseau là où il n'y en a pas. On dit ce qui se passe vraiment. */
+    btn.textContent = 'Chiffrement…';
+    const offStretch = sync.onStretched(() => {
+      btn.textContent = creating ? 'Création…' : 'Connexion…';
+    });
+
     try {
       if (creating) {
         await sync.register(mail, pass, eName.input.value.trim() || null);
@@ -213,6 +222,8 @@ function renderLogin(body) {
       err.textContent = message(ex);
       btn.disabled = false;
       btn.textContent = label;
+    } finally {
+      offStretch();
     }
   }
 
@@ -226,6 +237,11 @@ function message(ex) {
   switch (ex?.code) {
     case 'invalid_email': return 'E-mail invalide.';
     case 'weak_password': return 'Mot de passe trop court — 8 caractères minimum.';
+    /* Le serveur a reçu autre chose qu'une clé dérivée : cette version de
+     * l'app n'a pas préparé le mot de passe comme il faut. Rafraîchir la page
+     * récupère la version à jour — le service worker la remplace au relancement. */
+    case 'client_outdated': return 'Version de l’app trop ancienne. Ferme-la et rouvre-la pour la mettre à jour.';
+    case 'crypto_unavailable': return 'Ce navigateur ne peut pas sécuriser le mot de passe (page non chiffrée ?).';
     case 'rate_limited': return 'Trop de tentatives. Attends une minute.';
     case 'account_locked': return 'Compte bloqué après trop d’essais. Réessaie plus tard.';
     case 'email_taken': return 'Un compte existe déjà avec cet e-mail.';

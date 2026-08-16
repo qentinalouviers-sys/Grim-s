@@ -1,0 +1,16 @@
+{
+  "name": "grims-api",
+  "private": true,
+  "type": "module",
+  "description": "API compte et synchronisation de Grim's Compagnon, sur Cloudflare Workers + D1",
+  "scripts": {
+    "dev": "wrangler dev --env dev --local --port 8788 --ip 127.0.0.1",
+    "migrate:local": "wrangler d1 migrations apply grims-dev --env dev --local",
+    "migrate:prod": "wrangler d1 migrations apply grims --remote",
+    "deploy": "wrangler deploy",
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.123.0"
+  }
+}

@@ -40,6 +40,58 @@ final class Auth
      * bcrypt sans rien migrer. C'est pour ça qu'on ne fige pas l'algorithme
      * dans la base.
      */
+    /** Forme d'une clé dérivée par le client : 256 bits en hexadécimal. */
+    private const KEY_RE = '/^[0-9a-f]{64}$/';
+
+    /**
+     * L'étirement, embarqué dans la page de réinitialisation.
+     *
+     * Il fait exactement ce que fait `js/core/kdf.js` : même sel, même nombre
+     * de tours, même encodage. Toute divergence entre les deux se paierait par
+     * un compte devenu inaccessible après une réinitialisation réussie — la
+     * pire des pannes, puisqu'elle se déclare longtemps après la manœuvre.
+     */
+    private const KDF_SCRIPT = <<<'JS'
+const f = document.getElementById('f');
+if (f) f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p1 = document.getElementById('p1').value, p2 = document.getElementById('p2').value;
+  if (p1.length < 8) return alert('Le mot de passe doit faire au moins huit caractères.');
+  if (p1 !== p2) return alert('Les deux mots de passe ne sont pas identiques.');
+  const b = document.getElementById('b');
+  b.disabled = true; b.textContent = 'Chiffrement…';
+  const enc = new TextEncoder();
+  const salt = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode('grims-kdf-v1:' + EMAIL.trim().toLowerCase())));
+  const k = await crypto.subtle.importKey('raw', enc.encode(p1), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations:600000}, k, 256);
+  document.getElementById('key').value = [...new Uint8Array(bits)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  f.submit();
+});
+JS;
+
+    /**
+     * Impose que ce qui arrive soit une clé dérivée, et non un mot de passe.
+     *
+     * Le client étire le mot de passe dans le navigateur (`js/core/kdf.js`,
+     * 600 000 tours de PBKDF2) et n'envoie que le résultat. Ce serveur-ci
+     * pourrait très bien hacher un mot de passe brut — mais son jumeau sur
+     * Cloudflare Workers ne le peut pas, faute de temps processeur. Les deux
+     * doivent parler le même protocole, sinon un compte créé sur l'un ne
+     * s'ouvre pas sur l'autre.
+     *
+     * Conséquence assumée : la longueur minimale du mot de passe ne peut plus
+     * être vérifiée ici, puisqu'il n'arrive jamais. C'est le client qui la
+     * tient. Un client bricolé peut donc se donner un mot de passe d'un
+     * caractère — il n'expose que son propre compte, et c'est le prix de ne
+     * jamais transmettre le mot de passe lui-même.
+     */
+    private static function assertStretched(mixed $value): void
+    {
+        if (!is_string($value) || !preg_match(self::KEY_RE, $value)) {
+            Http::fail('client_outdated', 400);
+        }
+    }
+
     private static function hash(string $password): string
     {
         if (defined('PASSWORD_ARGON2ID')) {
@@ -159,15 +211,7 @@ final class Auth
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
             Http::fail('invalid_email', 400);
         }
-        /* Huit caractères, et rien d'autre. Exiger une majuscule et un chiffre
-         * produit des mots de passe plus courts, oubliés plus vite, et notés
-         * sur un papier dans le carré. La longueur est ce qui protège. */
-        if (strlen($password) < 8) {
-            Http::fail('weak_password', 400);
-        }
-        if (strlen($password) > 200) {
-            Http::fail('weak_password', 400);
-        }
+        self::assertStretched($password);
 
         $key = mb_strtolower($email);
         $pdo = Db::pdo();
@@ -203,6 +247,7 @@ final class Auth
 
         $email = trim((string) ($b['email'] ?? ''));
         $password = (string) ($b['password'] ?? '');
+        self::assertStretched($password);
 
         $st = Db::pdo()->prepare(
             'SELECT id, email, name, pass_hash, fail_count, locked_until FROM users WHERE email_key = ?'
@@ -316,16 +361,17 @@ final class Auth
         $token = (string) ($_GET['t'] ?? '');
         $done = false;
         $error = '';
+        $email = '';
 
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $token = (string) ($_POST['t'] ?? '');
-            $pw = (string) ($_POST['password'] ?? '');
-            $pw2 = (string) ($_POST['password2'] ?? '');
+            /* La page envoie la CLÉ DÉRIVÉE, pas le mot de passe — exactement
+             * comme l'application. Si les deux calculs divergeaient, le mot de
+             * passe changé ici ne rouvrirait plus le compte. */
+            $pw = (string) ($_POST['key'] ?? '');
 
-            if (strlen($pw) < 8) {
-                $error = 'Le mot de passe doit faire au moins huit caractères.';
-            } elseif ($pw !== $pw2) {
-                $error = 'Les deux mots de passe ne sont pas identiques.';
+            if (!preg_match(self::KEY_RE, $pw)) {
+                $error = 'Le navigateur n\'a pas pu préparer le mot de passe. Réessayez.';
             } else {
                 $st = Db::pdo()->prepare('SELECT token_hash, user_id, expires_at, used_at FROM resets WHERE token_hash = ?');
                 $st->execute([hash('sha256', $token)]);
@@ -348,16 +394,33 @@ final class Auth
             }
         }
 
+        /* L'adresse du compte est nécessaire à la page : le sel de dérivation
+         * s'en déduit. Celui qui tient le lien l'a déjà reçue par courriel. */
+        if (!$done && $token !== '') {
+            $st = Db::pdo()->prepare(
+                'SELECT u.email FROM resets r JOIN users u ON u.id = r.user_id
+                  WHERE r.token_hash = ? AND r.used_at = 0 AND r.expires_at > ?'
+            );
+            $st->execute([hash('sha256', $token), time()]);
+            $email = (string) ($st->fetchColumn() ?: '');
+            if ($email === '' && $error === '') {
+                $error = 'Ce lien a expiré ou a déjà servi.';
+            }
+        }
+
         header('Content-Type: text/html; charset=utf-8');
         $t = htmlspecialchars($token, ENT_QUOTES);
         $e = htmlspecialchars($error, ENT_QUOTES);
         $inner = $done
             ? '<p class="ok">Mot de passe changé. Retournez dans l\'application et connectez-vous.</p>'
             : ($e !== '' ? "<p class=\"err\">$e</p>" : '')
-                . '<form method="post"><input type="hidden" name="t" value="' . $t . '">'
-                . '<label>Nouveau mot de passe<input type="password" name="password" autocomplete="new-password" minlength="8" required></label>'
-                . '<label>Répétez-le<input type="password" name="password2" autocomplete="new-password" minlength="8" required></label>'
-                . '<button type="submit">Enregistrer</button></form>';
+                . ($email === '' ? '' :
+                    '<form method="post" id="f"><input type="hidden" name="t" value="' . $t . '">'
+                    . '<input type="hidden" name="key" id="key">'
+                    . '<p class="who">' . htmlspecialchars($email, ENT_QUOTES) . '</p>'
+                    . '<label>Nouveau mot de passe<input type="password" id="p1" autocomplete="new-password" minlength="8" required></label>'
+                    . '<label>Répétez-le<input type="password" id="p2" autocomplete="new-password" minlength="8" required></label>'
+                    . '<button type="submit" id="b">Enregistrer</button></form>');
 
         echo '<!doctype html><html lang="fr"><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -368,8 +431,11 @@ final class Auth
             . 'label{display:block;margin:0 0 1rem}input{width:100%;box-sizing:border-box;padding:.7rem;'
             . 'margin-top:.35rem;border-radius:.5rem;border:1px solid #2a3a52;background:#111c2e;color:inherit;font-size:1rem}'
             . 'button{width:100%;padding:.8rem;border:0;border-radius:.5rem;background:#2f81f7;color:#fff;font-size:1rem}'
+            . 'button[disabled]{opacity:.6}.who{color:#8fa7c4;margin:0 0 1rem;font-size:.9rem}'
             . '.err{color:#ffb4a2}.ok{color:#9ae6b4}'
-            . '</style><main><h1>Nouveau mot de passe</h1>' . $inner . '</main></html>';
+            . '</style><main><h1>Nouveau mot de passe</h1>' . $inner . '</main>'
+            . '<script>const EMAIL=' . json_encode($email, JSON_UNESCAPED_UNICODE) . ';'
+            . self::KDF_SCRIPT . '</script></html>';
         exit;
     }
 }

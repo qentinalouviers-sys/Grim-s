@@ -5,6 +5,14 @@ synchronisation, export, suppression de compte, réinitialisation du mot de
 passe. Aucune bibliothèque à installer, aucun `composer`, aucun `npm` — du PHP
 8 et une base de données.
 
+> **L'implémentation retenue est celle de `server/worker/`**, sur Cloudflare
+> Workers, parce qu'elle se pilote entièrement depuis le dépôt. Celle-ci reste
+> maintenue et testée par la même recette : elle sert de solution de repli et
+> de seconde lecture du contrat. Les deux parlent **le même protocole** — le
+> champ `password` porte une clé dérivée par le navigateur, jamais un mot de
+> passe (voir la section 0 bis du contrat) — donc un compte créé sur l'une
+> s'ouvre sur l'autre.
+
 Elle tourne sur **SQLite** pour développer et sur **MySQL** en production. Le
 code métier ignore lequel des deux est en dessous : seul `config.php` change.
 

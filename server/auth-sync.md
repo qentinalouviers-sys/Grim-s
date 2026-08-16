@@ -31,10 +31,43 @@ synchronisation est un plus, jamais un socle.
 
 ---
 
+## 0 bis. Le champ `password` ne contient PAS un mot de passe
+
+C'est la chose à savoir avant de lire le reste, et elle a changé depuis la
+première version de ce document.
+
+Le client étire le mot de passe **dans le navigateur** — 600 000 tours de
+PBKDF2-HMAC-SHA256, sel dérivé de l'adresse (`js/core/kdf.js`) — et envoie le
+résultat : 256 bits en hexadécimal minuscule. Le serveur ne voit jamais le mot
+de passe lui-même.
+
+Pourquoi : sur Cloudflare Workers, l'offre gratuite accorde 10 ms de temps
+processeur par requête, quand 600 000 tours en coûtent 273. Il n'existe aucun
+réglage qui tienne à la fois dans le budget et dans les règles de l'art.
+
+Ce que le serveur doit en faire :
+
+- **refuser tout ce qui n'a pas la forme `^[0-9a-f]{64}$`**, avec le code
+  `client_outdated`. Sans cette barrière, un client ancien ou bricolé ferait
+  stocker un vrai mot de passe derrière un hachage bien trop court, et personne
+  ne s'en apercevrait avant la fuite ;
+- **hacher quand même la clé reçue** avec un sel aléatoire propre au compte.
+  Un nombre de tours modeste suffit ici, et seulement ici : l'entrée est déjà
+  étirée, donc pour tester un mot de passe l'attaquant doit refaire les 600 000
+  tours du client. Le facteur de travail recommandé est bien présent — il a
+  seulement changé de machine ;
+- **ne plus vérifier la longueur du mot de passe.** Il n'arrive pas. C'est le
+  client qui la tient (`weak_password` n'est donc plus émis à l'inscription).
+
+Et ce que cela ne change pas : **HTTPS reste obligatoire**. La clé vaut mot de
+passe pour qui l'intercepte, exactement comme un mot de passe.
+
+---
+
 ## 1. `POST /api/auth/register`
 
 ```json
-{ "email": "toi@exemple.fr", "password": "……", "name": "Grim's" }
+{ "email": "toi@exemple.fr", "password": "<64 caractères hexa>", "name": "Grim's" }
 ```
 
 `name` est facultatif et peut être `null`.
@@ -49,7 +82,7 @@ synchronisation est un plus, jamais un socle.
 | code | quand |
 |---|---|
 | `invalid_email` | adresse mal formée |
-| `weak_password` | moins de 8 caractères |
+| `client_outdated` | `password` n'est pas une clé dérivée (voir 0 bis) |
 | `email_taken` | un compte existe déjà |
 | `rate_limited` | trop de tentatives depuis cette adresse IP |
 

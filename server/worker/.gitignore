@@ -1,0 +1,4 @@
+# État local de wrangler : la base D1 de développement, les caches de workerd.
+.wrangler/
+
+node_modules/

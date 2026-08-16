@@ -1,0 +1,68 @@
+# ==========================================================================
+# wrangler.toml — toute l'infrastructure, en un fichier versionné
+# --------------------------------------------------------------------------
+# C'est le point de la manœuvre : il n'y a rien à cliquer dans un panneau.
+# Le nom du service, la base, les origines autorisées, les migrations — tout
+# est ici, donc tout se relit, se compare et se corrige par un commit.
+#
+# Deux valeurs sont à remplir UNE fois, après avoir créé la base :
+#   npx wrangler d1 create grims
+# recopiez le `database_id` rendu, et déposez le jeton d'API dans les secrets
+# du dépôt GitHub. Rien d'autre ne demande d'intervention manuelle.
+# ==========================================================================
+
+name = "grims-api"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+# Les journaux, sans lesquels une panne en production reste une devinette.
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "grims"
+database_id = "à-remplir-après-wrangler-d1-create"
+migrations_dir = "migrations"
+
+[vars]
+# Origines autorisées à appeler l'API, séparées par des virgules. Une origine,
+# c'est le schéma + le domaine + le port, SANS barre finale.
+#
+# Oublier cette liste est la panne classique : `curl` passe parfaitement, le
+# navigateur affiche « Failed to fetch », et rien n'apparaît dans les journaux
+# — parce que la requête n'y arrive jamais.
+ALLOWED_ORIGINS = "https://qentinalouviers-sys.github.io,http://localhost:8099,http://127.0.0.1:8099"
+
+# Adresse publique du Worker, pour composer le lien de réinitialisation envoyé
+# par courriel. À corriger le jour où un vrai nom de domaine est branché.
+PUBLIC_URL = ""
+
+# Expéditeur des courriels. Tant qu'il est vide — ou que le secret SMTP_KEY
+# manque — la route « mot de passe oublié » répond 501, et l'app affiche
+# franchement « pas encore en service » au lieu d'une erreur trompeuse.
+MAIL_FROM = ""
+
+# Point d'entrée HTTP du service d'envoi. Un Worker n'a pas de sockets bruts :
+# il ne peut pas parler SMTP, seulement appeler une API.
+SMTP_URL = ""
+
+# Le secret SMTP_KEY ne s'écrit PAS ici — un fichier versionné n'est pas un
+# coffre. Il se dépose par `npx wrangler secret put SMTP_KEY`, ou depuis
+# l'action GitHub.
+
+# ==========================================================================
+# Environnement de recette local (wrangler dev --local), sans réseau ni compte.
+# ==========================================================================
+[env.dev]
+[env.dev.vars]
+ALLOWED_ORIGINS = "http://localhost:8099,http://127.0.0.1:8099"
+PUBLIC_URL = "http://127.0.0.1:8788"
+MAIL_FROM = ""
+SMTP_URL = ""
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "grims-dev"
+database_id = "local"
+migrations_dir = "migrations"

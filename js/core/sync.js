@@ -28,6 +28,7 @@ import * as learning from '../fishing/learning.js';
 import * as spots from '../fishing/spots.js';
 import * as soundings from '../fishing/soundings.js';
 import * as profile from './profile.js';
+import * as kdf from './kdf.js';
 
 /* --- URL de l'API. Surchargable en dev via localStorage.grimsApiBase ------- */
 export const API_BASE =
@@ -47,6 +48,9 @@ export const authEmail = () => auth?.user?.email || null;
 
 /** Abonnement à la fin d'un tour de synchro (pour l'état affiché). */
 export const onDone = (fn) => on('sync:done', fn);
+
+/** Fin de l'étirement du mot de passe : l'écran peut passer à « Connexion… ». */
+export const onStretched = (fn) => on('auth:stretched', fn);
 
 /**
  * Appel authentifié pour les autres modules — la présence de flotte s'appuie
@@ -110,15 +114,44 @@ export async function initSync() {
   return auth;
 }
 
+/**
+ * Le mot de passe ne quitte JAMAIS l'appareil.
+ *
+ * On envoie à sa place une clé dérivée par 600 000 tours de PBKDF2 (voir
+ * `core/kdf.js`, qui explique pourquoi le calcul est ici et pas sur le
+ * serveur). Le serveur refuse d'ailleurs tout ce qui n'a pas la forme d'une
+ * clé : un client qui oublierait cette étape reçoit `client_outdated` au lieu
+ * de faire enregistrer un mot de passe en clair sans que personne le voie.
+ *
+ * Sur un téléphone ancien, ce calcul peut prendre plusieurs secondes. On
+ * prévient l'écran avant et après, pour qu'il n'affiche pas « Connexion… »
+ * pendant qu'en réalité rien ne part encore.
+ */
+async function secretFor(email, password) {
+  if (!kdf.available()) {
+    const e = new Error('crypto_unavailable');
+    e.code = 'crypto_unavailable';
+    throw e;
+  }
+  emit('auth:stretching');
+  try {
+    return await kdf.deriveKey(email, password);
+  } finally {
+    emit('auth:stretched');
+  }
+}
+
 export async function register(email, password, name = null) {
-  const r = await api('/api/auth/register', { method: 'POST', body: { email, password, name } });
+  const secret = await secretFor(email, password);
+  const r = await api('/api/auth/register', { method: 'POST', body: { email, password: secret, name } });
   await persistAuth(r);
   await sync(); // le compte vient de naître : on monte ce qui existe déjà en local
   return r.user;
 }
 
 export async function login(email, password) {
-  const r = await api('/api/auth/login', { method: 'POST', body: { email, password } });
+  const secret = await secretFor(email, password);
+  const r = await api('/api/auth/login', { method: 'POST', body: { email, password: secret } });
   await persistAuth(r);
   await sync();
   return r.user;

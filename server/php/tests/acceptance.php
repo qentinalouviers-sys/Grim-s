@@ -59,6 +59,28 @@ function req(string $method, string $path, ?array $body = null, ?string $token =
     ];
 }
 
+/**
+ * L'étirement du mot de passe, tel que le navigateur le fait.
+ *
+ * Le serveur ne reçoit jamais un mot de passe : il reçoit cette clé. La
+ * recette doit donc faire exactement ce que fait `js/core/kdf.js`, sinon elle
+ * teste un protocole qui n'existe pas.
+ *
+ * Le sel se dérive de l'adresse : le client doit pouvoir le calculer AVANT
+ * d'être authentifié, donc le serveur ne peut pas le lui fournir. Un sel n'a
+ * pas besoin d'être secret, seulement distinct d'un compte à l'autre.
+ */
+function derive(string $email, string $password): string
+{
+    static $cache = [];
+    $k = $email . "\0" . $password;
+    if (isset($cache[$k])) {
+        return $cache[$k];
+    }
+    $salt = hash('sha256', 'grims-kdf-v1:' . mb_strtolower(trim($email)), true);
+    return $cache[$k] = hash_pbkdf2('sha256', $password, $salt, 600000, 64);
+}
+
 function check(string $label, bool $ok, string $detail = ''): void
 {
     global $pass, $fail;
@@ -84,8 +106,10 @@ section('1. Sonde et route inconnue');
 
 $r = req('GET', '/api/health');
 check('/api/health répond', $r['status'] === 200 && ($r['body']['ok'] ?? false) === true, "statut {$r['status']}");
-echo "       moteur : " . ($r['body']['driver'] ?? '?') . ", PHP " . ($r['body']['php'] ?? '?')
-    . ", argon2id : " . (($r['body']['argon2id'] ?? false) ? 'oui' : 'non — bcrypt') . "\n";
+/* La même recette sert aux deux implémentations — PHP/MySQL et Workers/D1 —
+ * parce qu'elle est écrite au niveau HTTP et ne connaît que le contrat. */
+echo "       moteur : " . ($r['body']['driver'] ?? '?')
+    . ", exécution : " . ($r['body']['runtime'] ?? ('PHP ' . ($r['body']['php'] ?? '?'))) . "\n";
 
 $r = req('GET', '/api/nawak');
 check('route inconnue → JSON 404, pas du HTML', $r['status'] === 404 && ($r['body']['error'] ?? '') === 'not_found', $r['raw'] ?? '');
@@ -114,30 +138,38 @@ check('origine inconnue → pas d\'Allow-Origin permissif', stripos($r['headers'
 /* ========================================================================== */
 section('3. Inscription');
 
-$r = req('POST', '/api/auth/register', ['email' => 'pas-une-adresse', 'password' => 'motdepasse']);
+$r = req('POST', '/api/auth/register', ['email' => 'pas-une-adresse', 'password' => derive('pas-une-adresse', 'motdepasse')]);
 check('adresse invalide → invalid_email', ($r['body']['error'] ?? '') === 'invalid_email', json_encode($r['body']));
 
-$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => 'court']);
-check('mot de passe court → weak_password', ($r['body']['error'] ?? '') === 'weak_password', json_encode($r['body']));
+/* Le serveur ne voit plus jamais un mot de passe : il ne peut donc plus en
+ * vérifier la longueur — c'est le client qui la tient. Ce qu'il DOIT refuser,
+ * en revanche, c'est un mot de passe brut : sans cette barrière, un client
+ * ancien ou bricolé ferait stocker un vrai mot de passe derrière un hachage
+ * bien trop court, et personne ne s'en apercevrait avant la fuite. */
+$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => 'motdepasse']);
+check('mot de passe BRUT refusé → client_outdated', ($r['body']['error'] ?? '') === 'client_outdated', json_encode($r['body']));
 
-$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => $pw, 'name' => "Grim's"]);
+$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => str_repeat('z', 64)]);
+check('clé mal formée (hexa invalide) refusée', ($r['body']['error'] ?? '') === 'client_outdated', json_encode($r['body']));
+
+$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => derive($mail, $pw), 'name' => "Grim's"]);
 $tokenA = $r['body']['token'] ?? null;
 check('inscription → jeton', $r['status'] === 200 && is_string($tokenA) && strlen($tokenA) === 64, json_encode($r['body']));
 check('inscription → utilisateur complet', ($r['body']['user']['email'] ?? '') === $mail && ($r['body']['user']['name'] ?? '') === "Grim's");
 
-$r = req('POST', '/api/auth/register', ['email' => strtoupper($mail), 'password' => $pw]);
+$r = req('POST', '/api/auth/register', ['email' => strtoupper($mail), 'password' => derive($mail, $pw)]);
 check('même adresse en majuscules → email_taken', ($r['body']['error'] ?? '') === 'email_taken', json_encode($r['body']));
 
 /* ========================================================================== */
 section('4. Connexion');
 
-$r = req('POST', '/api/auth/login', ['email' => $mail, 'password' => 'mauvais mot de passe']);
+$r = req('POST', '/api/auth/login', ['email' => $mail, 'password' => derive($mail, 'mauvais mot de passe')]);
 check('mauvais mot de passe → bad_credentials 401', $r['status'] === 401 && ($r['body']['error'] ?? '') === 'bad_credentials');
 
-$r = req('POST', '/api/auth/login', ['email' => 'inconnu@exemple.fr', 'password' => 'mauvais mot de passe']);
+$r = req('POST', '/api/auth/login', ['email' => 'inconnu@exemple.fr', 'password' => derive('inconnu@exemple.fr', 'mauvais')]);
 check('adresse inconnue → MÊME code bad_credentials', ($r['body']['error'] ?? '') === 'bad_credentials', json_encode($r['body']));
 
-$r = req('POST', '/api/auth/login', ['email' => $mail, 'password' => $pw]);
+$r = req('POST', '/api/auth/login', ['email' => $mail, 'password' => derive($mail, $pw)]);
 $tokenB = $r['body']['token'] ?? null;
 check('connexion → jeton (second appareil)', $r['status'] === 200 && is_string($tokenB));
 check('les deux appareils ont des jetons distincts', $tokenA !== $tokenB);
@@ -280,7 +312,7 @@ section('11. Limitation de débit (en dernier : elle bloque l\'adresse une minut
 
 $codes = [];
 for ($i = 0; $i < 9; $i++) {
-    $codes[] = req('POST', '/api/auth/login', ['email' => 'brute@exemple.fr', 'password' => 'essai' . $i])['status'];
+    $codes[] = req('POST', '/api/auth/login', ['email' => 'brute@exemple.fr', 'password' => derive('brute@exemple.fr', 'essai' . $i)])['status'];
 }
 check('les essais répétés finissent en 429', in_array(429, $codes, true), implode(' ', $codes));
 check('le blocage arrive vite (≤ 6 essais)', array_search(429, $codes, true) <= 6, implode(' ', $codes));
