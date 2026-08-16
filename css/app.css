@@ -1530,18 +1530,26 @@ body.driving { --tabbar-h: 0px; --banner-h: 0px; }
 /* --- Mer et ciel ---------------------------------------------------------
    Ce qu'on ne pilote pas mais qui décide de la manœuvre. Dans ce mode on n'a
    plus le droit d'aller le chercher ailleurs : les onglets n'existent plus. */
+/* Le coin bas-droit appartient au bouton de prise : il flotte par-dessus et,
+   au repos sur un grand écran, il tombait pile sur la fin des valeurs —
+   « 0.3 nd → 23… », « 9.7 m · desce… ». On lui réserve sa place plutôt que de
+   compter sur un défilement que rien n'oblige à faire. */
 .drive-sea {
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: var(--r);
   padding: 6px 10px;
+  /* APRÈS le raccourci, jamais avant : `padding: 6px 10px` remet la droite à
+     10 px et écrasait la réserve. Posé au-dessus, il ne servait à rien —
+     et ça ne se voit qu'à l'écran. */
+  padding-right: 74px;
 }
 .drive-sea-row {
   display: flex; justify-content: space-between; align-items: baseline;
   padding: 1px 0;
 }
 .drive-sea-k { font-size: 11px; color: var(--txt-3); }
-.drive-sea-v { font-size: 12.5px; font-weight: 700; }
+.drive-sea-v { font-size: 12.5px; font-weight: 700; text-align: right; }
 
 .drive-acts { display: flex; gap: 7px; }
 .drive-acts > * { flex: 1; }
