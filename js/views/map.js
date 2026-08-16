@@ -33,6 +33,7 @@ import * as soundings from '../fishing/soundings.js';
 import * as isobaths from '../ui/isobaths.js';
 import * as shom from '../data/shomchart.js';
 import { openShomSetup } from '../ui/shomsetup.js';
+import { openMntImport } from '../ui/mntimport.js';
 import * as bathy from '../data/bathy.js';
 import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
@@ -444,8 +445,11 @@ function buildOverlay() {
     markToggle(refs.btnVec, ui.vectors);
   }, true);
   refs.btnIso = menuItem('〰️', 'Lignes de fond', 'Isobathes 5 · 10 · 20 · 30 m', () => {
+    /* Pas de modèle : on OUVRE L'INSTALLATION au lieu de renvoyer vers un
+     * fichier du dépôt. Un message qui dit « lis la doc » à quelqu'un sur un
+     * bateau est un message qui ne sert à rien. */
     if (!isobaths.available()) {
-      return void toast('Modèle de fonds non installé — voir data/README-bathymetrie.md', 'warn', 4000);
+      return void openMntImport({ onDone: () => { ui.isobaths = true; layers.isobaths.addTo(map); drawIsobaths(); markToggle(refs.btnIso, true); } });
     }
     ui.isobaths = !ui.isobaths;
     if (ui.isobaths) {
@@ -474,6 +478,10 @@ function buildOverlay() {
   refs.btnShom.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     openShomSetup({ onSaved: onShomChanged });
+  });
+  refs.btnIso.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openMntImport({ onDone: () => drawIsobaths() });
   });
   refs.btnShade = menuItem('🌊', 'Dégradé de profondeur', 'Relief coloré — EMODnet', () => {
     ui.depthShade = !ui.depthShade;

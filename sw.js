@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.34.0';
+const VERSION = 'v1.35.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -86,6 +86,7 @@ const SHELL_FILES = [
   'js/ui/soundingpad.js',
   'js/ui/isobaths.js',
   'js/ui/shomsetup.js',
+  'js/ui/mntimport.js',
   'js/views/nav.js',
   'js/views/pilot.js',
   'js/views/drive.js',

@@ -1610,6 +1610,16 @@ input[type=range]::-moz-range-thumb {
 .fc-sea { flex: 0 0 62px; text-align: right; color: #7dd3fc; font-size: 11.5px; }
 .fc-air { flex: 0 0 52px; text-align: right; font-size: 11.5px; }
 
+/* La barre de lecture du modèle de fonds. Un fichier de deux cents mégaoctets
+   met une dizaine de secondes : sans retour visible, on croit que l'app a
+   planté et on ferme l'écran au milieu. */
+.mnt-prog { margin-top: 12px; }
+.mnt-bar {
+  height: 6px; border-radius: 999px; background: var(--bg-2);
+  overflow: hidden; margin-top: 5px;
+}
+.mnt-bar-in { height: 100%; width: 0; background: var(--cyan); transition: width .2s; }
+
 /* ══ CARNET DE SONDES ══════════════════════════════════════════════════
    Le pad de saisie. Que des cibles larges : on note une sonde en dérivant,
    une main sur la canne, et le clavier système du téléphone n'a rien à faire

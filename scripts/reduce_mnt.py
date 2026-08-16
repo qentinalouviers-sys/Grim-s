@@ -293,8 +293,13 @@ def read_tiff(path: str):
 # ==========================================================================
 def build(src):
     dx, dy = src["dx"], src["dy"]
-    if dx > 0.02:
-        die(f"maille source de {dx:.4f}° — trop grossière, ce n'est pas un MNT côtier")
+    # Même seuil que l'import dans l'app : 0,002° ≈ 220 m laisse passer le SHOM
+    # (111 m) et EMODnet (115 m), et écarte GEBCO (460 m), qui produirait une
+    # grille de 334 m rééchantillonnée depuis 460 — plus de détail affiché que
+    # contenu dans la source.
+    if dx > 0.002:
+        die(f"maille source de {round(dx * 111320)} m — trop grossière pour du côtier. "
+            "GEBCO (460 m) ne convient pas ; prends le MNT de façade du SHOM (111 m).")
 
     # Combien de cases source par case de sortie, au moins une.
     fx = max(1, round(TARGET_DLON / dx))

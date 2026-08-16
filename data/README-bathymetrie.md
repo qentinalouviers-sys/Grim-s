@@ -11,6 +11,20 @@ relais là où l'on est passé.
 
 ---
 
+## Le plus simple : directement dans l'app
+
+**JOURNAL → Carnet de sondes → 🗺 Modèle public de fonds → Choisir le fichier.**
+
+Pas de terminal, pas de dépôt, pas de Python. L'app lit le fichier en flux,
+n'en garde que l'emprise du secteur, et range la grille dans l'appareil. Une
+dalle de 20 Mo prend une seconde ; une de 200 Mo, une dizaine.
+
+Même chose depuis la carte : le menu « 〰️ Lignes de fond » ouvre l'installation
+quand aucun modèle n'est présent.
+
+Le script ci-dessous reste pour qui veut produire le fichier une fois et le
+livrer avec l'app.
+
 ## En deux commandes
 
 ```bash
@@ -40,6 +54,10 @@ pour qu'il soit disponible hors ligne, et à monter la version.
   et le script le lit sans aucune bibliothèque
 - Licence ouverte, téléchargement libre
 - Source officielle française
+
+⚠ **GEBCO ne convient pas.** La grille mondiale fait 460 m de maille — quatre
+fois plus grossier que le SHOM. Sur des fonds de 10 à 30 m elle ne montre rien,
+et l'app la refuse à l'import en le disant.
 
 ### Équivalent — EMODnet Bathymetry
 
@@ -102,6 +120,7 @@ Trois refus, tous vérifiés sur des fichiers fabriqués exprès :
 
 | Cas | Comportement |
 |---|---|
+| Maille > 220 m | Refusé — c'est GEBCO (460 m), qui ne montre rien en côtier |
 | Bande de 8 bits | Refusé — « c'est un rendu colorié, pas un modèle de terrain » |
 | Profondeurs déjà positives | Détecté au signe dominant, inversé, et annoncé |
 | Coin nord-ouest hors de 5–90 m | Refusé — il est à 30 milles au large de Fécamp |

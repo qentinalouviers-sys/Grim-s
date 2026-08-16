@@ -27,16 +27,35 @@
  * Le fichier est optionnel : absent, tout continue de fonctionner.
  * ========================================================================== */
 
+import * as idb from '../core/idb.js';
+
 const LAND = 32767;
 const NODATA = 32766;
 
 let model = null;
 let loading = null;
 
+/**
+ * Deux origines possibles, dans cet ordre :
+ *
+ *   IMPORTÉ  une grille installée depuis l'app par l'utilisateur, à partir
+ *            d'un MNT téléchargé sur un portail. Elle prime — c'est un geste
+ *            délibéré, et elle est forcément plus récente que le fichier livré.
+ *   LIVRÉ    data/bathy-dieppe.json, quand le dépôt en contient un.
+ *
+ * L'absence des deux n'est pas une panne : tout le reste de l'app fonctionne,
+ * et le carnet de sondes prend le relais là où l'on est passé.
+ */
 export function init() {
   if (model || loading) return loading || Promise.resolve(model);
-  loading = fetch('data/bathy-dieppe.json', { cache: 'no-cache' })
-    .then((r) => (r.ok ? r.json() : null))
+  loading = idb.get('kv', 'bathyGrid')
+    .catch(() => null)
+    .then((saved) => {
+      if (saved?.grid) return saved;
+      return fetch('data/bathy-dieppe.json', { cache: 'no-cache' })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    })
     .then((spec) => {
       model = spec && spec.grid ? decode(spec) : null;
       return model;
@@ -46,6 +65,18 @@ export function init() {
       loading = null;
     });
   return loading;
+}
+
+/**
+ * Relit la source après un import ou un retrait. Le cache de relief est vidé
+ * avec : ses entrées portent des profondeurs de l'ancien modèle, et les
+ * garder ferait cohabiter deux fonds sur la même carte.
+ */
+export function reload() {
+  model = null;
+  loading = null;
+  reliefCache.clear();
+  return init();
 }
 
 /**

@@ -25,6 +25,8 @@ import * as sync from '../core/sync.js';
 import * as rescue from '../ui/rescue.js';
 import * as wxalert from '../core/wxalert.js';
 import * as soundings from '../fishing/soundings.js';
+import * as bathy from '../data/bathy.js';
+import { openMntImport } from '../ui/mntimport.js';
 import { openAlerts } from '../ui/wxalertform.js';
 
 let root;
@@ -185,6 +187,22 @@ async function render() {
     wipe.style.marginTop = '8px';
     sndCard.append(wipe);
   }
+  /* Le modèle public de fonds, juste sous le carnet : les deux répondent à la
+     même question — quelle profondeur ici — et l'un couvre ce que l'autre ne
+     couvre pas. Les séparer dans deux écrans obligerait à comprendre la
+     différence avant de savoir qu'elle existe. */
+  const bmeta = bathy.meta();
+  const mntRow = el('button', 'list-item');
+  mntRow.type = 'button';
+  const mntMain = el('div', 'list-main');
+  mntMain.append(el('div', 'list-title', '🗺 Modèle public de fonds'));
+  mntMain.append(el('div', 'list-sub', bmeta
+    ? `Installé · maille ${bmeta.resolutionM} m · ${bmeta.depthRangeM ? `${bmeta.depthRangeM[0]} à ${bmeta.depthRangeM[1]} m` : ''}`
+    : 'Aucun. Il donne les lignes de fond sur la carte et la sonde partout — même où tu n’es jamais passé.'));
+  mntRow.append(mntMain, el('span', 'chev', '›'));
+  mntRow.addEventListener('click', () => openMntImport({ onDone: render }));
+  sndCard.append(mntRow);
+
   box.append(sndCard);
 
   /* ══ Sauvegarde ══════════════════════════════════════════════════════
