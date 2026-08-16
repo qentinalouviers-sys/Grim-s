@@ -25,7 +25,7 @@ import * as weather from '../data/weather.js';
 import * as stream from '../data/stream.js';
 import { sunAltitude } from '../data/astro.js';
 import * as spots from '../fishing/spots.js';
-import * as bathy from '../data/bathy.js';
+import * as depth from '../data/depth.js';
 import * as idb from '../core/idb.js';
 
 // L'état survit à la fermeture de la feuille : on rouvre la boîte dix fois
@@ -41,7 +41,7 @@ function autoContext() {
   const turb = hourly.length ? weather.turbidity(hourly, now, state.tideNow?.coefficient ?? 70) : null;
   const sunAlt = sunAltitude(new Date(now), pos.lat, pos.lon);
 
-  const depth = bathy.depthAt(pos.lat, pos.lon);
+  const depthM = depth.meters(pos.lat, pos.lon);
   const st = stream.tidalStream(now, pos);
 
   return {
@@ -50,8 +50,8 @@ function autoContext() {
       turbidity: turb,
       sunAltDeg: sunAlt,
     }),
-    depthM: Number.isFinite(depth) && depth > 1 ? Math.round(depth) : 12,
-    depthKnown: Number.isFinite(depth) && depth > 1,
+    depthM: Number.isFinite(depthM) && depthM > 1 ? Math.round(depthM) : 12,
+    depthKnown: Number.isFinite(depthM) && depthM > 1,
     // `spd`, pas `speedKn` — même faute que dans live.js, et elle faisait
     // calculer toutes les plombées à 1 nœud quel que soit le courant réel.
     currentKn: Number.isFinite(st?.spd) ? Math.round(st.spd * 10) / 10 : 1,

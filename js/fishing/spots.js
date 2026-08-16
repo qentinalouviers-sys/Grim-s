@@ -30,7 +30,12 @@ import * as idb from '../core/idb.js';
 import * as net from '../core/net.js';
 import * as streamModel from '../data/stream.js';
 import * as tide from '../data/tide.js';
-import * as bathy from '../data/bathy.js';
+/* `depthData` et non `depth` : une variable locale porte déjà ce nom dans
+ * scoreSpot(). Une importation masquée par une locale ne lève rien au
+ * chargement — elle explose au premier appel, ici en pleine boucle de
+ * scoring, et le message parle d'une fonction manquante plutôt que d'un nom
+ * repris. */
+import * as depthData from '../data/depth.js';
 import * as wrecks from '../data/wrecks.js';
 import { distance, bearing, angleDiff, norm360 } from '../core/geo.js';
 import { SPECIES_RULES } from './species.js';
@@ -185,7 +190,9 @@ export function scoreSpot(spot, speciesId, t, wx, fromPos = null) {
    * gagne — c'est tout l'intérêt d'avoir embarqué le relief. */
   let depth = 0.6;
   const h = tide.height(t);
-  const measured = bathy.depthAt(spot.lat, spot.lon);
+  // Par `depth` et non `bathy` : si le poste a été sondé au sondeur du bord,
+  // c'est CETTE sonde qui score, pas la maille de cent mètres qui la noie.
+  const measured = depthData.meters(spot.lat, spot.lon);
   if (measured != null) {
     depth = plateau(measured + h, rule.depthRangeM[0], rule.depthRangeM[1], 6);
   } else if (Array.isArray(spot.depthM)) {
@@ -228,7 +235,7 @@ export function scoreSpot(spot, speciesId, t, wx, fromPos = null) {
    * préférence des habitats déjà déclarés plutôt que d'ajouter un champ à
    * maintenir dans sept fiches. */
   const wantsBreak = rule.habitat.some((x) => ['epave', 'roche', 'tombant', 'ridin', 'veine'].includes(x));
-  const rel = bathy.relief(spot.lat, spot.lon);
+  const rel = depthData.relief(spot.lat, spot.lon);
   let reliefScore = 0.55;              // neutre tant qu'on ne sait pas
   if (rel) {
     // 8 m d'écart au kilomètre est un accident très marqué en Manche orientale.

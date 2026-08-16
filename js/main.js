@@ -47,6 +47,7 @@ import * as advisor from './fishing/advisor.js';
 import * as learning from './fishing/learning.js';
 import * as record from './fishing/record.js';
 import * as traces from './fishing/traces.js';
+import * as soundings from './fishing/soundings.js';
 import * as sync from './core/sync.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
@@ -117,6 +118,10 @@ async function boot() {
     // Les alertes météo doivent être en mémoire avant le premier tour lent :
     // c'est lui qui les évalue contre la prévision qui vient d'arriver.
     wxalert.init(),
+    // Le carnet de sondes AVANT le premier scoring : c'est lui qui prime sur
+    // le modèle public, et un poste scoré sans lui puis rescoré avec change de
+    // note sous les yeux de l'utilisateur sans explication.
+    soundings.init(),
   ]);
 
   const settings = (await idb.get('kv', 'settings')) || {};

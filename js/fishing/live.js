@@ -35,7 +35,8 @@
 import { CATALOG, seasonAt, findSpecies } from './catalog.js';
 import { SPECIES_RULES, getRegulationStatus } from './species.js';
 import * as seabed from '../data/seabed.js';
-import * as bathy from '../data/bathy.js';
+// `depthData` : `depth` est déjà une variable locale de ce fichier.
+import * as depthData from '../data/depth.js';
 import { state } from '../core/store.js';
 import * as spots from './spots.js';
 import * as stream from '../data/stream.js';
@@ -188,7 +189,7 @@ function estimate(sp, { t, habitats, depthM, driftKn }) {
 export function ranking({ t = Date.now(), limit = 4 } = {}) {
   const pos = state.fix || spots.getPort();
   const habitats = seabed.ready() ? seabed.habitatsAround(pos.lat, pos.lon, 600) : [];
-  const measured = bathy.ready() ? bathy.depthAt(pos.lat, pos.lon) : null;
+  const measured = depthData.meters(pos.lat, pos.lon);
   const st = stream.tidalStream(t, pos);
   // tidalStream() renvoie `spd`, pas `speedKn` : la première version lisait
   // un champ inexistant et le facteur courant ne s'appliquait jamais. Trois
@@ -259,7 +260,7 @@ export function basis() {
   return {
     positioned: !!state.fix,
     seabed: seabed.ready() ? seabed.habitatsAround(pos.lat, pos.lon, 600) : [],
-    depthM: bathy.ready() ? bathy.depthAt(pos.lat, pos.lon) : null,
+    depthM: depthData.meters(pos.lat, pos.lon),
     modelledCount: CATALOG.filter((s) => s.scored).length,
     total: CATALOG.filter((s) => s.status !== 'forbidden').length,
   };

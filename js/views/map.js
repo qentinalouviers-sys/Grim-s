@@ -29,6 +29,7 @@ import { openDestinationPicker, startNav } from '../ui/destination.js';
 import * as stream from '../data/stream.js';
 import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
+import * as soundings from '../fishing/soundings.js';
 import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
 import * as idb from '../core/idb.js';
@@ -60,6 +61,10 @@ let ui = {
   seamarks: true,
   vectors: false,
   catches: true,
+  // Le carnet de sondes : allumé d'office. C'est de la donnée qu'on a relevée
+  // soi-même, elle est rare et chère à obtenir — la cacher par défaut serait
+  // la faire oublier.
+  soundings: true,
   // Éteinte au départ : la nature des fonds est une couche de TRAVAIL, on
   // l'allume quand on cherche un poste, pas quand on rentre au port de nuit.
   seabed: false,
@@ -190,6 +195,7 @@ export async function mount(container) {
   layers.vectors = L.layerGroup();
   layers.spots = L.layerGroup().addTo(map);
   layers.catches = L.layerGroup().addTo(map);
+  layers.soundings = L.layerGroup().addTo(map);
   layers.boat = L.layerGroup().addTo(map);
   // La flotte au-dessus des marques : un bateau qui bouge prime sur un point fixe.
   layers.fleet = L.layerGroup().addTo(map);
@@ -214,7 +220,12 @@ export async function mount(container) {
     const crossed = (lastZoom < 12) !== (z < 12) || (lastZoom < 13) !== (z < 13);
     lastZoom = z;
     if (crossed) drawSpots();
+    drawSoundings();
   });
+  // Les sondes se dessinent par emprise visible : sans redessin au
+  // déplacement, on sort du cadre initial et la carte paraît vide alors que le
+  // carnet est plein.
+  map.on('moveend', () => drawSoundings());
   // Appui long. `contextmenu` suffit sur desktop et Android, mais Safari iOS
   // ne le déclenche pas de façon fiable au toucher : on double avec un vrai
   // détecteur d'appui long, annulé au moindre déplacement (sinon un début de
@@ -395,6 +406,14 @@ function buildOverlay() {
     } else map.removeLayer(layers.vectors);
     markToggle(refs.btnVec, ui.vectors);
   }, true);
+  refs.btnSnd = menuItem('📏', 'Mes sondes', 'Relevées au sondeur du bord', () => {
+    ui.soundings = !ui.soundings;
+    if (ui.soundings) {
+      layers.soundings.addTo(map);
+      drawSoundings();
+    } else map.removeLayer(layers.soundings);
+    markToggle(refs.btnSnd, ui.soundings);
+  }, true);
   refs.btnCatch = menuItem('🐟', 'Mes prises', 'Les poissons déjà notés', () => {
     ui.catches = !ui.catches;
     if (ui.catches) {
@@ -405,10 +424,11 @@ function buildOverlay() {
   }, true);
   refs.btnDriftPanel = menuItem('⏳', 'Dérive prévue', 'Où je passe, moteur coupé',
     () => setDrift(!ui.drift), true);
-  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnCatch, refs.btnDriftPanel);
+  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnSnd, refs.btnCatch, refs.btnDriftPanel);
   markToggle(refs.btnSea, ui.seamarks);
   markToggle(refs.btnGround, ui.seabed);
   markToggle(refs.btnVec, ui.vectors);
+  markToggle(refs.btnSnd, ui.soundings);
   markToggle(refs.btnCatch, ui.catches);
   markToggle(refs.btnDriftPanel, ui.drift);
 
@@ -783,6 +803,72 @@ function drawBoat() {
       dashArray: '4 4',
       fillOpacity: 0.04,
     }).addTo(g);
+  }
+}
+
+/* ==========================================================================
+ * Les sondes du carnet
+ * --------------------------------------------------------------------------
+ * Dessinées comme sur une carte marine : un CHIFFRE, pas une épingle. Ce qu'on
+ * cherche sur une carte de sondes, c'est la valeur — l'emplacement se lit tout
+ * seul par la position du nombre.
+ *
+ * ── LA SONDE AFFICHÉE EST CELLE DU ZÉRO DES CARTES ────────────────────────
+ * Pas la valeur brute qu'affichait le sondeur ce jour-là. C'est la seule qui
+ * se compare d'une sortie à l'autre, et c'est la convention de toutes les
+ * cartes marines : à toi d'ajouter la marée du moment pour savoir ce que tu
+ * auras sous la quille. Le compteur du mode pêche, lui, fait cette addition.
+ *
+ * ── POURQUOI SEULEMENT CE QUI EST À L'ÉCRAN, ET SEULEMENT DE PRÈS ─────────
+ * Trois ans de relevés font des milliers de chiffres. Tous dessinés, ils se
+ * recouvrent en une bouillie illisible et font ramer la carte. On ne dessine
+ * donc que l'emprise visible, à partir du zoom 13 — l'échelle à laquelle deux
+ * sondes distantes de cent mètres ne se chevauchent plus — et on plafonne.
+ * ========================================================================== */
+const SND_MIN_ZOOM = 13;
+const SND_MAX_DRAWN = 400;
+
+function drawSoundings() {
+  if (!layers.soundings) return;
+  layers.soundings.clearLayers();
+  if (!ui.soundings || map.getZoom() < SND_MIN_ZOOM) return;
+
+  const b = map.getBounds();
+  const list = soundings.inBounds(b.getSouth(), b.getWest(), b.getNorth(), b.getEast());
+  if (!list.length) return;
+
+  /* Le plus FAIBLE tirant d'eau de l'emprise est mis en évidence : sur un
+   * ridin, c'est le sommet, et c'est le point qu'on cherche à repasser. */
+  const zeros = list.map((s) => s.zeroM).filter((v) => v != null);
+  const crest = zeros.length ? Math.min(...zeros) : null;
+
+  for (const s of list.slice(0, SND_MAX_DRAWN)) {
+    const v = s.zeroM ?? s.rawM;
+    const top = crest != null && s.zeroM === crest && list.length > 2;
+    const icon = L.divIcon({
+      className: '',
+      html: `<span class="snd-mark${top ? ' snd-crest' : ''}">${
+        Number.isInteger(v) ? v : v.toFixed(1)}</span>`,
+      iconSize: [30, 12],
+      iconAnchor: [15, 6],
+    });
+    const m = L.marker([s.lat, s.lon], { icon, keyboard: false });
+    // La valeur brute et la marée du relevé restent accessibles : c'est ce qui
+    // permet de comprendre un chiffre qui surprend, six mois plus tard.
+    m.bindTooltip(
+      `${v} m au zéro des cartes`
+      + `\nrelevé ${s.rawM} m le ${new Date(s.t).toLocaleDateString('fr-FR')}`
+      + (s.tideM != null ? ` (marée ${s.tideM} m)` : ' — marée non corrigée')
+      + (s.note ? `\n${s.note}` : ''),
+      { direction: 'top', offset: [0, -6] },
+    );
+    m.addTo(layers.soundings);
+  }
+
+  if (list.length > SND_MAX_DRAWN) {
+    // Une troncature silencieuse ferait croire à un carnet plus pauvre qu'il
+    // n'est. On le dit, une fois, et on invite à zoomer.
+    toast(`${list.length} sondes ici — ${SND_MAX_DRAWN} affichées, zoome pour les voir toutes`, '', 3000);
   }
 }
 

@@ -1610,6 +1610,69 @@ input[type=range]::-moz-range-thumb {
 .fc-sea { flex: 0 0 62px; text-align: right; color: #7dd3fc; font-size: 11.5px; }
 .fc-air { flex: 0 0 52px; text-align: right; font-size: 11.5px; }
 
+/* ══ CARNET DE SONDES ══════════════════════════════════════════════════
+   Le pad de saisie. Que des cibles larges : on note une sonde en dérivant,
+   une main sur la canne, et le clavier système du téléphone n'a rien à faire
+   dans ce geste-là. */
+.sp-big { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin: 6px 0 2px; }
+.sp-val { font-size: 62px; font-weight: 800; line-height: 1; letter-spacing: -.03em; color: var(--txt); }
+.sp-unit { font-size: 20px; font-weight: 700; color: var(--txt-3); }
+.sp-read { text-align: center; margin-bottom: 12px; }
+.sp-read-l { font-size: 11.5px; color: var(--txt-3); }
+/* La sonde ramenée au zéro des cartes, en cyan : c'est LA valeur qui vaut
+   d'une sortie à l'autre, et la seule que le carnet compare. */
+.sp-read-v { font-size: 14px; font-weight: 700; color: var(--cyan); margin-top: 2px; }
+.sp-read-n { font-size: 10.5px; color: var(--amber); margin-top: 5px; line-height: 1.35; }
+
+.sp-step { display: flex; gap: 10px; }
+.sp-pm {
+  flex: 1; min-height: 66px;
+  font: inherit; font-size: 30px; font-weight: 700;
+  color: var(--txt); background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: var(--r);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.sp-pm:active { background: var(--line); transform: scale(.97); }
+
+.sp-lbl { font-size: 10px; font-weight: 750; letter-spacing: .1em; color: var(--txt-3); margin: 14px 0 6px; }
+.sp-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-q {
+  flex: 1 1 52px; min-height: 44px;
+  font: inherit; font-size: 15px; font-weight: 700;
+  color: var(--txt-2); background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sp-q:active { border-color: var(--cyan); color: var(--cyan); }
+
+.sp-notes { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-note {
+  flex: 1 1 auto; min-height: 40px; padding: 0 12px;
+  font: inherit; font-size: 12.5px; font-weight: 650;
+  color: var(--txt-3); background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: 999px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sp-note.on { background: rgba(34,211,238,.16); border-color: var(--cyan); color: var(--cyan); }
+
+/* Le troisième geste du mode pêche. Cyan comme la sonde partout ailleurs
+   dans l'app — ni ambre (la touche) ni vert (le poisson à bord) : c'est une
+   mesure, pas un évènement de pêche. */
+.fm-sound { border-color: rgba(34,211,238,.55); background: rgba(34,211,238,.12); color: var(--cyan); }
+
+/* Une sonde du carnet, sur la carte. Pas d'épingle : un CHIFFRE, comme sur
+   une carte marine — c'est la valeur qu'on lit, pas l'emplacement qu'on
+   cherche. Le halo sombre le détache du fond de carte clair comme du sombre. */
+.snd-mark {
+  font: 700 11px/1 var(--font);
+  color: #7dd3fc;
+  text-shadow: 0 0 3px #050b14, 0 0 3px #050b14, 0 0 3px #050b14;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.snd-crest { color: var(--lime); font-size: 12px; font-weight: 800; }
+
 /* ══ BANDES HORIZONTALES — le confort du glissé ════════════════════════
    Toutes les bandes qui défilent de droite à gauche, réunies ici parce
    qu'elles souffraient toutes des trois mêmes choses.

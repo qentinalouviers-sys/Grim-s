@@ -24,6 +24,7 @@ import * as account from '../ui/account.js';
 import * as sync from '../core/sync.js';
 import * as rescue from '../ui/rescue.js';
 import * as wxalert from '../core/wxalert.js';
+import * as soundings from '../fishing/soundings.js';
 import { openAlerts } from '../ui/wxalertform.js';
 
 let root;
@@ -126,6 +127,65 @@ async function render() {
   acctCard.append(alertRow);
 
   box.append(acctCard);
+
+  /* ══ Carnet de sondes ═════════════════════════════════════════════════
+     La donnée la plus chère à obtenir de toute l'app : elle ne se télécharge
+     pas, elle se relève, sortie après sortie, en passant sur le poste. Elle
+     mérite donc d'être visible, chiffrée, et exportable — un carnet qu'on ne
+     peut pas sortir de l'app est un carnet qu'on finit par perdre. */
+  const st = soundings.stats();
+  const sndCard = el('div', 'card');
+  const sndHead = el('div', 'card-head');
+  sndHead.append(el('h3', null, 'CARNET DE SONDES'), el('div', 'spacer'));
+  sndHead.append(el('span', `chip ${st.n ? 'good' : ''}`, `${st.n} relevé${st.n > 1 ? 's' : ''}`));
+  sndCard.append(sndHead);
+
+  if (!st.n) {
+    sndCard.append(el('p', 'muted',
+      'Aucune sonde. Le modèle public fait cent mètres de maille : il montre le plateau et '
+      + 'les fosses, pas le ridin. Tes propres relevés, eux, sont au mètre — et ils priment '
+      + 'sur le modèle partout où tu es passé. Bouton « 📏 SONDE » dans le mode pêche.'));
+  } else {
+    sndCard.append(el('div', 'list-title',
+      `${st.minM} à ${st.maxM} m au zéro des cartes`));
+    sndCard.append(el('div', 'list-sub',
+      `${st.corrigées} sonde${st.corrigées > 1 ? 's' : ''} corrigée${st.corrigées > 1 ? 's' : ''} de la marée`
+      + ` · depuis le ${new Date(st.depuis).toLocaleDateString('fr-FR')}`
+      + ` · dernière ${fmt.age(st.derniere)}`));
+    if (st.corrigées < st.n) {
+      sndCard.append(el('div', 'tiny',
+        `${st.n - st.corrigées} relevé(s) hors de la zone du modèle de marée : gardés bruts, non corrigés.`));
+    }
+
+    const sndRow = el('div', 'btn-row');
+    sndRow.style.marginTop = '10px';
+    sndRow.append(
+      button('📤 GPX', 'btn-sm', () => saveFile(soundings.toGPX(),
+        `grims-sondes-${new Date().toISOString().slice(0, 10)}.gpx`, 'application/gpx+xml')),
+      button('📄 CSV', 'btn-sm', () => saveFile(soundings.toCSV(),
+        `grims-sondes-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv')),
+    );
+    sndCard.append(sndRow);
+
+    /* L'effacement demande confirmation, contrairement aux traces de dérive :
+       celles-ci valent pour la sortie du jour, les sondes valent des années. */
+    const wipe = button('Effacer le carnet', 'btn-sm', () => {
+      const c = el('div');
+      c.append(el('p', null,
+        `${st.n} sondes relevées depuis le ${new Date(st.depuis).toLocaleDateString('fr-FR')} vont être effacées. `
+        + 'Elles ne se retéléchargent pas : elles ont été mesurées à bord. Exporte-les d’abord si tu hésites.'));
+      c.append(button('Effacer définitivement', 'btn-danger btn-lg', async () => {
+        await soundings.clear();
+        closeSheet();
+        toast('Carnet de sondes effacé');
+        render();
+      }));
+      openSheet('Effacer le carnet de sondes', c);
+    });
+    wipe.style.marginTop = '8px';
+    sndCard.append(wipe);
+  }
+  box.append(sndCard);
 
   /* ══ Sauvegarde ══════════════════════════════════════════════════════
      Placée haut, et pas dans les réglages : une sauvegarde qu'on ne voit
@@ -522,4 +582,26 @@ function aboutCard() {
 
   c.append(el('p', 'tiny', 'Aucun compte, aucun serveur, aucune télémétrie. Tout reste sur cet appareil.'));
   return c;
+}
+
+/* --------------------------------------------------------------------------
+ * Enregistrer un fichier
+ * --------------------------------------------------------------------------
+ * L'URL d'objet est révoquée après le clic : sans ça, chaque export garde son
+ * contenu en mémoire jusqu'au rechargement de la page, et un carnet de trois
+ * mille sondes exporté cinq fois pèse lourd sur un téléphone.
+ * ------------------------------------------------------------------------ */
+function saveFile(text, filename, mime) {
+  try {
+    const blob = new Blob([text], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast(`${filename} exporté`, 'good');
+  } catch {
+    toast('Export impossible sur ce navigateur', 'danger');
+  }
 }

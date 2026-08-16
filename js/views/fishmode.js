@@ -42,6 +42,9 @@ import * as live from '../fishing/live.js';
 import * as lures from '../fishing/lures.js';
 import * as record from '../fishing/record.js';
 import * as catalog from '../fishing/catalog.js';
+import * as soundings from '../fishing/soundings.js';
+import * as depth from '../data/depth.js';
+import { openSoundingPad } from '../ui/soundingpad.js';
 
 const LEAFLET_JS = 'vendor/leaflet/leaflet.js';
 const LEAFLET_CSS = 'vendor/leaflet/leaflet.css';
@@ -70,6 +73,7 @@ const PANELS = [
   { id: 'maree', name: 'Marée', hint: 'hauteur, sens, coefficient', on: true },
   { id: 'courant', name: 'Courant de marée', hint: 'vitesse, direction, étale', on: true },
   { id: 'fond', name: 'Nature du fond', hint: 'sable, roche, gravier sous le bateau', on: true },
+  { id: 'sonde', name: 'Sonde', hint: 'hauteur d’eau ici — tes relevés d’abord, le modèle sinon', on: true },
   { id: 'vent', name: 'Vent', hint: 'secteur et force', on: true },
   { id: 'eau', name: 'Température de l’eau', hint: '', on: false },
   { id: 'prises', name: 'Compteur de prises', hint: 'de cette sortie', on: true },
@@ -369,7 +373,16 @@ function build() {
     el('span', 'fm-act-txt', 'À BORD'));
   refs.btnFish.addEventListener('click', openCatchPicker);
 
-  acts.append(refs.btnTouch, refs.btnFish);
+  /* La sonde, troisième geste du mode pêche. Elle a sa place ICI et pas dans
+   * un menu : on la lit sur l'écran du sondeur pendant qu'on dérive, la main
+   * déjà sur l'écran du téléphone. Notée ailleurs, elle ne serait pas notée. */
+  refs.btnSound = el('button', 'fm-act fm-sound', '');
+  refs.btnSound.type = 'button';
+  refs.btnSound.append(el('span', 'fm-act-ico', '📏'),
+    el('span', 'fm-act-txt', 'SONDE'));
+  refs.btnSound.addEventListener('click', () => openSoundingPad({ onSaved: () => refresh() }));
+
+  acts.append(refs.btnTouch, refs.btnFish, refs.btnSound);
   box.append(acts);
 
   /* ---- Compteurs ---------------------------------------------------------- */
@@ -569,6 +582,16 @@ function paintPanel() {
   if (prefs.fond) {
     const cls = seabed.ready() ? seabed.at(pos.lat, pos.lon) : null;
     cell(cls?.fr ? cls.fr.split(' ')[0] : '—', 'FOND');
+  }
+  /* La sonde AVEC la marée du moment : c'est la hauteur d'eau réelle sous la
+   * quille, pas la sonde de carte. Le libellé dit d'où vient le chiffre —
+   * « SONDÉ » quand ce sont tes propres relevés, « MODÈLE » sinon. Les deux
+   * n'engagent pas au même point. */
+  if (prefs.sonde) {
+    const w = depth.water(pos.lat, pos.lon, now);
+    if (w) cell(`${fmt.num(w.waterM, 1)} m`, w.source === 'carnet' ? 'SONDÉ' : 'MODÈLE',
+      w.source === 'carnet' ? 'c-lime' : '');
+    else cell('—', 'SONDE');
   }
   if (prefs.vent && wx) {
     cell(`${Math.round(wx.windSpeedKn)} nd`, fmt.windFrom(wx.windDirDeg).toUpperCase());

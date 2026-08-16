@@ -26,6 +26,7 @@ import * as idb from './idb.js';
 import { state, set, emit, on } from './store.js';
 import * as learning from '../fishing/learning.js';
 import * as spots from '../fishing/spots.js';
+import * as soundings from '../fishing/soundings.js';
 import * as profile from './profile.js';
 
 /* --- URL de l'API. Surchargable en dev via localStorage.grimsApiBase ------- */
@@ -203,6 +204,19 @@ const COLLECTIONS = {
    * l'outil de fond qui les relit pour envoyer les mails. Elles redescendent
    * comme le reste — régler une alerte sur le téléphone et la retrouver sur la
    * tablette est le comportement attendu de n'importe quel réglage. */
+  /* Les sondes relevées au sondeur. Contrairement aux traces de dérive — qui
+   * valent pour la sortie du jour et restent sur le téléphone — une sonde ne
+   * périme pas : elle s'accumule sortie après sortie et finit par valoir des
+   * années de relevés. Perdre son téléphone ne doit pas coûter ça. */
+  soundings: {
+    kind: 'blob',
+    blobId: 'soundings',
+    load: async () => (await idb.get('kv', 'soundings')) || [],
+    updatedAtOf: async () => (await idb.get('kv', 'soundingsAt')) || 0,
+    apply: async (id, data, deleted) => {
+      await idb.put('kv', 'soundings', deleted ? [] : data);
+    },
+  },
   wxAlerts: {
     kind: 'blob',
     blobId: 'wxAlerts',
@@ -301,6 +315,9 @@ export async function sync() {
     /* Recalcul dérivé après fusion. */
     await learning.recompute().catch(() => {});
     await spots.reload?.().catch(() => {});
+    // Le carnet de sondes a pu descendre : la copie en mémoire doit suivre,
+    // sinon le scoring continue sur l'ancienne jusqu'au prochain lancement.
+    await soundings.reload?.().catch(() => {});
     if (state.profile) { /* le profil d'état est déjà à jour via apply */ }
 
     set({ syncing: false, lastSyncAt: Date.now() });
