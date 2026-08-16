@@ -52,17 +52,42 @@
      un cinquième onglet permanent volerait de la largeur aux quatre autres
      pour un écran qui ne sert que pendant une traversée. -->
 <nav class="tabbar" id="tabbar" role="tablist" aria-label="Modes">
+  <!-- PÊCHE au milieu, et ce n'est pas une question de goût : c'est le mode
+       le plus ouvert de l'app, et sur un téléphone tenu d'une main le pouce
+       tombe naturellement au centre de la barre. Les deux modes de conduite
+       l'encadrent à gauche, les deux modes de consultation à droite. -->
   <button class="tab active" id="tab-nav" data-goto="nav" role="tab" aria-selected="true">
-    <span class="tab-ico">🧭</span><span class="tab-lbl">NAV</span>
+    <span class="tab-ico" aria-hidden="true">
+      <!-- Une barre à roue, pas une boussole : c'est le geste de conduire le
+           bateau qu'on désigne ici, pas celui de chercher le nord. Dessinée en
+           SVG parce qu'aucun émoji ne représente une barre de bateau — ☸ est
+           une roue du dharma, et elle n'a pas de poignées.
+           Les deux icônes cohabitent dans le document et c'est la classe
+           `tab-live` qui choisit : remplacer le contenu en JS aurait effacé
+           le SVG au premier armement de route, sans retour possible. -->
+      <span class="ico-helm">
+        <!-- 23 px et un trait de 1,9 : à 21 px et 1,7 la roue pesait
+             visiblement moins que les émojis voisins, et NAV avait l'air
+             désactivé à côté de CARTE. -->
+        <svg viewBox="0 0 24 24" width="23" height="23" fill="none"
+             stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+          <circle cx="12" cy="12" r="4.1"/>
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+          <path d="M12 7.9V2.7M12 16.1v5.2M7.9 12H2.7M16.1 12h5.2
+                   M9.1 9.1 5.4 5.4M14.9 9.1 18.6 5.4M9.1 14.9 5.4 18.6M14.9 14.9l3.7 3.7"/>
+        </svg>
+      </span>
+      <span class="ico-pilot">🎯</span>
+    </span><span class="tab-lbl">NAV</span>
   </button>
   <button class="tab" data-goto="map" role="tab" aria-selected="false">
     <span class="tab-ico">🗺️</span><span class="tab-lbl">CARTE</span>
   </button>
-  <button class="tab" data-goto="horizon" role="tab" aria-selected="false">
-    <span class="tab-ico">🔦</span><span class="tab-lbl">HORIZON</span>
-  </button>
   <button class="tab" data-goto="fish" role="tab" aria-selected="false">
     <span class="tab-ico">🐟</span><span class="tab-lbl">PÊCHE</span>
+  </button>
+  <button class="tab" data-goto="horizon" role="tab" aria-selected="false">
+    <span class="tab-ico">🔦</span><span class="tab-lbl">HORIZON</span>
   </button>
   <button class="tab" data-goto="log" role="tab" aria-selected="false">
     <span class="tab-ico">📓</span><span class="tab-lbl">JOURNAL</span>

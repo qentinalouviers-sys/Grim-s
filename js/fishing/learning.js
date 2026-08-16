@@ -223,7 +223,7 @@ export function explain() {
   } else {
     out.push({
       title: 'Modèle de courant non calibré',
-      text: `Enregistre des dérives moteur coupé (bouton ⏱ en mode Carte). À partir de ${MIN_FOR_DRIFT}, la dérive prédite devient celle de ton bateau.`,
+      text: `Enregistre des dérives moteur coupé (mode Carte, Outils ▸ Relever une dérive). À partir de ${MIN_FOR_DRIFT}, la dérive prédite devient celle de ton bateau.`,
     });
   }
 

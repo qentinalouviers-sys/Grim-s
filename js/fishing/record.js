@@ -734,7 +734,7 @@ export function describeSnapshot(s) {
 
   const m = [];
   if (s.windSpeedKn != null) {
-    m.push(['Vent', `${fmt.cardinal(s.windDirDeg)} ${Math.round(s.windSpeedKn)} nd${
+    m.push(['Vent', `${fmt.windFrom(s.windDirDeg)}, ${Math.round(s.windSpeedKn)} nd${
       s.windGustKn ? ` (raf. ${Math.round(s.windGustKn)})` : ''}`]);
   }
   if (s.waveHeightM != null) m.push(['Mer', `${fmt.num(s.waveHeightM, 1)} m${s.wavePeriodS ? ` / ${Math.round(s.wavePeriodS)} s` : ''}`]);

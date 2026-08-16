@@ -263,7 +263,21 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   position: relative;
   transition: color .15s;
 }
-.tab-ico { font-size: 20px; line-height: 1; filter: grayscale(1) opacity(.65); transition: filter .15s; }
+.tab-ico {
+  font-size: 20px; line-height: 1;
+  /* Hauteur fixée : les émojis et le SVG de la barre à roue doivent poser leur
+     libellé sur la même ligne, sinon NAV danse d'un pixel par rapport aux
+     quatre autres onglets. */
+  height: 23px; display: grid; place-items: center;
+  filter: grayscale(1) opacity(.65); transition: filter .15s;
+}
+/* Barre à roue quand on prépare, cible quand on pilote. */
+.tab-ico .ico-pilot { display: none; }
+.tab-live .tab-ico .ico-helm { display: none; }
+.tab-live .tab-ico .ico-pilot { display: block; }
+/* Le SVG suit la couleur de l'onglet : gris au repos, cyan actif, vert en
+   pilotage — sans une seule règle de couleur en plus. */
+.tab-ico .ico-helm { display: grid; place-items: center; color: currentColor; }
 /* Cinq onglets tiennent sur 320 px de large : le libellé perd son interlettrage
    plutôt que d'être tronqué, parce qu'un onglet « JOURN… » ne se lit pas d'un
    coup d'œil et que c'est tout ce qu'on lui demande. */
@@ -395,7 +409,11 @@ canvas { display: block; max-width: 100%; }
   border-radius: var(--r-sm);
 }
 .pill-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
-.pill-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--txt-3); font-weight: 700; margin-top: 1px; }
+/* `nowrap` : le bandeau défile horizontalement, une pastille peut donc être
+   large — mais si son intitulé passe à la ligne, TOUTES grandissent en hauteur
+   (elles s'étirent sur la plus haute) et le bandeau gagne une ligne pour un
+   seul mot un peu long. Elle s'élargit, elle ne s'épaissit pas. */
+.pill-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--txt-3); font-weight: 700; margin-top: 1px; white-space: nowrap; }
 
 /* ══ Listes ════════════════════════════════════════════════════════════ */
 .list { display: flex; flex-direction: column; }
@@ -628,6 +646,24 @@ canvas { display: block; max-width: 100%; }
   overflow: hidden;
 }
 .map-bottom .seg button { padding: 6px 4px; font-size: 12px; }
+/* En-tête du panneau de dérive : il se range, il lui faut donc de quoi se
+   ranger sans passer par le menu — on referme là où on a les yeux. */
+.map-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: -3px 0 7px;
+}
+.map-panel-title {
+  font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700;
+}
+.map-panel-x {
+  /* 44 px de zone tactile, moins de trace à l'écran : la croix est petite,
+     sa cible ne l'est pas. */
+  width: 44px; height: 32px; margin: -6px -8px -6px 0;
+  display: grid; place-items: center;
+  background: transparent; border: 0; color: var(--muted); font-size: 14px;
+}
+.map-panel-x:active { color: var(--fg); }
 .leaflet-container { background: #0a1421 !important; font-family: var(--font) !important; }
 .leaflet-control-attribution {
   background: rgba(5,11,20,.75) !important;

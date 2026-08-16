@@ -25,7 +25,7 @@ import { SPECIES_RULES, getRegulationStatus } from './species.js';
 import { findWindows, ranking } from './engine.js';
 import * as spots from './spots.js';
 import * as weather from '../data/weather.js';
-import { hhmm, hhmmDay, cardinal, num, dist, beaufort, beaufortLabel } from '../core/fmt.js';
+import { hhmm, hhmmDay, cardinal, windFrom, num, dist, beaufort, beaufortLabel } from '../core/fmt.js';
 import { moonPhase } from '../data/astro.js';
 import { state } from '../core/store.js';
 import * as profile from '../core/profile.js';
@@ -54,11 +54,16 @@ export function brief({ now = Date.now(), samples = [], scores = {}, hourly = []
   /* ---- 1. Sécurité et faisabilité : ça passe avant la pêche -------------- */
   if (wx) {
     const bf = beaufort(wx.windSpeedKn);
+    /* Ces conditions s'affichent en pastilles : un gros chiffre et, dessous,
+     * son intitulé. Le secteur écrit en toutes lettres va donc dans l'INTITULÉ
+     * — la pastille s'élargit, le bandeau défile, et rien ne se tasse. Collé
+     * dans la valeur, « vent de nord-ouest, 12 nd (F4) » aurait été composé en
+     * 15 px gras sur trois lignes. */
     conditions.push({
-      label: 'Vent',
-      value: `${cardinal(wx.windDirDeg)} ${Math.round(wx.windSpeedKn)} nd (F${bf}${
-        wx.windGustKn > wx.windSpeedKn + 5 ? `, raf. ${Math.round(wx.windGustKn)}` : ''
-      })`,
+      label: windFrom(wx.windDirDeg),
+      value: `${Math.round(wx.windSpeedKn)} nd · F${bf}${
+        wx.windGustKn > wx.windSpeedKn + 5 ? ` · raf. ${Math.round(wx.windGustKn)}` : ''
+      }`,
     });
     if (bf >= 6) {
       warnings.push({ level: 'danger', text: `${beaufortLabel(bf)} annoncé — sortie déconseillée en petite unité.` });

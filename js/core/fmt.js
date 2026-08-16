@@ -28,10 +28,46 @@ export function heading(v) {
 
 const CARDINALS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
 
+/* Les mêmes seize secteurs, écrits. « NO » se lit sans hésiter quand on a
+ * l'habitude ; « nord-ouest » se lit sans l'avoir. La rose abrégée reste pour
+ * les lignes techniques (courant, relèvement, cap), où la place est comptée et
+ * où l'abréviation est la convention. */
+const CARDINALS_LONG = [
+  'nord', 'nord-nord-est', 'nord-est', 'est-nord-est',
+  'est', 'est-sud-est', 'sud-est', 'sud-sud-est',
+  'sud', 'sud-sud-ouest', 'sud-ouest', 'ouest-sud-ouest',
+  'ouest', 'ouest-nord-ouest', 'nord-ouest', 'nord-nord-ouest',
+];
+
+const sector = (deg) => Math.round((((deg % 360) + 360) % 360) / 22.5) % 16;
+
 /** Rose 16 secteurs, nomenclature française (O et non W). */
 export function cardinal(deg) {
   if (!Number.isFinite(deg)) return '—';
-  return CARDINALS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+  return CARDINALS[sector(deg)];
+}
+
+/** Rose 16 secteurs en toutes lettres : « nord-ouest », « est-sud-est ». */
+export function cardinalLong(deg) {
+  if (!Number.isFinite(deg)) return '—';
+  return CARDINALS_LONG[sector(deg)];
+}
+
+/**
+ * Le vent, écrit comme on le dit à bord : « vent de nord-ouest ».
+ *
+ * La direction météo est celle D'OÙ vient le vent — c'est ce que renvoie
+ * Open-Meteo (`wind_direction_10m`) et c'est ce que dit la préposition « de ».
+ * Le courant, lui, se donne dans le sens où il PORTE : les deux ne s'écrivent
+ * donc pas de la même façon, et les confondre inverse une information de
+ * sécurité de cent-quatre-vingts degrés.
+ */
+export function windFrom(deg) {
+  if (!Number.isFinite(deg)) return 'vent indisponible';
+  const s = CARDINALS_LONG[sector(deg)];
+  // Élision. « vent de est-sud-est » ne s'écrit pas et ne se dit pas : six des
+  // seize secteurs commencent par une voyelle (est…, ouest…) et prennent d'.
+  return `vent d${/^[aeiou]/.test(s) ? '’' : 'e '}${s}`;
 }
 
 /** Latitude/longitude en degrés-minutes décimales : 49°55.94'N 001°04.98'E */

@@ -309,8 +309,10 @@ function render() {
   refs.speedQual.textContent = fix ? `±${Math.round(fix.accuracy || 0)} m` : 'sans position';
 
   widgets.wind.set(wx?.windSpeedKn ?? null, wx ? fmt.cardinal(wx.windDirDeg) : '');
+  // Sous la jauge, la place existe : le secteur s'y écrit en toutes lettres.
+  // « NO » demande de connaître la rose ; « vent de nord-ouest », non.
   refs.windQual.textContent = wx
-    ? `${fmt.cardinal(wx.windDirDeg)} · F${fmt.beaufort(wx.windSpeedKn)}${
+    ? `${fmt.windFrom(wx.windDirDeg)} · F${fmt.beaufort(wx.windSpeedKn)}${
         wx.windGustKn > wx.windSpeedKn + 4 ? ` · raf ${Math.round(wx.windGustKn)}` : ''
       }`
     : 'indisponible';

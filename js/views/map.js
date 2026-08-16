@@ -66,6 +66,11 @@ let ui = {
   // Le menu d'outils est refermé à l'ouverture de la carte : le premier écran
   // d'un mode CARTE doit être une carte, pas une liste de commandes.
   menu: false,
+  // Le calcul de dérive aussi. C'est un outil qu'on sort pour préparer une
+  // dérive — deux ou trois fois dans une sortie — et son panneau occupait en
+  // permanence le quart bas de l'écran, y compris pendant la route du retour
+  // où l'on ne dérive pas du tout.
+  drift: false,
   driftMin: 40,
   target: null,   // cible de dérive inverse
   mode: 'forward',
@@ -179,7 +184,9 @@ export async function mount(container) {
 
   layers.track = L.polyline([], { color: '#22d3ee', weight: 2.5, opacity: 0.75 }).addTo(map);
   layers.route = L.layerGroup().addTo(map);
-  layers.drift = L.layerGroup().addTo(map);
+  // Pas de `.addTo(map)` : la dérive se sort depuis le menu, tracé et panneau
+  // ensemble.
+  layers.drift = L.layerGroup();
   layers.vectors = L.layerGroup();
   layers.spots = L.layerGroup().addTo(map);
   layers.catches = L.layerGroup().addTo(map);
@@ -238,7 +245,7 @@ export async function mount(container) {
   holder.addEventListener('touchend', cancelPress, { passive: true });
   holder.addEventListener('touchcancel', cancelPress, { passive: true });
   map.on('click', (e) => {
-    if (ui.mode === 'reverse') {
+    if (ui.drift && ui.mode === 'reverse') {
       ui.target = { lat: e.latlng.lat, lon: e.latlng.lng };
       drawDrift();
     }
@@ -347,8 +354,20 @@ function buildOverlay() {
   menu.append(card);
   refs.menu = menu;
 
-  /* Deux sections, et l'ordre n'est pas décoratif : ce qu'on AFFICHE d'abord
-     (on prépare la carte), ce qu'on FAIT ensuite (on s'en sert). */
+  /* Trois sections, et l'ordre n'est pas décoratif : où l'on VA, ce que la
+     carte AFFICHE, ce qu'on FAIT. Les deux premières entrées doublent les
+     boutons du rail — à dessein. Le rail est un raccourci pour la main qui
+     tient la barre ; le menu est la liste complète, et une liste complète
+     dont il manque deux lignes n'apprend pas ce que l'app sait faire. */
+  card.append(el('div', 'map-menu-sect', 'Navigation'));
+  refs.miNav = menuItem('🎯', 'Naviguer vers…', 'Marque, coordonnées, port', navButton);
+  refs.miFollow = menuItem('◎', 'Recentrer sur le bateau', 'La carte suit la position', () => {
+    setFollow(!ui.follow);
+    markToggle(refs.miFollow, ui.follow);
+  }, true);
+  card.append(refs.miNav, refs.miFollow);
+  markToggle(refs.miFollow, ui.follow);
+
   card.append(el('div', 'map-menu-sect', 'Ce que la carte affiche'));
   refs.btnSea = menuItem('⚓', 'Balisage maritime', 'Bouées, cardinales, feux', () => {
     ui.seamarks = !ui.seamarks;
@@ -384,11 +403,14 @@ function buildOverlay() {
     } else map.removeLayer(layers.catches);
     markToggle(refs.btnCatch, ui.catches);
   }, true);
-  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnCatch);
+  refs.btnDriftPanel = menuItem('⏳', 'Dérive prévue', 'Où je passe, moteur coupé',
+    () => setDrift(!ui.drift), true);
+  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnCatch, refs.btnDriftPanel);
   markToggle(refs.btnSea, ui.seamarks);
   markToggle(refs.btnGround, ui.seabed);
   markToggle(refs.btnVec, ui.vectors);
   markToggle(refs.btnCatch, ui.catches);
+  markToggle(refs.btnDriftPanel, ui.drift);
 
   card.append(el('div', 'map-menu-sect', 'Actions'));
   refs.btnMark = menuItem('📍', 'Marquer la position', 'Enregistrer un point ici', markHere);
@@ -411,9 +433,27 @@ function buildOverlay() {
   refs.onKey = (e) => { if (e.key === 'Escape' && ui.menu) closeMenu(); };
   document.addEventListener('keydown', refs.onKey);
 
-  /* --- Panneau de dérive --- */
+  /* --- Panneau de dérive ----------------------------------------------------
+   * Rangé, et sorti à la demande depuis « Dérive prévue » dans le menu. Il
+   * occupait le quart bas de l'écran en permanence : deux boutons, un curseur,
+   * deux lignes de relevé et une pastille d'avertissement — utiles quand on
+   * prépare une dérive, purement encombrants pendant la route, le mouillage
+   * ou le retour au port, c'est-à-dire la plus grande partie d'une sortie.
+   * Le tracé sur la carte et le panneau vont ensemble : un seul interrupteur.
+   * ------------------------------------------------------------------------ */
   const bottom = el('div', 'map-overlay map-bottom');
+  refs.driftPanel = bottom;
   const panel = el('div', 'map-panel');
+
+  const head = el('div', 'map-panel-head');
+  head.append(el('span', 'map-panel-title', 'Dérive'));
+  const shut = el('button', 'map-panel-x', '✕');
+  shut.type = 'button';
+  shut.title = 'Ranger le calcul de dérive';
+  shut.setAttribute('aria-label', 'Ranger le calcul de dérive');
+  shut.addEventListener('click', () => setDrift(false));
+  head.append(shut);
+  panel.append(head);
 
   const seg = el('div', 'seg');
   const bFwd = el('button', 'on', 'Dérive prévue');
@@ -446,10 +486,8 @@ function buildOverlay() {
   row.append(el('span', 'tiny', 'Durée'), slider, refs.durLbl);
   panel.append(row);
 
-  // Le panneau est volontairement bas : il flotte AU-DESSUS de la carte, et
-  // c'est la carte qu'on est venu voir. Le relevé tient en deux lignes, les
-  // actions sont montées dans la colonne d'icônes, et l'avertissement de
-  // calibration devient une pastille au lieu de deux lignes de texte.
+  // Le relevé tient en deux lignes et l'avertissement de calibration est une
+  // pastille : même sorti, le panneau ne doit pas manger la carte.
   refs.driftInfo = el('div', 'tiny map-readout');
   refs.driftInfo.style.whiteSpace = 'pre-line';
   panel.append(refs.driftInfo);
@@ -459,7 +497,35 @@ function buildOverlay() {
   panel.append(refs.driftWarn);
 
   bottom.append(panel);
+  bottom.hidden = !ui.drift;
+  refs.driftSeg = { fwd: bFwd, rev: bRev };
   root.append(bottom);
+}
+
+/**
+ * Sort ou range le calcul de dérive — le panneau du bas ET son tracé sur la
+ * carte, indissociables : un cône jaune sans le panneau qui l'explique serait
+ * un dessin, et un panneau sans son tracé, un tableau de chiffres.
+ */
+function setDrift(on) {
+  ui.drift = !!on;
+  markToggle(refs.btnDriftPanel, ui.drift);
+  if (refs.driftPanel) refs.driftPanel.hidden = !ui.drift;
+  if (!map) return;
+  if (ui.drift) {
+    layers.drift.addTo(map);
+    drawDrift();
+  } else {
+    // On repasse en dérive prévue : sinon, le mode « point de largage »
+    // survivrait au panneau fermé et le prochain toucher de carte poserait une
+    // cible invisible.
+    ui.mode = 'forward';
+    ui.target = null;
+    refs.driftSeg?.fwd.classList.add('on');
+    refs.driftSeg?.rev.classList.remove('on');
+    layers.drift.clearLayers();
+    map.removeLayer(layers.drift);
+  }
 }
 
 /**
@@ -764,6 +830,10 @@ function drawSpots() {
 
 function drawDrift() {
   if (!map) return;
+  // Rangé : rien à dessiner, rien à écrire. Mais le relevé du haut, lui, vit
+  // sa propre vie — il portait sa mise à jour à la fin de cette fonction, et
+  // sortir sans l'appeler figeait la position affichée. Vu au banc.
+  if (!ui.drift) return void updateReadout();
   const g = layers.drift;
   g.clearLayers();
   const now = Date.now();
@@ -829,9 +899,12 @@ function drawDrift() {
 
   const cfg = stream.config();
   refs.driftInfo.textContent = head;
+  // Le renvoi doit désigner quelque chose qui existe : « bouton ⏱ » pointait
+  // vers une icône du rail qui a été rangée dans le menu. Une consigne qui
+  // désigne un bouton disparu est pire qu'une absence de consigne.
   refs.driftWarn.textContent = cfg.calibrated
     ? `modèle calibré · ${cfg.observations} relevés`
-    : '⚠︎ modèle non calibré — bouton ⏱';
+    : '⚠︎ modèle non calibré — Outils ▸ Relever une dérive';
   refs.driftWarn.className = `chip ${cfg.calibrated ? 'good' : 'warn'}`;
   updateReadout();
 }
@@ -885,6 +958,13 @@ function updateReadout() {
     parts.push(`${fmt.latDDM(fix.lat)} ${fmt.lonDDM(fix.lon)}`);
   }
   parts.push(`${fmt.num(fix?.speedKn, 1)} nd / ${fmt.heading(fix?.cogDeg)}`);
+  /* Ici, et ICI SEULEMENT, la rose reste abrégée. Ce relevé est plafonné à
+   * deux lignes — il flotte au-dessus de la carte et une ligne de plus
+   * recouvrirait le marqueur de destination. Mesuré à 320 px : position, cap
+   * et courant remplissent déjà les deux lignes, et le vent écrit en toutes
+   * lettres serait coupé au milieu d'un mot au lieu d'être lu. Le vent se lit
+   * en toutes lettres là où il y a la place : sous la jauge VENT du mode NAV,
+   * dans le plan de sortie, dans la fiche d'une prise. */
   parts.push(`Courant ${fmt.num(st.spd, 1)} nd ${fmt.cardinal(st.dir)}`);
   if (wx) parts.push(`Vent ${fmt.cardinal(wx.windDirDeg)} ${Math.round(wx.windSpeedKn)}`);
   refs.readout.textContent = parts.join('  ·  ');

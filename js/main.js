@@ -466,7 +466,9 @@ function syncNavTab() {
   const tab = document.getElementById('tab-nav');
   const on = !!state.nav;
   tab.dataset.goto = on ? 'pilot' : 'nav';
-  tab.querySelector('.tab-ico').textContent = on ? '🎯' : '🧭';
+  // L'icône n'est plus réécrite ici : la barre à roue est un SVG, et lui
+  // affecter du texte l'aurait effacée sans retour. Les deux dessins sont dans
+  // le document, `tab-live` choisit lequel se montre.
   tab.querySelector('.tab-lbl').textContent = on ? 'PILOTE' : 'NAV';
   tab.classList.toggle('tab-live', on);
 }
