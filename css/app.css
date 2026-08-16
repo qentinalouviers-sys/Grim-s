@@ -1570,3 +1570,274 @@ body.driving { --tabbar-h: 0px; --banner-h: 0px; }
   font-size: 11px; font-weight: 500; color: var(--txt-3);
   margin-top: 3px; letter-spacing: 0; text-transform: none;
 }
+
+/* ══ MODE PÊCHE ════════════════════════════════════════════════════════
+   Même isolement que la conduite, même raison : ce qu'on masque vit hors de
+   la vue. Et la même limite — MOB et SOS restent. */
+body.angling .tabbar,
+body.angling .banner-host,
+body.angling .topbar-row.secondary { display: none; }
+body.angling { --tabbar-h: 0px; --banner-h: 0px; }
+/* Le bouton de prise global s'efface : le mode a le sien, énorme, sous la
+   carte. Deux boutons pour le même geste, dont un plus petit et mal placé,
+   c'est un doigt qui hésite. */
+body.angling .fab { display: none; }
+
+.fm { display: flex; flex-direction: column; height: 100%; }
+
+/* --- Bandeau ------------------------------------------------------------- */
+.fm-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px;
+}
+.fm-who { flex: 1; min-width: 0; }
+.fm-title {
+  font-size: 14px; font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fm-headsub { font-size: 11px; color: var(--txt-3); }
+.fm-exit {
+  flex: 0 0 auto;
+  min-height: 44px; padding: 6px 12px;
+  display: flex; align-items: center; gap: 6px;
+  border-radius: var(--r-sm);
+  background: rgba(248,113,113,.14);
+  border: 1px solid rgba(248,113,113,.5);
+  color: #fca5a5;
+  font-size: 12px; font-weight: 800; letter-spacing: .06em;
+}
+
+/* --- Carte ---------------------------------------------------------------
+   Elle prend la moitié haute et rien ne se pose dessus sauf l'engrenage. La
+   trace de dérive EST l'objet du mode : un bouton posé par-dessus la masque
+   exactement là où elle devient intéressante. */
+.fm-mapwrap { position: relative; flex: 0 0 46%; min-height: 190px; }
+.fm-map { width: 100%; height: 100%; background: #0a1421; }
+.fm-gear {
+  position: absolute; top: 8px; right: 8px; z-index: 500;
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border-radius: var(--r-sm);
+  background: rgba(10,20,33,.92);
+  border: 1px solid var(--line);
+  font-size: 17px;
+  backdrop-filter: blur(8px);
+}
+.fm-nomap { padding: 16px; font-size: 13px; color: var(--txt-3); line-height: 1.4; }
+
+/* --- Les deux gestes -----------------------------------------------------
+   64 px de haut, pleine largeur, côte à côte. On les presse une canne dans
+   l'autre main, sur un bateau qui bouge, sans regarder l'écran plus d'une
+   demi-seconde. Tout ce qui est plus petit se rate. */
+.fm-acts { flex: 0 0 auto; display: flex; gap: 8px; padding: 8px 10px 0; }
+.fm-act {
+  flex: 1;
+  min-height: 64px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: var(--r);
+  border: 1.5px solid var(--line);
+  background: var(--bg-1);
+}
+.fm-act:active { transform: scale(.97); }
+.fm-act-ico { font-size: 22px; line-height: 1; }
+.fm-act-txt { font-size: 12.5px; font-weight: 800; letter-spacing: .05em; }
+/* Ambre pour la touche — une information, pas une prise. Vert pour le poisson
+   à bord — c'est le seul geste de la sortie qui compte vraiment. */
+.fm-touch { border-color: rgba(251,191,36,.55); background: rgba(251,191,36,.12); color: var(--amber); }
+.fm-fish  { border-color: rgba(163,230,53,.55); background: rgba(163,230,53,.14); color: var(--lime); }
+
+/* --- Compteurs ------------------------------------------------------------
+   Un bandeau qui défile : on en allume trois ou dix selon ce qu'on regarde,
+   et il ne doit jamais voler une ligne à la carte ni aux conseils. */
+.fm-panel {
+  flex: 0 0 auto;
+  display: flex; gap: 7px;
+  overflow-x: auto; scrollbar-width: none;
+  padding: 8px 10px 0;
+}
+.fm-panel::-webkit-scrollbar { display: none; }
+.fm-count {
+  flex: 0 0 auto;
+  min-width: 74px;
+  padding: 6px 9px;
+  text-align: center;
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  border: 1px solid var(--line-soft);
+}
+.fm-count-v { font-size: 15px; font-weight: 800; line-height: 1.15; }
+.fm-count-l {
+  font-size: 9px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--txt-3);
+  white-space: nowrap; margin-top: 2px;
+}
+
+/* --- Conseils ------------------------------------------------------------- */
+.fm-advice {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px 10px calc(var(--safe-b) + 12px);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.fm-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 9px 11px;
+}
+.fm-card-h {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13.5px; font-weight: 800; margin-bottom: 5px;
+}
+.fm-line { font-size: 12px; line-height: 1.4; margin-top: 3px; }
+.fm-line-k { color: var(--txt-3); font-weight: 700; }
+.fm-dim { color: var(--txt-3); }
+.fm-warn {
+  margin-top: 5px; padding: 5px 8px;
+  border-radius: var(--r-sm);
+  font-size: 11.5px; font-weight: 650;
+  color: var(--amber);
+  background: rgba(251,191,36,.12);
+  border: 1px solid rgba(251,191,36,.4);
+}
+
+/* --- Lancement ------------------------------------------------------------ */
+.fm-step {
+  font-size: 11px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--cyan);
+  margin: 14px 0 2px;
+}
+.fm-step:first-child { margin-top: 0; }
+.fm-sub {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--txt-3);
+  margin: 10px 0 5px;
+}
+/* Les pastilles de ciel et d'eau défilent horizontalement : elles sont
+   quatre ou six, et les empiler prendrait une demi-page de l'écran de
+   lancement pour une question à deux touches. */
+.fm-swatches {
+  display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.fm-swatches::-webkit-scrollbar { display: none; }
+.fm-swatch {
+  flex: 0 0 auto;
+  min-width: 76px; min-height: 62px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 7px 6px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+  background: var(--bg-1);
+}
+.fm-swatch-dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 14px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+}
+.fm-swatch-name { font-size: 10px; font-weight: 700; line-height: 1.15; text-align: center; }
+.fm-swatch.on { border-color: var(--cyan); background: rgba(34,211,238,.14); }
+.fm-swatch.on .fm-swatch-name { color: var(--cyan); }
+
+.fm-preview { margin-top: 8px; }
+.fm-lures { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 5px; }
+.fm-lure {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-soft);
+  font-size: 11.5px; font-weight: 650;
+}
+.fm-lure-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
+}
+
+/* Le catalogue du lancement : trois colonnes de cases de 62 px, défilables
+   au pouce. Le nom est écrit — un pictogramme de poisson seul ne distingue
+   pas un lieu d'un merlan. */
+.fm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 7px;
+  max-height: 46vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.fm-grid::-webkit-scrollbar { display: none; }
+.fm-cell {
+  position: relative;
+  min-height: 62px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 7px 5px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+  background: var(--bg-1);
+  text-align: center;
+}
+.fm-cell-ico { font-size: 19px; line-height: 1; }
+.fm-cell-name { font-size: 10.5px; font-weight: 700; line-height: 1.2; }
+.fm-cell-score {
+  font-size: 10px; font-weight: 800;
+  padding: 1px 6px; border-radius: 999px;
+  margin-top: 1px;
+}
+.fm-cell-flag { position: absolute; top: 3px; left: 5px; font-size: 10px; color: var(--amber); }
+.fm-cell.on { border-color: var(--lime); background: rgba(163,230,53,.16); }
+.fm-cell.on .fm-cell-name { color: var(--lime); }
+
+.fm-chosen { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; min-height: 22px; }
+.fm-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(163,230,53,.5);
+  background: rgba(163,230,53,.14);
+  color: var(--lime);
+  font-size: 12px; font-weight: 700;
+}
+.fm-chip-x { opacity: .7; font-size: 11px; }
+.fm-go { margin-top: 14px; }
+
+/* --- Réglages ------------------------------------------------------------- */
+.fm-toggle {
+  width: 100%; min-height: 48px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 10px; margin-top: 5px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+  text-align: left;
+}
+.fm-toggle-n { font-size: 13px; font-weight: 650; }
+.fm-toggle-h { font-size: 10.5px; color: var(--txt-3); line-height: 1.25; }
+.fm-toggle-box {
+  flex: 0 0 auto;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px; color: transparent;
+}
+.fm-toggle.on { border-color: rgba(34,211,238,.42); background: rgba(34,211,238,.1); }
+.fm-toggle.on .fm-toggle-box { color: #061019; background: var(--cyan); border-color: var(--cyan); }
+
+/* Le bouton de lancement du mode pêche. Il est plus haut et plus vert que les
+   autres boutons primaires parce qu'il ouvre un MODE, pas une feuille : on
+   doit le voir depuis l'autre bout du bateau, et ne jamais le confondre avec
+   les commandes de consultation qui le suivent. */
+.fish-launch {
+  min-height: 68px;
+  margin-bottom: 10px;
+  background: linear-gradient(160deg, rgba(163,230,53,.22), rgba(101,163,13,.18));
+  border-color: rgba(163,230,53,.6);
+  color: var(--lime);
+  font-size: 15px; letter-spacing: .04em;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.fish-launch-sub {
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0;
+  color: var(--txt-3); text-transform: none;
+}

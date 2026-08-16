@@ -15,6 +15,7 @@
 import { state, subscribe, emit, set } from '../core/store.js';
 import { el, clear, card, button, toast, openSheet, closeSheet, collapsible, noteBanner, heatColor, scoreBadge, factorBars } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
+import { openFishChooser } from './fishmode.js';
 import { SPECIES_RULES, SPECIES_ORDER, getRegulationStatus, REGULATION_META } from '../fishing/species.js';
 import * as catalog from '../fishing/catalog.js';
 import { openSpeciesBook, openSheetFor } from '../ui/speciesbook.js';
@@ -40,6 +41,14 @@ export function mount(container) {
   root = clear(container);
 
   refs.head = el('div', 'card');
+  /* ---- Lancement du mode pêche -----------------------------------------
+   * Tout en haut, seul, pleine largeur. C'est l'action de cet écran : le
+   * reste — classement, conditions, plan de sortie — sert à décider AVANT de
+   * mouiller. Une fois qu'on pêche, on n'a plus besoin de lire, on a besoin
+   * de deux gros boutons et d'une carte. */
+  refs.launch = button('🎣  LANCER LE MODE PÊCHE', 'btn-primary btn-lg fish-launch', openFishChooser);
+  refs.launch.append(el('div', 'fish-launch-sub',
+    'Carte, trace de dérive en direct, touches et prises en un doigt'));
   refs.top4 = el('div');
   refs.warn = el('div');
   refs.cond = el('div', 'card tight');
@@ -53,7 +62,7 @@ export function mount(container) {
    * 470 px qu'elle lui prenait. */
   const gridFold = collapsible('ESPÈCES × HEURES', refs.grid, { hint: 'la journée en un coup d’œil' });
 
-  root.append(refs.head, refs.top4, refs.warn, refs.cond, refs.lure, refs.plan, gridFold, refs.foot);
+  root.append(refs.launch, refs.head, refs.top4, refs.warn, refs.cond, refs.lure, refs.plan, gridFold, refs.foot);
 
   unsub = subscribe(['advice', 'scores', 'samples', 'weather', 'fix'], render);
   render();

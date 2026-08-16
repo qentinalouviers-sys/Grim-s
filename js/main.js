@@ -43,6 +43,7 @@ import * as engine from './fishing/engine.js';
 import * as advisor from './fishing/advisor.js';
 import * as learning from './fishing/learning.js';
 import * as record from './fishing/record.js';
+import * as traces from './fishing/traces.js';
 import * as sync from './core/sync.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
@@ -54,6 +55,7 @@ import * as route from './nav/route.js';
 import * as navView from './views/nav.js';
 import * as pilotView from './views/pilot.js';
 import * as driveView from './views/drive.js';
+import * as fishModeView from './views/fishmode.js';
 import * as mapView from './views/map.js';
 import * as horizonView from './views/horizon.js';
 import * as fishView from './views/fish.js';
@@ -64,6 +66,7 @@ const VIEWS = {
   nav: navView,
   pilot: pilotView,
   drive: driveView,
+  'fish-mode': fishModeView,
   map: mapView,
   horizon: horizonView,
   fish: fishView,
@@ -97,7 +100,7 @@ async function boot() {
   bathy.init();
   wrecks.init();
   presence.init();
-  await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord()]);
+  await Promise.all([tide.init(), spots.init(), learning.init(), record.initRecord(), traces.init()]);
 
   const settings = (await idb.get('kv', 'settings')) || {};
   set({ settings, nightMode: !!settings.nightMode });
@@ -450,7 +453,7 @@ function showView(name) {
    * qu'on n'a pas pris. Dans les deux cas on ne pêche pas, on navigue. */
   /* En CONDUITE il reste, et c'est voulu : c'est la seule commande que le mode
    * isolé conserve, parce qu'on pêche en dérivant — donc en conduisant. */
-  record.setFabVisible(!['log', 'pilot', 'horizon'].includes(name));
+  record.setFabVisible(!['log', 'pilot', 'horizon', 'fish-mode'].includes(name));
   history.replaceState(null, '', `#${name}`);
   set({ view: name });
 }
