@@ -257,11 +257,20 @@ function renderWeather(wx, place) {
   head.append(src);
   box.append(head);
 
+  /* Les deux commandes viennent AVANT le vent, juste sous le titre.
+   *
+   * Elles étaient en bas de la carte, sous les sept jours : mesuré à 763 px du
+   * haut sur un iPhone SE, soit près de deux écrans de défilement. Personne ne
+   * défile deux écrans pour découvrir une fonction dont il ignore l'existence —
+   * et le retour a été exactement celui-là, « je ne trouve pas les alertes ».
+   * Une commande qu'il faut chercher n'existe pas.
+   *
+   * Elles coûtent quarante pixels au chiffre du vent, qui reste le premier
+   * élément qu'on lit ; c'est le prix d'une fonction qu'on peut trouver. */
+  box.append(weatherActions(place, wx ? 7 : 0));
+
   if (!wx) {
     box.append(el('p', 'muted', 'Prévision indisponible — pas encore de réseau depuis l’ouverture. Le reste de l’écran, marée et courant compris, est calculé à bord et reste juste.'));
-    // Les commandes restent : c'est justement le moment où l'on veut poser une
-    // alerte pour être prévenu quand la prévision arrivera.
-    box.append(weatherActions(place, 0));
     return;
   }
 
@@ -350,8 +359,6 @@ function renderWeather(wx, place) {
     box.append(week);
   }
 
-  box.append(weatherActions(place, days.length));
-
   box.append(el('div', 'tiny',
     `Pour ${place ? place.name : 'la position'} · vent, pression et visibilité : Open-Meteo. Mer, houle et température de l’eau : Open-Meteo Marine. Deux modèles distincts, affichés séparément.`));
 }
@@ -362,11 +369,10 @@ function renderWeather(wx, place) {
  * alerte pour être prévenu quand elle arrivera. Les deux écrans qu'elles
  * ouvrent savent se présenter sans données.
  */
-function weatherActions(place, dayCount) {
-  const acts = el('div', 'btn-row');
-  acts.style.marginTop = dayCount > 1 ? '8px' : '10px';
+function weatherActions(place) {
+  const acts = el('div', 'btn-row wx-acts');
   acts.append(
-    button('📅 Heure par heure', 'btn-sm',
+    button('📅 7 jours', 'btn-sm',
       () => openForecast({ hourly: state.weather?.hourly || [], place, dayIndex: 0 })),
     /* L'alerte se règle DEPUIS la météo, pas depuis un écran de réglages :
      * l'envie de se faire prévenir naît en regardant une semaine ventée, pas

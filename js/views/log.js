@@ -23,6 +23,8 @@ import * as record from '../fishing/record.js';
 import * as account from '../ui/account.js';
 import * as sync from '../core/sync.js';
 import * as rescue from '../ui/rescue.js';
+import * as wxalert from '../core/wxalert.js';
+import { openAlerts } from '../ui/wxalertform.js';
 
 let root;
 let refs = {};
@@ -107,6 +109,22 @@ async function render() {
     acctCard.append(el('p', 'muted',
       'Retrouve ton journal et tes marques sur un autre téléphone, et sauvegarde-les. Sans compte, tout reste sur cet appareil.'));
   }
+  /* Les alertes météo tiennent au compte — c'est son adresse qui reçoit le
+   * mail — donc leur place est ici autant que sur la carte météo. Deux portes
+   * pour une même pièce, et c'est voulu : on cherche « mes alertes » du côté
+   * des réglages aussi souvent que du côté de la météo. */
+  const alertRow = el('button', 'list-item');
+  alertRow.type = 'button';
+  const alertMain = el('div', 'list-main');
+  alertMain.append(el('div', 'list-title', '🔔 Alertes bonne météo'));
+  const n = wxalert.enabledCount();
+  alertMain.append(el('div', 'list-sub', n
+    ? `${n} alerte${n > 1 ? 's' : ''} en veille — tu seras prévenu dès que tes conditions se présentent.`
+    : 'Se faire prévenir quand le vent et la mer passent sous tes seuils.'));
+  alertRow.append(alertMain, el('span', 'chev', '›'));
+  alertRow.addEventListener('click', () => openAlerts());
+  acctCard.append(alertRow);
+
   box.append(acctCard);
 
   /* ══ Sauvegarde ══════════════════════════════════════════════════════

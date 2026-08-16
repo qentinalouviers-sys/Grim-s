@@ -1476,6 +1476,11 @@ input[type=range]::-moz-range-thumb {
   padding: 5px 9px;
 }
 
+/* Les commandes de la carte météo, juste sous le titre. Elles étaient en bas,
+   sous les sept jours : à 763 px du haut sur un iPhone SE, personne ne les
+   trouvait — et c'est exactement le retour qu'on a eu. */
+.wx-acts { margin: 0 0 10px; }
+
 /* Le vent en premier et en gros : c'est lui qui décide si l'on sort. */
 .wx-hero { display: flex; align-items: baseline; gap: 10px; }
 .wx-hero-v {
