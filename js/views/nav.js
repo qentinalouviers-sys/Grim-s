@@ -26,6 +26,7 @@ import * as compass from '../sensors/heading.js';
 import * as spots from '../fishing/spots.js';
 import * as route from '../nav/route.js';
 import { openDestinationPicker } from '../ui/destination.js';
+import { openDriveChooser } from './drive.js';
 import { sunTimes, moonPhase } from '../data/astro.js';
 
 const HOUR = 3600000;
@@ -104,7 +105,16 @@ export function mount(container) {
 
   // La navigation GPS est l'action la plus lourde de conséquences de cet
   // écran : elle occupe toute la largeur, seule, et se lit sans chercher.
-  refs.btnGo = button('🎯 Naviguer vers…', 'btn-primary btn-lg', () => openDestinationPicker());
+  /* Le mode conduite passe DEVANT « Naviguer vers… », et ce n'est pas une
+   * promotion arbitraire : « naviguer vers » demande déjà de savoir où l'on
+   * va, alors que la plupart des sorties commencent sans but — on largue les
+   * amarres, on verra sur l'eau. Le mode conduite accepte les deux, et c'est
+   * lui qui pose la question. */
+  refs.btnDrive = button('🛞 Mode conduite', 'btn-primary btn-lg', openDriveChooser);
+  actions.append(refs.btnDrive);
+
+  refs.btnGo = button('🎯 Naviguer vers…', 'btn-lg', () => openDestinationPicker());
+  refs.btnGo.style.marginTop = '8px';
   actions.append(refs.btnGo);
 
   const row1 = el('div', 'btn-row');

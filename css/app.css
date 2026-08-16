@@ -1430,3 +1430,135 @@ input[type=range]::-moz-range-thumb {
   box-shadow: 0 2px 6px rgba(0,0,0,.6);
 }
 .catch-marker span { transform: rotate(-45deg); font-size: 13px; line-height: 1; }
+
+/* ══ MODE CONDUITE ═════════════════════════════════════════════════════
+   Un mode, pas un écran. L'isolement se joue ici, sur le body : ce qu'on
+   masque — la barre d'onglets, les bandeaux, les pastilles d'état — vit HORS
+   de la vue, et c'est exactement ce qui distingue un mode d'un écran.
+
+   Ce qui reste en haut est délibéré : MOB et SOS. Un mode immersif qui
+   supprime l'appel de détresse est un mode qui tue. L'isolement porte sur les
+   MENUS, jamais sur la sécurité. */
+body.driving .tabbar,
+body.driving .banner-host,
+body.driving .topbar-row.secondary { display: none; }
+/* Les deux variables commandent l'encadrement de #main : les remettre à zéro
+   rend au cockpit toute la hauteur, sans une seule règle de position à
+   réécrire. */
+body.driving { --tabbar-h: 0px; --banner-h: 0px; }
+
+.drive {
+  display: flex; flex-direction: column; gap: 6px;
+  /* Le dégagement du bas n'est pas décoratif : la barre d'onglets ayant
+     disparu, le bouton de prise descend de 62 px et venait recouvrir la
+     dernière ligne du cockpit. On lui réserve sa place. */
+  padding: 8px 10px calc(var(--safe-b) + 84px);
+}
+.drive-card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 10px;
+}
+
+/* --- Bandeau ------------------------------------------------------------ */
+.drive-head { display: flex; align-items: center; gap: 10px; }
+.drive-who { flex: 1; min-width: 0; }
+.drive-title {
+  font-size: 15px; font-weight: 800; letter-spacing: .02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.drive-sub { font-size: 11px; color: var(--txt-3); }
+/* La sortie est ÉCRITE. Quitter un mode n'est pas fermer une fenêtre, et un
+   pictogramme seul se touche par erreur — surtout celui-là, qui est le seul
+   bouton de tout l'écran à changer d'univers. */
+.drive-exit {
+  flex: 0 0 auto;
+  min-height: 44px; padding: 6px 12px;
+  display: flex; align-items: center; gap: 6px;
+  border-radius: var(--r-sm);
+  background: rgba(248,113,113,.14);
+  border: 1px solid rgba(248,113,113,.5);
+  color: #fca5a5;
+  font-size: 12px; font-weight: 800; letter-spacing: .06em;
+}
+.drive-exit-ico { font-size: 15px; }
+
+/* --- Cap ---------------------------------------------------------------- */
+.drive-cap { display: flex; align-items: flex-end; margin-top: 2px; }
+.drive-big { font-size: 30px; font-weight: 800; line-height: 1; }
+.drive-lbl {
+  font-size: 9.5px; font-weight: 800; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--txt-3); margin-top: 3px;
+  white-space: nowrap;
+}
+
+/* --- Ordre de barre ------------------------------------------------------
+   La seule ligne du cockpit qui donne un ORDRE. Elle a sa bande à elle, sa
+   couleur, et rien d'autre dedans : c'est ce qu'on lit en une demi-seconde,
+   la main déjà sur la barre. */
+.drive-steer {
+  text-align: center;
+  padding: 9px 10px;
+  border-radius: var(--r);
+  font-size: 21px; font-weight: 800; letter-spacing: .02em;
+  border: 1px solid var(--line);
+  background: var(--bg-1);
+}
+.drive-steer.ok   { color: var(--lime);  border-color: rgba(163,230,53,.5);  background: rgba(163,230,53,.12); }
+.drive-steer.warn { color: var(--amber); border-color: rgba(251,191,36,.5);  background: rgba(251,191,36,.12); }
+.drive-steer.bad  { color: #fca5a5;      border-color: rgba(248,113,113,.55); background: rgba(248,113,113,.14); }
+
+/* --- Vitesse -------------------------------------------------------------
+   En très gros : elle décide de tout le reste — l'heure d'arrivée, la tenue
+   de la route, et si l'on peut remonter le courant. */
+.drive-speed { text-align: center; padding: 5px 10px 7px; }
+.drive-huge { font-size: 52px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+.drive-unit {
+  font-size: 10px; font-weight: 800; letter-spacing: .12em;
+  color: var(--txt-3); margin-top: 2px;
+}
+.drive-note { font-size: 10.5px; color: var(--txt-3); margin-top: 4px; line-height: 1.3; }
+
+/* --- Trois chiffres ------------------------------------------------------ */
+.drive-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.drive-cell { text-align: center; padding: 7px 3px; }
+/* 17 px : à 19 px « 3.01 NM » passait à la ligne dans une cellule de 87 px
+   sur iPhone SE, et la cellule grandissait pour elle seule. Mesuré. */
+.drive-mid { font-size: 17px; font-weight: 800; line-height: 1.1; }
+
+/* --- Mer et ciel ---------------------------------------------------------
+   Ce qu'on ne pilote pas mais qui décide de la manœuvre. Dans ce mode on n'a
+   plus le droit d'aller le chercher ailleurs : les onglets n'existent plus. */
+.drive-sea {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 6px 10px;
+}
+.drive-sea-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 1px 0;
+}
+.drive-sea-k { font-size: 11px; color: var(--txt-3); }
+.drive-sea-v { font-size: 12.5px; font-weight: 700; }
+
+.drive-acts { display: flex; gap: 7px; }
+.drive-acts > * { flex: 1; }
+
+.drive-alert {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px; font-weight: 650; line-height: 1.35;
+  border: 1px solid var(--line);
+}
+.drive-alert.ok  { color: var(--lime);  border-color: rgba(163,230,53,.45);  background: rgba(163,230,53,.1); }
+.drive-alert.bad { color: #fca5a5;      border-color: rgba(248,113,113,.5);  background: rgba(248,113,113,.12); }
+
+/* Sous-titre des deux choix d'entrée : ils font la différence entre « je pars
+   voir » et « je vais là », et cette différence ne tient pas dans un titre. */
+.drive-choice-sub {
+  font-size: 11px; font-weight: 500; color: var(--txt-3);
+  margin-top: 3px; letter-spacing: 0; text-transform: none;
+}

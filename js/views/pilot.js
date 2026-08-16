@@ -19,7 +19,7 @@
  * chercher, et on cherche mal quand ça bouge.
  * ========================================================================== */
 
-import { state, subscribe, on, set } from '../core/store.js';
+import { state, subscribe, on, set, emit } from '../core/store.js';
 import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
 import { Gauge, Compass, CDI } from '../ui/widgets.js';
 import * as fmt from '../core/fmt.js';
@@ -74,6 +74,10 @@ function idleScreen() {
   box.append(el('div', 'list-title', 'Aucune route active'));
   box.append(el('p', 'muted', 'Choisis un but : des coordonnées saisies au clavier, une de tes marques, une prise de ton journal, ou le retour au port.'));
   box.append(button('🎯 Choisir une destination', 'btn-primary btn-lg', () => openDestinationPicker()));
+  // Ou pas de but du tout : on sort, on verra sur l'eau. Le cockpit sait faire.
+  const libre = button('🛞 Conduite libre, sans but', 'btn-lg', () => emit('goto', 'drive'));
+  libre.style.marginTop = '8px';
+  box.append(libre);
   return box;
 }
 
@@ -163,9 +167,15 @@ function build() {
   refs.smart = el('div', 'card tight');
   root.append(refs.smart);
 
-  /* ---- Actions ---------------------------------------------------------- */
+  /* ---- Actions ---------------------------------------------------------- *
+   * Le passage en conduite vit ICI, et il a fallu s'en apercevoir : dès qu'une
+   * route est armée, le premier onglet devient PILOTE et l'écran NAV — donc le
+   * bouton d'entrée du mode conduite — n'est plus atteignable. Le cockpit
+   * devenait inaccessible exactement au moment où il sert. */
+  root.append(button('🛞 Passer en mode conduite', 'btn-primary btn-lg', () => emit('goto', 'drive')));
+
   const acts = el('div', 'btn-row');
-  acts.style.marginBottom = '8px';
+  acts.style.margin = '8px 0';
   acts.append(
     button('🎯 Autre but', '', () => openDestinationPicker()),
     button('↺ Recaler la route', '', () => {

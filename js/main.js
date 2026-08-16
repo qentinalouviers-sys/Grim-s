@@ -53,6 +53,7 @@ import * as route from './nav/route.js';
 
 import * as navView from './views/nav.js';
 import * as pilotView from './views/pilot.js';
+import * as driveView from './views/drive.js';
 import * as mapView from './views/map.js';
 import * as horizonView from './views/horizon.js';
 import * as fishView from './views/fish.js';
@@ -62,6 +63,7 @@ const HOUR = 3600000;
 const VIEWS = {
   nav: navView,
   pilot: pilotView,
+  drive: driveView,
   map: mapView,
   horizon: horizonView,
   fish: fishView,
@@ -446,6 +448,8 @@ function showView(name) {
    * En mode HORIZON c'est pire : il chevauche la moitié droite du bouton de
    * cadence, et un doigt qui vise le rythme d'un feu enregistrerait un poisson
    * qu'on n'a pas pris. Dans les deux cas on ne pêche pas, on navigue. */
+  /* En CONDUITE il reste, et c'est voulu : c'est la seule commande que le mode
+   * isolé conserve, parce qu'on pêche en dérivant — donc en conduisant. */
   record.setFabVisible(!['log', 'pilot', 'horizon'].includes(name));
   history.replaceState(null, '', `#${name}`);
   set({ view: name });
@@ -476,13 +480,19 @@ function syncNavTab() {
 on('nav:start', (nav) => {
   syncNavTab();
   dom.dismissBanner('arrived');
-  showView('pilot');
+  // Sauf en CONDUITE : ce mode affiche déjà la route, en plus grand, et
+  // basculer vers PILOTE ferait sortir du cockpit celui qui vient seulement
+  // d'y choisir un but. Un mode isolé qu'on peut quitter sans l'avoir demandé
+  // n'est pas isolé.
+  if (current !== 'drive') showView('pilot');
   dom.toast(`Route sur ${nav.name}`, 'good');
 });
 
 on('nav:stop', () => {
   syncNavTab();
   dom.dismissBanner('arrived');
+  // La conduite reste : sans but, elle redevient simplement une conduite
+  // libre. C'est le mode qui décide de sa forme, pas la route.
   if (current === 'pilot') showView('nav');
 });
 
@@ -509,7 +519,7 @@ on('nav:arrived', (a) => {
     'info',
     { id: 'arrived' },
   );
-  if (current !== 'pilot' && current !== 'map') showView('pilot');
+  if (!['pilot', 'map', 'drive'].includes(current)) showView('pilot');
 });
 
 on('nav:offcourse', (o) => {

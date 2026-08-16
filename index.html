@@ -41,6 +41,11 @@
 <main id="main">
   <section class="view" id="view-nav" data-view="nav"></section>
   <section class="view" id="view-pilot" data-view="pilot" hidden></section>
+  <!-- Le mode CONDUITE est un mode, pas un onglet : aucun bouton de la barre
+       ne le désigne, on y entre depuis NAV et on en sort par son propre
+       bouton. Sa section vit ici comme les autres pour que le routeur n'ait
+       aucun cas particulier à connaître. -->
+  <section class="view" id="view-drive" data-view="drive" hidden></section>
   <section class="view" id="view-map" data-view="map" hidden></section>
   <section class="view" id="view-horizon" data-view="horizon" hidden></section>
   <section class="view" id="view-fish" data-view="fish" hidden></section>
