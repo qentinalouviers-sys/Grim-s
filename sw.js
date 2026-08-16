@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.33.1';
+const VERSION = 'v1.34.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -48,6 +48,7 @@ const SHELL_FILES = [
   'js/data/weather.js',
   'js/data/places.js',
   'js/data/depth.js',
+  'js/data/shomchart.js',
   'js/data/stream.js',
   'js/data/seamarks.js',
   'js/data/seabed.js',
@@ -84,6 +85,7 @@ const SHELL_FILES = [
   'js/ui/wxalertform.js',
   'js/ui/soundingpad.js',
   'js/ui/isobaths.js',
+  'js/ui/shomsetup.js',
   'js/views/nav.js',
   'js/views/pilot.js',
   'js/views/drive.js',
@@ -172,6 +174,8 @@ self.addEventListener('fetch', (e) => {
     url.hostname.includes('emodnet') ||
     url.hostname.includes('open-meteo.com') ||
     url.hostname.includes('overpass') ||
+    // Les tuiles SHOM ne passent pas par ici : la couche décide elle-même si
+    // elle conserve quoi que ce soit, selon la licence de la clé.
     url.hostname.includes('shom.fr')
   ) {
     return;

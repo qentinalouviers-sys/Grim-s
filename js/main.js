@@ -34,6 +34,7 @@ import * as bathy from './data/bathy.js';
 import * as wrecks from './data/wrecks.js';
 import * as weatherApi from './data/weather.js';
 import * as places from './data/places.js';
+import * as shomchart from './data/shomchart.js';
 import * as stream from './data/stream.js';
 import { sunTimesOfDay } from './data/astro.js';
 
@@ -122,6 +123,9 @@ async function boot() {
     // le modèle public, et un poste scoré sans lui puis rescoré avec change de
     // note sous les yeux de l'utilisateur sans explication.
     soundings.init(),
+    // Le réglage de la carte officielle, avant le montage de la vue CARTE :
+    // sinon la couche n'est branchée qu'au deuxième passage sur l'onglet.
+    shomchart.init(),
   ]);
 
   const settings = (await idb.get('kv', 'settings')) || {};

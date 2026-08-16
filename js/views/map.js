@@ -31,6 +31,8 @@ import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
 import * as soundings from '../fishing/soundings.js';
 import * as isobaths from '../ui/isobaths.js';
+import * as shom from '../data/shomchart.js';
+import { openShomSetup } from '../ui/shomsetup.js';
 import * as bathy from '../data/bathy.js';
 import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
@@ -72,6 +74,10 @@ let ui = {
   // au port de nuit, où elles ne feraient que charger l'écran.
   isobaths: false,
   depthShade: false,
+  // La carte officielle : allumée d'office DÈS QU'ELLE EST CONFIGURÉE. Si
+  // quelqu'un a pris la peine d'obtenir une clé, il ne veut pas rallumer la
+  // couche à chaque ouverture.
+  shom: false,
   // Éteinte au départ : la nature des fonds est une couche de TRAVAIL, on
   // l'allume quand on cherche un poste, pas quand on rentre au port de nuit.
   seabed: false,
@@ -204,6 +210,7 @@ export async function mount(container) {
   layers.catches = L.layerGroup().addTo(map);
   layers.soundings = L.layerGroup().addTo(map);
   layers.isobaths = isobaths.create(L);
+  if (shom.ready()) mountShom();
 
   /* Le dégradé de profondeur d'EMODnet, en CC-BY. C'est la seule imagerie de
    * fonds à la fois gratuite, redistribuable et couvrant toute la zone. Elle
@@ -447,6 +454,27 @@ function buildOverlay() {
     } else map.removeLayer(layers.isobaths);
     markToggle(refs.btnIso, ui.isobaths);
   }, true);
+  refs.btnShom = menuItem('🇫🇷', 'Carte marine SHOM', 'Officielle — demande une clé', () => {
+    if (!shom.ready()) return void openShomSetup({ onSaved: onShomChanged });
+    ui.shom = !ui.shom;
+    if (ui.shom) {
+      mountShom();
+      layers.shom?.addTo(map);
+      // Au-dessus du fond OSM mais SOUS le balisage et les marques : la carte
+      // officielle porte déjà son balisage, et masquer les prises ou la route
+      // sous une carte n'aide personne.
+      layers.shom?.bringToBack();
+      layers.base.bringToBack();
+    } else if (layers.shom) map.removeLayer(layers.shom);
+    markToggle(refs.btnShom, ui.shom);
+  }, true);
+  /* Appui long sur l'entrée : les réglages. Un toucher normal allume ou
+   * éteint, comme les autres couches ; l'écran de configuration ne doit pas
+   * s'ouvrir chaque fois qu'on veut simplement masquer la carte. */
+  refs.btnShom.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openShomSetup({ onSaved: onShomChanged });
+  });
   refs.btnShade = menuItem('🌊', 'Dégradé de profondeur', 'Relief coloré — EMODnet', () => {
     ui.depthShade = !ui.depthShade;
     if (ui.depthShade) {
@@ -455,7 +483,8 @@ function buildOverlay() {
       layers.depthShade.bringToBack();
       layers.base.bringToBack();
     } else map.removeLayer(layers.depthShade);
-    markToggle(refs.btnShade, ui.depthShade);
+    markToggle(refs.btnShom, ui.shom);
+  markToggle(refs.btnShade, ui.depthShade);
   }, true);
   refs.btnSnd = menuItem('📏', 'Mes sondes', 'Relevées au sondeur du bord', () => {
     ui.soundings = !ui.soundings;
@@ -475,7 +504,7 @@ function buildOverlay() {
   }, true);
   refs.btnDriftPanel = menuItem('⏳', 'Dérive prévue', 'Où je passe, moteur coupé',
     () => setDrift(!ui.drift), true);
-  card.append(refs.btnSea, refs.btnGround, refs.btnShade, refs.btnIso, refs.btnVec,
+  card.append(refs.btnShom, refs.btnSea, refs.btnGround, refs.btnShade, refs.btnIso, refs.btnVec,
     refs.btnSnd, refs.btnCatch, refs.btnDriftPanel);
   markToggle(refs.btnSea, ui.seamarks);
   markToggle(refs.btnGround, ui.seabed);
@@ -879,6 +908,63 @@ function drawBoat() {
  * donc que l'emprise visible, à partir du zoom 13 — l'échelle à laquelle deux
  * sondes distantes de cent mètres ne se chevauchent plus — et on plafonne.
  * ========================================================================== */
+/* ==========================================================================
+ * La carte marine officielle
+ * --------------------------------------------------------------------------
+ * Montée à la demande, jamais au démarrage : tant qu'il n'y a pas de clé il
+ * n'y a rien à monter, et la couche se reconstruit si l'utilisateur change de
+ * couche ou de réglage de cache.
+ * ========================================================================== */
+function mountShom() {
+  if (!shom.ready()) return null;
+  const conf = shom.config();
+  const url = shom.leafletUrl(conf);
+  if (!url) return null;
+
+  // Reconstruction si le réglage a changé : comparer l'URL suffit, elle porte
+  // la couche, le style et le jeu de matrices.
+  if (layers.shom && layers.shom.__url === url && layers.shom.__cache === !!conf.cache) {
+    return layers.shom;
+  }
+  if (layers.shom) map.removeLayer(layers.shom);
+
+  const z = shom.zoomRange(conf);
+  const opts = {
+    minZoom: z.min,
+    maxZoom: 19,
+    // Au-delà de ce que le service produit, Leaflet agrandit la dernière
+    // tuile au lieu d'en demander une qui n'existe pas — sinon la carte
+    // blanchit dès qu'on zoome un cran de trop.
+    maxNativeZoom: z.max,
+    attribution: '© SHOM',
+  };
+
+  /* Le cache est un CHOIX de l'utilisateur, pas un défaut : conserver sur son
+   * disque une donnée sous licence engage sa licence, pas la nôtre. Sans
+   * cache, on utilise la couche Leaflet standard — aucune tuile n'est écrite. */
+  layers.shom = conf.cache
+    ? makeCachedLayer(L, url, opts, `shom-${conf.layer}`)
+    : L.tileLayer(url, opts);
+  layers.shom.__url = url;
+  layers.shom.__cache = !!conf.cache;
+  return layers.shom;
+}
+
+function onShomChanged(conf) {
+  if (!conf) {
+    if (layers.shom) map.removeLayer(layers.shom);
+    layers.shom = null;
+    ui.shom = false;
+  } else {
+    ui.shom = true;
+    mountShom();
+    layers.shom?.addTo(map);
+    layers.shom?.bringToBack();
+    layers.base.bringToBack();
+  }
+  if (refs.btnShom) markToggle(refs.btnShom, ui.shom);
+}
+
 function drawIsobaths() {
   if (!layers.isobaths || !ui.isobaths) return;
   const r = isobaths.refresh(layers.isobaths, map.getBounds(), map.getZoom());
