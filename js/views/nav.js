@@ -32,6 +32,7 @@ import * as gps from '../sensors/gps.js';
 import * as spots from '../fishing/spots.js';
 import * as route from '../nav/route.js';
 import { openDestinationPicker } from '../ui/destination.js';
+import { openForecast } from '../ui/forecast.js';
 import { openDriveChooser, helmIcon } from './drive.js';
 import { openFishChooser } from './fishmode.js';
 import * as places from '../data/places.js';
@@ -307,8 +308,68 @@ function renderWeather(wx, place) {
   if (wx.cloudPct != null) cell(`${Math.round(wx.cloudPct)} %`, 'NUAGES');
   box.append(grid);
 
+  /* ---- La semaine -------------------------------------------------------
+   * Sept jours résumés à une ligne chacun, directement sur la carte : c'est ce
+   * qu'on regarde en premier quand on choisit QUAND sortir, et le mettre
+   * derrière un bouton aurait obligé à ouvrir une fenêtre pour apprendre que
+   * jeudi souffle à trente. Le détail heure par heure, lui, mérite l'écran
+   * entier — il s'ouvre d'un toucher sur le jour. */
+  const days = weather.byDay(state.weather?.hourly || []);
+  if (days.length > 1) {
+    const week = el('div', 'wx-week');
+    const now = Date.now();
+    days.forEach((d, i) => {
+      const conf = weather.confidence(d.start, now);
+      const row = el('button', `wx-day${conf.level === 'low' ? ' far' : ''}`);
+      row.type = 'button';
+      row.append(el('span', 'wx-day-n', dayName(d.start, now)));
+
+      const s = d.summary;
+      const w = el('span', 'wx-day-w tnum');
+      w.textContent = s.windMaxKn == null ? '—'
+        : `${Math.round(s.windMinKn)}–${Math.round(s.windMaxKn)} nd`;
+      w.style.color = windColor(s.windMaxKn);
+      row.append(w);
+
+      row.append(el('span', 'wx-day-c', s.windDirDeg == null ? '' : fmt.cardinal(s.windDirDeg)));
+      row.append(el('span', 'wx-day-s tnum',
+        s.waveMaxM == null ? '' : `🌊 ${fmt.num(s.waveMaxM, 1)} m`));
+      row.append(el('span', 'chev', '›'));
+      row.addEventListener('click', () => openForecast({ hourly: state.weather.hourly, place, dayIndex: i }));
+      week.append(row);
+    });
+    box.append(week);
+
+    const more = button('📅 Heure par heure · 7 jours', 'btn-sm',
+      () => openForecast({ hourly: state.weather.hourly, place, dayIndex: 0 }));
+    more.style.marginTop = '8px';
+    more.style.width = '100%';
+    box.append(more);
+  }
+
   box.append(el('div', 'tiny',
     `Pour ${place ? place.name : 'la position'} · vent, pression et visibilité : Open-Meteo. Mer, houle et température de l’eau : Open-Meteo Marine. Deux modèles distincts, affichés séparément.`));
+}
+
+/** « Auj. », « Demain », puis « mer. 19 » — comme on en parle à bord. */
+function dayName(t, now) {
+  const d0 = new Date(now); d0.setHours(0, 0, 0, 0);
+  const diff = Math.round((new Date(t).setHours(0, 0, 0, 0) - d0.getTime()) / 86400000);
+  if (diff === 0) return "Auj.";
+  if (diff === 1) return 'Demain';
+  const d = new Date(t);
+  return `${['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][d.getDay()]} ${d.getDate()}`;
+}
+
+/* Les seuils sont ceux d'un petit bateau de pêche : au-delà de force 6, une
+ * embarcation de six mètres n'avance plus, elle encaisse. La couleur le dit
+ * avant qu'on ait lu le chiffre. */
+function windColor(kn) {
+  if (kn == null) return 'var(--txt-2)';
+  if (kn < 11) return 'var(--lime)';
+  if (kn < 17) return 'var(--amber)';
+  if (kn < 22) return '#fb923c';
+  return 'var(--red)';
 }
 
 /**

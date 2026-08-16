@@ -1210,3 +1210,202 @@ export class CurrentFlow extends Canvas {
     }
   }
 }
+
+/* ==========================================================================
+ * Méteogramme — une journée de vent et de mer
+ * --------------------------------------------------------------------------
+ * Vingt-quatre lignes de chiffres, personne ne les lit. Une courbe, si : on
+ * voit d'un coup d'œil que le vent monte à partir de midi, ou que la matinée
+ * est la seule fenêtre calme de la journée. C'est cette lecture-là qu'on vient
+ * chercher quand on choisit son créneau.
+ *
+ * ── CE QUI EST DESSINÉ, ET DANS QUEL ORDRE ────────────────────────────────
+ * 1. la NUIT en fond, du coucher au lever : sortir avant le jour n'est pas la
+ *    même décision que sortir à midi, et la barre du fond le rappelle sans un
+ *    mot ;
+ * 2. la MER en aire bleue, sur son propre axe — c'est elle qui décide de la
+ *    sortie sur un petit bateau, avant le vent ;
+ * 3. les RAFALES en bande claire au-dessus du vent moyen : c'est l'écart entre
+ *    les deux qui rend une journée pénible, pas le vent seul ;
+ * 4. le VENT MOYEN en trait plein, avec l'échelle en nœuds à gauche.
+ *
+ * ── UNE SEULE ÉCHELLE DE VENT, JAMAIS AUTOMATIQUE À 100 % ─────────────────
+ * L'échelle part de zéro et monte au moins à 20 nœuds même par temps calme.
+ * Une échelle qui s'ajuste au maximum du jour donne exactement le même dessin
+ * à une journée à 5 nœuds et à une journée à 35 : la courbe monte pareil, et
+ * l'œil retient « ça souffle » dans les deux cas. C'est le pire mensonge qu'un
+ * graphique puisse faire à quelqu'un qui décide de sortir en mer.
+ * ========================================================================== */
+export class Meteogram extends Canvas {
+  constructor(parent, opts = {}) {
+    super(parent, opts.height || 132);
+    this.data = null;
+    this.resize();
+  }
+
+  /**
+   * @param {Array} hours Heures de la journée (0 h → 23 h), telles que rendues
+   *   par data/weather.js.
+   * @param {{sunriseT:number, sunsetT:number}} [sun] Lever et coucher du jour.
+   * @param {number} [now] Instant courant, pour le repère vertical.
+   */
+  set(hours, sun, now) {
+    this.data = { hours: hours || [], sun, now };
+    this.draw();
+  }
+
+  draw() {
+    const { ctx, w, h } = this;
+    this.clearAll();
+    const hours = this.data?.hours;
+    if (!hours?.length) return;
+    const { sun, now } = this.data;
+    const font = getComputedStyle(document.body).fontFamily;
+
+    const padL = 24;
+    const padR = 26;
+    const padT = 8;
+    const padB = 16;
+    const plotW = Math.max(10, w - padL - padR);
+    const plotH = Math.max(10, h - padT - padB);
+
+    // L'axe des temps couvre la JOURNÉE ENTIÈRE, pas seulement les heures
+    // reçues : si la série commence à 07 h — cas d'aujourd'hui — la courbe doit
+    // se placer à droite dans la journée, pas s'étaler sur toute la largeur
+    // comme si elle la couvrait.
+    const t0 = new Date(hours[0].t).setHours(0, 0, 0, 0);
+    const t1 = t0 + 24 * 3600000;
+    const X = (t) => padL + ((t - t0) / (t1 - t0)) * plotW;
+
+    const gustMax = Math.max(...hours.map((x) => x.windGustKn ?? 0));
+    const windMax = Math.max(...hours.map((x) => x.windSpeedKn ?? 0));
+    const top = Math.max(20, Math.ceil(Math.max(gustMax, windMax) / 5) * 5);
+    const Y = (kn) => padT + plotH - (Math.max(0, kn) / top) * plotH;
+
+    const waveVals = hours.map((x) => x.waveHeightM).filter((v) => typeof v === 'number');
+    const waveTop = waveVals.length ? Math.max(1, Math.ceil(Math.max(...waveVals) * 2) / 2) : 0;
+    const YW = (m) => padT + plotH - (Math.max(0, m) / waveTop) * plotH;
+
+    /* ---- Grille horaire : 00, 06, 12, 18 ---- */
+    ctx.font = `700 8px ${font}`;
+    ctx.textAlign = 'center';
+    for (let hh = 0; hh <= 24; hh += 6) {
+      const x = X(t0 + hh * 3600000);
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
+      ctx.strokeStyle = 'rgba(28,47,71,.75)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      if (hh < 24) {
+        ctx.fillStyle = '#64809d';
+        ctx.fillText(`${String(hh).padStart(2, '0')}h`, x, h - 4);
+      }
+    }
+
+    /* ---- 1. la mer ---- */
+    if (waveTop) {
+      ctx.beginPath();
+      let started = false;
+      for (const x of hours) {
+        if (typeof x.waveHeightM !== 'number') continue;
+        const px = X(x.t);
+        const py = YW(x.waveHeightM);
+        if (!started) { ctx.moveTo(px, padT + plotH); started = true; }
+        ctx.lineTo(px, py);
+      }
+      if (started) {
+        ctx.lineTo(X(hours[hours.length - 1].t), padT + plotH);
+        ctx.closePath();
+        const g = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+        g.addColorStop(0, 'rgba(59,130,246,.42)');
+        g.addColorStop(1, 'rgba(59,130,246,.05)');
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+    }
+
+    /* ---- 2. la nuit, PAR-DESSUS l'aire de mer ----
+     * Elle était dessinée en premier, sous tout le reste : l'aire de mer, qui
+     * est opaque en bas, la recouvrait entièrement — la nuit ne se voyait plus
+     * du tout aux heures qui comptent, celles où l'on part avant le jour. Posée
+     * par-dessus, en voile léger, elle assombrit la zone sans effacer ce qui
+     * est dessous. Elle reste sous les courbes de vent, qui doivent rester
+     * franches. */
+    if (sun?.sunriseT && sun?.sunsetT) {
+      ctx.fillStyle = 'rgba(3,7,14,.42)';
+      const dawn = Math.max(t0, Math.min(t1, sun.sunriseT));
+      const dusk = Math.max(t0, Math.min(t1, sun.sunsetT));
+      ctx.fillRect(padL, padT, X(dawn) - padL, plotH);
+      ctx.fillRect(X(dusk), padT, padL + plotW - X(dusk), plotH);
+      // Deux traits fins aux bornes : sans eux, un voile de 42 % se confond
+      // avec une variation de dégradé et personne ne sait où le jour se lève.
+      ctx.strokeStyle = 'rgba(251,191,36,.35)';
+      ctx.lineWidth = 1;
+      for (const x of [X(dawn), X(dusk)]) {
+        if (x <= padL + 1 || x >= padL + plotW - 1) continue;
+        ctx.beginPath();
+        ctx.moveTo(x, padT);
+        ctx.lineTo(x, padT + plotH);
+        ctx.stroke();
+      }
+    }
+
+    /* ---- 3. les rafales ---- */
+    ctx.beginPath();
+    hours.forEach((x, i) => {
+      const px = X(x.t);
+      const py = Y(x.windGustKn ?? x.windSpeedKn ?? 0);
+      return i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    });
+    for (let i = hours.length - 1; i >= 0; i--) {
+      ctx.lineTo(X(hours[i].t), Y(hours[i].windSpeedKn ?? 0));
+    }
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(251,191,36,.22)';
+    ctx.fill();
+
+    /* ---- 4. le vent moyen ---- */
+    ctx.beginPath();
+    hours.forEach((x, i) => {
+      const px = X(x.t);
+      const py = Y(x.windSpeedKn ?? 0);
+      return i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    });
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    /* ---- Échelles chiffrées ----
+     * Le vent à gauche en nœuds, la mer à droite en mètres. Sans les unités
+     * écrites, deux courbes sur deux axes différents se lisent comme deux
+     * courbes sur le même — et on croit que la mer double quand c'est le vent. */
+    ctx.font = `700 8px ${font}`;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(`${top}`, padL - 3, padT + 7);
+    ctx.fillText('nd', padL - 3, padT + 17);
+    ctx.fillText('0', padL - 3, padT + plotH);
+
+    if (waveTop) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#7dd3fc';
+      ctx.fillText(`${waveTop.toFixed(1)}`, padL + plotW + 3, padT + 7);
+      ctx.fillText('m', padL + plotW + 3, padT + 17);
+    }
+
+    /* ---- Maintenant ---- */
+    if (now >= t0 && now <= t1) {
+      const x = X(now);
+      ctx.beginPath();
+      ctx.moveTo(x, padT);
+      ctx.lineTo(x, padT + plotH);
+      ctx.strokeStyle = 'rgba(232,241,250,.75)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+}

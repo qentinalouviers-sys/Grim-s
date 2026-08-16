@@ -78,7 +78,22 @@ function indexHourly(hourly) {
  *   fetchedAt:number, stale:boolean, source:string
  * }>}
  */
-export async function load(lat, lon, { days = 4, force = false } = {}) {
+/**
+ * Sept jours, et pas quatre.
+ *
+ * Quatre suffisaient pour le scoring : au-delà, une prévision de vent à 96 h ne
+ * vaut plus grand-chose pour décider d'une marée précise. Mais ce n'est pas le
+ * seul usage — on regarde aussi la semaine pour savoir QUEL JOUR sortir, et
+ * cette question-là se pose le lundi pour le week-end. Sept jours, c'est la
+ * limite de l'API marine (huit) moins la marge, et l'horizon au-delà duquel
+ * l'écran devra dire lui-même que la confiance baisse.
+ *
+ * Le coût : 168 heures au lieu de 96, soit ~70 ko en cache au lieu de ~40. Une
+ * seule connexion au port les télécharge, et ils restent lisibles en mer.
+ */
+export const FORECAST_DAYS = 7;
+
+export async function load(lat, lon, { days = FORECAST_DAYS, force = false } = {}) {
   const common = {
     latitude: lat.toFixed(3),
     longitude: lon.toFixed(3),
@@ -87,14 +102,17 @@ export async function load(lat, lon, { days = 4, force = false } = {}) {
   };
 
   const [f, m] = await Promise.all([
+    // `days` fait partie de la clé de cache : sans lui, passer de quatre à sept
+    // jours aurait resservi l'ancienne réponse tronquée jusqu'à sa péremption,
+    // et l'écran de semaine serait resté à moitié vide sans raison visible.
     net.getJSON(q(FORECAST, { ...common, hourly: FORECAST_VARS }), {
-      key: `forecast:${common.latitude},${common.longitude}`,
+      key: `forecast:${common.latitude},${common.longitude}:${days}`,
       maxAgeMs: force ? 0 : 45 * 60_000,
       timeoutMs: 9000,
       force,
     }),
     net.getJSON(q(MARINE, { ...common, hourly: MARINE_VARS }), {
-      key: `marine:${common.latitude},${common.longitude}`,
+      key: `marine:${common.latitude},${common.longitude}:${days}`,
       maxAgeMs: force ? 0 : 60 * 60_000,
       timeoutMs: 9000,
       force,
@@ -171,6 +189,99 @@ export async function load(lat, lon, { days = 4, force = false } = {}) {
     stale: f.stale || m.stale,
     source: f.source === 'network' || m.source === 'network' ? 'network' : f.source,
   };
+}
+
+/* ==========================================================================
+ * Découpage par journée
+ * --------------------------------------------------------------------------
+ * Open-Meteo publie une série horaire continue. Pour choisir un jour, il faut
+ * la couper aux minuits LOCAUX — pas toutes les 24 heures depuis maintenant :
+ * « demain » commence à minuit, pas à cette heure-ci demain, et un pêcheur qui
+ * regarde samedi veut samedi entier, de 00 h à 23 h.
+ *
+ * Le passage à l'heure d'été est géré sans y penser : on avance de jour en
+ * jour avec setDate(), qui respecte le calendrier local, plutôt qu'en
+ * additionnant 86 400 000 ms — ce qui décalerait tout d'une heure deux fois
+ * par an, et donc d'une heure de marée.
+ * ========================================================================== */
+
+/**
+ * @returns {{start:number, end:number, hours:Array, summary:{
+ *   windMaxKn:number, windMinKn:number, gustMaxKn:number, windDirDeg:number|null,
+ *   waveMaxM:number|null, seaTempC:number|null, airMaxC:number|null,
+ *   airMinC:number|null, precipMm:number, cloudPct:number|null }}[]}
+ */
+export function byDay(hourly, maxDays = FORECAST_DAYS) {
+  if (!hourly?.length) return [];
+  const days = [];
+  const cursor = new Date(hourly[0].t);
+  cursor.setHours(0, 0, 0, 0);
+
+  for (let d = 0; d < maxDays; d++) {
+    const start = cursor.getTime();
+    const nextDay = new Date(start);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const end = nextDay.getTime();
+    const hours = hourly.filter((h) => h.t >= start && h.t < end);
+    // Une journée sans aucune heure signifie qu'on est au bout de la série :
+    // rien à afficher, et surtout pas une carte vide qui ferait croire à une
+    // panne. On s'arrête.
+    if (!hours.length) break;
+    days.push({ start, end, hours, summary: summarize(hours) });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return days;
+}
+
+/** Agrégats d'une journée. `null` quand la donnée manque — jamais zéro. */
+function summarize(hours) {
+  const nums = (k) => hours.map((h) => h[k]).filter((v) => typeof v === 'number');
+  const max = (k) => (nums(k).length ? Math.max(...nums(k)) : null);
+  const min = (k) => (nums(k).length ? Math.min(...nums(k)) : null);
+  const avg = (k) => (nums(k).length ? nums(k).reduce((a, b) => a + b, 0) / nums(k).length : null);
+
+  /* Direction dominante : moyenne VECTORIELLE, pas arithmétique. Une journée de
+   * vent de nord oscillant entre 350° et 10° donnerait 180° — plein sud, soit
+   * l'exact opposé — si on faisait la moyenne des nombres. On pondère par la
+   * vitesse : l'heure où il souffle à 25 nd pèse plus que celle à 3 nd, ce qui
+   * est bien la direction qu'on veut retenir de la journée. */
+  let sx = 0;
+  let sy = 0;
+  for (const h of hours) {
+    if (typeof h.windDirDeg !== 'number') continue;
+    const w = h.windSpeedKn ?? 1;
+    const r = (h.windDirDeg * Math.PI) / 180;
+    sx += Math.sin(r) * w;
+    sy += Math.cos(r) * w;
+  }
+  const windDirDeg = sx || sy ? (Math.atan2(sx, sy) * 180) / Math.PI : null;
+
+  return {
+    windMaxKn: max('windSpeedKn'),
+    windMinKn: min('windSpeedKn'),
+    gustMaxKn: max('windGustKn'),
+    windDirDeg: windDirDeg == null ? null : (windDirDeg + 360) % 360,
+    waveMaxM: max('waveHeightM'),
+    seaTempC: avg('seaTempC'),
+    airMaxC: max('airTempC'),
+    airMinC: min('airTempC'),
+    precipMm: hours.reduce((a, h) => a + (h.precipMm || 0), 0),
+    cloudPct: avg('cloudPct'),
+  };
+}
+
+/**
+ * La confiance décroît avec l'échéance, et l'écran doit le dire. Ce ne sont pas
+ * des pourcentages inventés : c'est l'ordre de grandeur admis pour les modèles
+ * globaux dont Open-Meteo tire ses données — bon à 48 h, utilisable à 4 jours,
+ * indicatif au-delà. Une prévision de vent à 7 jours sert à choisir un
+ * week-end, pas à décider d'une sortie.
+ */
+export function confidence(dayStart, now = Date.now()) {
+  const h = (dayStart - now) / 3600000;
+  if (h < 48) return { level: 'high', label: 'fiable' };
+  if (h < 96) return { level: 'fair', label: 'à confirmer' };
+  return { level: 'low', label: 'tendance seulement' };
 }
 
 /** Point horaire le plus proche de t. */
