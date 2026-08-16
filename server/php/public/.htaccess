@@ -1,0 +1,27 @@
+# ==========================================================================
+# .htaccess — réécriture et en-têtes, pour Apache (OVH mutualisé)
+# ==========================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Apache en CGI/FastCGI — c'est le cas chez OVH — n'expose PAS l'en-tête
+    # Authorization à PHP. Sans cette ligne, tout marche en local et CHAQUE
+    # appel authentifié répond 401 en production, sans autre indice. C'est le
+    # piège numéro un de ce type d'hébergement.
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Tout vers le point d'entrée, sauf les fichiers réellement présents.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Rien à indexer ici : c'est une API, pas un site.
+<IfModule mod_headers.c>
+    Header set X-Robots-Tag "noindex, nofollow"
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+Options -Indexes

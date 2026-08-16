@@ -1,0 +1,6 @@
+# Contient le mot de passe de la base : n'a rien à faire dans un dépôt, même
+# privé. Le modèle à copier est `config.sample.php`.
+config.php
+
+# La base SQLite de développement, et ses journaux WAL.
+data/

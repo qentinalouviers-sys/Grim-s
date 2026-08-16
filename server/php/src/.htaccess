@@ -1,0 +1,14 @@
+# Ce dossier ne doit jamais être servi. Il l'est pourtant si vous déposez
+# l'ensemble dans `www/` au lieu de garder `src/` au-dessus de la racine web —
+# et sur mutualisé, c'est souvent le seul dépôt possible.
+#
+# Les deux syntaxes cohabitent volontairement : la première pour Apache 2.4,
+# la seconde pour 2.2. Celle qui n'est pas comprise est ignorée.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

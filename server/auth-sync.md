@@ -190,10 +190,27 @@ connexion.
 Tout ce qui a changé **strictement après** `since`, pour ce compte uniquement.
 `since=0` au premier appel : renvoyer alors tout le compte.
 
-`serverNow` est réutilisé tel quel comme `since` du tour suivant. Il doit donc
-être **l'heure du serveur au moment de la lecture**, pas celle du dernier
-enregistrement — sinon un enregistrement écrit pendant la requête est sauté
-pour toujours.
+`serverNow` est réutilisé tel quel comme `since` du tour suivant. C'est un
+**curseur opaque** : le client ne l'interprète jamais, il le range et le rend.
+
+> **Correction apportée par l'implémentation** (`server/php/`, et à reprendre
+> dans toute autre). Ce document disait d'y mettre l'heure du serveur. C'est
+> faux sur deux points, et les deux perdent des données en silence :
+>
+> - **`updatedAt` ne peut pas servir de curseur.** Il vient du client et sert à
+>   trancher les conflits. Un téléphone dont l'horloge retarde de dix minutes
+>   pousse une prise datée dans le passé : elle se range *avant* le curseur des
+>   autres appareils, et aucun ne la verra jamais redescendre.
+> - **L'heure du serveur ne suffit pas non plus.** Deux écritures dans la même
+>   milliseconde partagent la même valeur, et une lecture « strictement
+>   supérieure » en saute une définitivement.
+>
+> Il faut donc **deux colonnes** : `updated_at`, venue du client, pour
+> l'arbitrage ; et un entier serveur strictement croissant, alloué à
+> l'écriture, pour le curseur. L'implémentation PHP utilise un compteur
+> incrémenté dans la transaction d'écriture, ce qui ferme aussi la fenêtre où
+> une ligne en cours d'écriture pourrait être enjambée par une lecture
+> simultanée.
 
 **Pagination** : si le compte est gros, renvoyer par tranches avec un
 `serverNow` correspondant à la tranche. Le client rappellera. Ne jamais
