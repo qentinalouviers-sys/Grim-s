@@ -266,8 +266,21 @@ function build() {
    * On lit d'où ça vient sans lire un chiffre — et le chiffre est écrit quand
    * même, en dessous, pour celui qui le veut. */
   const flow = el('div', 'drive-card drive-flow');
-  refs.flowHead = el('div', 'drive-lbl', 'D’OÙ VIENT LE COURANT');
-  flow.append(refs.flowHead);
+  /* Le titre dit CE QUI EST DESSINÉ, et le badge de droite dit le régime —
+   * flot, jusant, étale — qui commande la couleur des vagues.
+   *
+   * L'ancien titre était « D'OÙ VIENT LE COURANT », et il mentait par
+   * omission : le cadran est alimenté par la DÉRIVE, c'est-à-dire le courant
+   * de marée PLUS le fardage du vent sur la coque. La question est venue telle
+   * quelle — « en orange, c'est le courant ou le vent ? » — et la bonne réponse
+   * était « les deux ». Un instrument qui répond à côté de son étiquette n'est
+   * pas un instrument. Et sans le badge, l'orange n'était expliqué nulle part :
+   * dans la prévision météo, l'ambre est la couleur du vent. */
+  const flowHead = el('div', 'drive-flow-head');
+  refs.flowHead = el('span', 'drive-lbl', 'CE QUI PORTE LE BATEAU');
+  refs.flowSense = el('span', 'drive-lbl drive-flow-sense', '');
+  flowHead.append(refs.flowHead, el('div', 'spacer'), refs.flowSense);
+  flow.append(flowHead);
   const fWrap = el('div');
   flow.append(fWrap);
   /* Plus court dès qu'une route est armée. Mesuré sur iPhone SE : à 92 px de
@@ -410,22 +423,44 @@ function render() {
     r.append(el('span', 'drive-sea-k', k), el('span', 'drive-sea-v tnum', v));
     sea.append(r);
   };
-  seaLine('Courant', `${fmt.num(st.spd, 1)} nd → ${fmt.heading(st.dir)} ${fmt.cardinal(st.dir)}`);
+  /* « Courant de marée » et non « Courant » : le cadran au-dessus affiche la
+   * DÉRIVE, qui vaut le courant plus le fardage. Deux chiffres différents pour
+   * deux grandeurs différentes — quand ils portaient le même nom, l'écart de
+   * six degrés entre les deux passait pour une erreur de l'app. */
+  seaLine('Courant de marée', `${fmt.num(st.spd, 1)} nd → ${fmt.heading(st.dir)} ${fmt.cardinal(st.dir)}`);
 
   /* Les vagues suivent la DÉRIVE réelle du bateau — courant de marée plus
      fardage — et non le seul courant de marée : c'est cette eau-là qui
      déplace la coque, et c'est elle qu'on sent. */
+  const drift = stream.driftVector(now, pos, wx);
   if (widgets.flow) {
-    const d = stream.driftVector(now, pos, wx);
-    const calm = d.sense === 'slack' || d.spd < 0.15;
+    const calm = drift.sense === 'slack' || drift.spd < 0.15;
+    // Le régime explique la couleur : cyan au flot, orange au jusant, gris à
+    // l'étale. Écrit, il n'y a plus à le deviner.
+    refs.flowSense.textContent = calm ? 'ÉTALE'
+      : drift.sense === 'ebb' ? 'JUSANT' : 'FLOT';
+    refs.flowSense.className = `drive-lbl drive-flow-sense ${
+      calm ? '' : drift.sense === 'ebb' ? 'is-ebb' : 'is-flood'}`;
+
     // Deux étiquettes, une par bord : collées bout à bout, la vitesse sortait
     // du cadre sur un écran de 320 px et se faisait couper. Mesuré.
+    //
+    // « Vient de » ET « porte au » : pour un courant, la convention marine est
+    // le sens VERS lequel il porte — « il porte au 236 ». N'écrire que d'où il
+    // vient le faisait lire comme un vent, qui se nomme lui par son origine.
     widgets.flow.label = calm
       ? 'ÉTALE — l’eau ne porte plus'
-      : `VIENT ${fmt.cardinalFrom(norm360(d.dir + 180)).toUpperCase()}`;
-    widgets.flow.label2 = calm ? '' : `${fmt.num(d.spd, 1)} nd → ${fmt.heading(d.dir)}`;
-    widgets.flow.set({ dir: d.dir, spd: d.spd, sense: d.sense },
+      : `VIENT ${fmt.cardinalFrom(norm360(drift.dir + 180)).toUpperCase()}`;
+    widgets.flow.label2 = calm ? ''
+      : `PORTE AU ${fmt.heading(drift.dir)} ${fmt.cardinal(drift.dir)} · ${fmt.num(drift.spd, 1)} nd`;
+    widgets.flow.set({ dir: drift.dir, spd: drift.spd, sense: drift.sense },
       state.heading?.deg ?? state.fix?.cogDeg);
+  }
+  /* La part du vent, écrite dès qu'elle pèse. C'est la réponse à « c'est le
+   * courant ou le vent ? » : les deux, et voilà combien de chacun. */
+  const lee = drift.leeway?.spd || 0;
+  if (lee > 0.08) {
+    seaLine('dont fardage du vent', `${fmt.num(lee, 1)} nd → ${fmt.heading(drift.leeway.dir)}`);
   }
   seaLine('Marée', `${fmt.num(tide.height(now), 1)} m · ${tide.rate(now) >= 0 ? 'montante' : 'descendante'}`);
   if (wx) seaLine('Vent', `${fmt.windFrom(wx.windDirDeg)} · ${Math.round(wx.windSpeedKn)} nd`);

@@ -2254,6 +2254,13 @@ body.angling .fab { display: none; }
    au-dessus du canevas, pas dedans : dessiné dans le canevas il aurait fallu
    le redessiner soixante fois par seconde avec les vagues, pour un texte qui
    ne change qu'au changement de marée. */
+/* L'en-tête du cadran de dérive : ce que c'est à gauche, le régime de marée à
+   droite. Le régime porte la couleur des vagues — sans lui, l'orange du jusant
+   se confondait avec l'ambre du vent employé dans la prévision. */
+.drive-flow-head { display: flex; align-items: baseline; gap: 8px; }
+.drive-flow-sense { color: var(--txt-3); letter-spacing: .12em; }
+.drive-flow-sense.is-ebb { color: var(--ebb); }
+.drive-flow-sense.is-flood { color: var(--flood); }
 .drive-flow { padding: 7px 10px 8px; }
 .drive-flow .drive-lbl { margin-bottom: 4px; }
 .drive-flow canvas { border-radius: var(--r-sm); display: block; }
