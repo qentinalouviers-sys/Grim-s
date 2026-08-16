@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.32.0';
+const VERSION = 'v1.33.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -83,6 +83,7 @@ const SHELL_FILES = [
   'js/ui/forecast.js',
   'js/ui/wxalertform.js',
   'js/ui/soundingpad.js',
+  'js/ui/isobaths.js',
   'js/views/nav.js',
   'js/views/pilot.js',
   'js/views/drive.js',
@@ -168,6 +169,7 @@ self.addEventListener('fetch', (e) => {
   if (
     url.hostname.includes('tile.openstreetmap.org') ||
     url.hostname.includes('tiles.openseamap.org') ||
+    url.hostname.includes('emodnet') ||
     url.hostname.includes('open-meteo.com') ||
     url.hostname.includes('overpass') ||
     url.hostname.includes('shom.fr')

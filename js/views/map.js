@@ -30,6 +30,8 @@ import * as stream from '../data/stream.js';
 import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
 import * as soundings from '../fishing/soundings.js';
+import * as isobaths from '../ui/isobaths.js';
+import * as bathy from '../data/bathy.js';
 import * as tide from '../data/tide.js';
 import * as gps from '../sensors/gps.js';
 import * as idb from '../core/idb.js';
@@ -65,6 +67,11 @@ let ui = {
   // soi-même, elle est rare et chère à obtenir — la cacher par défaut serait
   // la faire oublier.
   soundings: true,
+  // Les isobathes et le dégradé de profondeur : éteints au départ. Ce sont des
+  // couches de TRAVAIL, qu'on allume pour chercher un poste — pas pour rentrer
+  // au port de nuit, où elles ne feraient que charger l'écran.
+  isobaths: false,
+  depthShade: false,
   // Éteinte au départ : la nature des fonds est une couche de TRAVAIL, on
   // l'allume quand on cherche un poste, pas quand on rentre au port de nuit.
   seabed: false,
@@ -196,6 +203,28 @@ export async function mount(container) {
   layers.spots = L.layerGroup().addTo(map);
   layers.catches = L.layerGroup().addTo(map);
   layers.soundings = L.layerGroup().addTo(map);
+  layers.isobaths = isobaths.create(L);
+
+  /* Le dégradé de profondeur d'EMODnet, en CC-BY. C'est la seule imagerie de
+   * fonds à la fois gratuite, redistribuable et couvrant toute la zone. Elle
+   * donne le RELIEF en couleur, pas les chiffres — les chiffres viennent du
+   * carnet de sondes et les lignes du modèle embarqué.
+   *
+   * Semi-transparente et posée SOUS le balisage : une carte de fonds qui
+   * recouvre les bouées est une carte dangereuse. */
+  layers.depthShade = makeCachedLayer(
+    L,
+    'https://tiles.emodnet-bathymetry.eu/2020/baselayer/web_mercator/{z}/{x}/{y}.png',
+    {
+      maxZoom: 12,
+      // maxNativeZoom : au-delà de 12 le service ne produit plus de tuiles ;
+      // sans ça, Leaflet en demande et la carte devient blanche en zoomant.
+      maxNativeZoom: 12,
+      opacity: 0.55,
+      attribution: '© EMODnet Bathymetry (CC-BY)',
+    },
+    'emodnet',
+  );
   layers.boat = L.layerGroup().addTo(map);
   // La flotte au-dessus des marques : un bateau qui bouge prime sur un point fixe.
   layers.fleet = L.layerGroup().addTo(map);
@@ -221,11 +250,12 @@ export async function mount(container) {
     lastZoom = z;
     if (crossed) drawSpots();
     drawSoundings();
+    drawIsobaths();
   });
   // Les sondes se dessinent par emprise visible : sans redessin au
   // déplacement, on sort du cadre initial et la carte paraît vide alors que le
   // carnet est plein.
-  map.on('moveend', () => drawSoundings());
+  map.on('moveend', () => { drawSoundings(); drawIsobaths(); });
   // Appui long. `contextmenu` suffit sur desktop et Android, mais Safari iOS
   // ne le déclenche pas de façon fiable au toucher : on double avec un vrai
   // détecteur d'appui long, annulé au moindre déplacement (sinon un début de
@@ -406,6 +436,27 @@ function buildOverlay() {
     } else map.removeLayer(layers.vectors);
     markToggle(refs.btnVec, ui.vectors);
   }, true);
+  refs.btnIso = menuItem('〰️', 'Lignes de fond', 'Isobathes 5 · 10 · 20 · 30 m', () => {
+    if (!isobaths.available()) {
+      return void toast('Modèle de fonds non installé — voir data/README-bathymetrie.md', 'warn', 4000);
+    }
+    ui.isobaths = !ui.isobaths;
+    if (ui.isobaths) {
+      layers.isobaths.addTo(map);
+      drawIsobaths();
+    } else map.removeLayer(layers.isobaths);
+    markToggle(refs.btnIso, ui.isobaths);
+  }, true);
+  refs.btnShade = menuItem('🌊', 'Dégradé de profondeur', 'Relief coloré — EMODnet', () => {
+    ui.depthShade = !ui.depthShade;
+    if (ui.depthShade) {
+      layers.depthShade.addTo(map);
+      // Sous le balisage et sous les marques : une couche de fond reste au fond.
+      layers.depthShade.bringToBack();
+      layers.base.bringToBack();
+    } else map.removeLayer(layers.depthShade);
+    markToggle(refs.btnShade, ui.depthShade);
+  }, true);
   refs.btnSnd = menuItem('📏', 'Mes sondes', 'Relevées au sondeur du bord', () => {
     ui.soundings = !ui.soundings;
     if (ui.soundings) {
@@ -424,10 +475,13 @@ function buildOverlay() {
   }, true);
   refs.btnDriftPanel = menuItem('⏳', 'Dérive prévue', 'Où je passe, moteur coupé',
     () => setDrift(!ui.drift), true);
-  card.append(refs.btnSea, refs.btnGround, refs.btnVec, refs.btnSnd, refs.btnCatch, refs.btnDriftPanel);
+  card.append(refs.btnSea, refs.btnGround, refs.btnShade, refs.btnIso, refs.btnVec,
+    refs.btnSnd, refs.btnCatch, refs.btnDriftPanel);
   markToggle(refs.btnSea, ui.seamarks);
   markToggle(refs.btnGround, ui.seabed);
   markToggle(refs.btnVec, ui.vectors);
+  markToggle(refs.btnShade, ui.depthShade);
+  markToggle(refs.btnIso, ui.isobaths);
   markToggle(refs.btnSnd, ui.soundings);
   markToggle(refs.btnCatch, ui.catches);
   markToggle(refs.btnDriftPanel, ui.drift);
@@ -825,6 +879,14 @@ function drawBoat() {
  * donc que l'emprise visible, à partir du zoom 13 — l'échelle à laquelle deux
  * sondes distantes de cent mètres ne se chevauchent plus — et on plafonne.
  * ========================================================================== */
+function drawIsobaths() {
+  if (!layers.isobaths || !ui.isobaths) return;
+  const r = isobaths.refresh(layers.isobaths, map.getBounds(), map.getZoom());
+  // Zéro segment n'est pas une panne : c'est un fond régulier, ou un zoom
+  // trop large. On ne dit rien plutôt que d'alarmer sur un non-évènement.
+  return r;
+}
+
 const SND_MIN_ZOOM = 13;
 const SND_MAX_DRAWN = 400;
 

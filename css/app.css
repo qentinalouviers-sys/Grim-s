@@ -1661,6 +1661,15 @@ input[type=range]::-moz-range-thumb {
    mesure, pas un évènement de pêche. */
 .fm-sound { border-color: rgba(34,211,238,.55); background: rgba(34,211,238,.12); color: var(--cyan); }
 
+/* L'étiquette d'une isobathe : le seul moyen de savoir quelle ligne bleue est
+   laquelle. Halo sombre pour tenir sur un fond de carte clair comme foncé. */
+.iso-lbl {
+  font: 800 10px/1 var(--font);
+  text-shadow: 0 0 3px #050b14, 0 0 3px #050b14, 0 0 3px #050b14;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* Une sonde du carnet, sur la carte. Pas d'épingle : un CHIFFRE, comme sur
    une carte marine — c'est la valeur qu'on lit, pas l'emplacement qu'on
    cherche. Le halo sombre le détache du fond de carte clair comme du sombre. */
