@@ -54,19 +54,32 @@ export function cardinalLong(deg) {
 }
 
 /**
+ * Le secteur précédé de sa préposition : « du nord-ouest », « de l'est ».
+ *
+ * Élision. « de est-sud-est » ne s'écrit pas et ne se dit pas : six des seize
+ * secteurs commencent par une voyelle (est…, ouest…) et prennent d'. Et « de
+ * nord » ne se dit pas non plus — on dit « du nord ». Une seule règle, ici,
+ * pour tout ce qui vient d'un secteur : le vent, le courant, la houle.
+ */
+export function cardinalFrom(deg) {
+  if (!Number.isFinite(deg)) return '—';
+  const s = CARDINALS_LONG[sector(deg)];
+  return /^[aeiou]/.test(s) ? `de l’${s}` : `du ${s}`;
+}
+
+/**
  * Le vent, écrit comme on le dit à bord : « vent de nord-ouest ».
  *
  * La direction météo est celle D'OÙ vient le vent — c'est ce que renvoie
  * Open-Meteo (`wind_direction_10m`) et c'est ce que dit la préposition « de ».
  * Le courant, lui, se donne dans le sens où il PORTE : les deux ne s'écrivent
  * donc pas de la même façon, et les confondre inverse une information de
- * sécurité de cent-quatre-vingts degrés.
+ * sécurité de cent-quatre-vingts degrés. C'est pourquoi le mode navigation
+ * écrit les DEUX pour le courant : d'où il vient, et vers où il porte.
  */
 export function windFrom(deg) {
   if (!Number.isFinite(deg)) return 'vent indisponible';
   const s = CARDINALS_LONG[sector(deg)];
-  // Élision. « vent de est-sud-est » ne s'écrit pas et ne se dit pas : six des
-  // seize secteurs commencent par une voyelle (est…, ouest…) et prennent d'.
   return `vent d${/^[aeiou]/.test(s) ? '’' : 'e '}${s}`;
 }
 

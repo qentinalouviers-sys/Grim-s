@@ -1857,3 +1857,11 @@ body.angling .fab { display: none; }
    ferait un émoji monochrome, et s'aligne sur la ligne de base au lieu de
    flotter au-dessus. */
 .helm-ico { display: inline-grid; place-items: center; line-height: 0; color: currentColor; }
+
+/* Le courant en vagues, sous le compas du mode navigation. Le titre est
+   au-dessus du canevas, pas dedans : dessiné dans le canevas il aurait fallu
+   le redessiner soixante fois par seconde avec les vagues, pour un texte qui
+   ne change qu'au changement de marée. */
+.drive-flow { padding: 7px 10px 8px; }
+.drive-flow .drive-lbl { margin-bottom: 4px; }
+.drive-flow canvas { border-radius: var(--r-sm); display: block; }

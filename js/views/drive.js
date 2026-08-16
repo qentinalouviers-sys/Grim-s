@@ -32,13 +32,14 @@
 
 import { state, subscribe, on, emit } from '../core/store.js';
 import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
-import { Compass, CDI } from '../ui/widgets.js';
+import { Compass, CDI, CurrentFlow } from '../ui/widgets.js';
 import * as fmt from '../core/fmt.js';
 import * as route from '../nav/route.js';
 import * as stream from '../data/stream.js';
 import * as tide from '../data/tide.js';
 import * as weather from '../data/weather.js';
 import * as spots from '../fishing/spots.js';
+import { norm360 } from '../core/geo.js';
 import { openDestinationPicker } from '../ui/destination.js';
 
 let root;
@@ -232,7 +233,10 @@ function build() {
   const cap = el('div', 'drive-card');
   const cWrap = el('div');
   cap.append(cWrap);
-  widgets.compass = new Compass(cWrap, { height: 94 });
+  // Un peu plus court avec un but : le compas porte alors deux relèvements et
+  // se lit d'un coup d'œil ; sans but il est le seul instrument de cap, et il
+  // mérite ses dix pixels de plus.
+  widgets.compass = new Compass(cWrap, { height: nav ? 84 : 94 });
 
   const capRow = el('div', 'drive-cap');
   const left = el('div');
@@ -247,6 +251,25 @@ function build() {
   capRow.append(left, el('div', 'spacer'), right);
   cap.append(capRow);
   box.append(cap);
+
+  /* ---- D'où vient l'eau --------------------------------------------------- *
+   * Juste sous le compas, et dans la même logique : le bateau est fixe,
+   * étrave en haut, et c'est le monde qui tourne autour. Les vagues traversent
+   * l'écran dans le sens où l'eau porte réellement, à la vitesse du courant.
+   * On lit d'où ça vient sans lire un chiffre — et le chiffre est écrit quand
+   * même, en dessous, pour celui qui le veut. */
+  const flow = el('div', 'drive-card drive-flow');
+  refs.flowHead = el('div', 'drive-lbl', 'D’OÙ VIENT LE COURANT');
+  flow.append(refs.flowHead);
+  const fWrap = el('div');
+  flow.append(fWrap);
+  /* Plus court dès qu'une route est armée. Mesuré sur iPhone SE : à 92 px de
+   * haut dans les deux cas, le bandeau poussait la VITESSE sous la ligne de
+   * pliage — or avec un but, l'ordre de barre et la vitesse commandent, le
+   * courant se consulte. Sans but, c'est l'inverse : on dérive, le courant EST
+   * l'information, et il a droit à sa pleine hauteur. */
+  widgets.flow = new CurrentFlow(fWrap, { height: nav ? 60 : 92 });
+  box.append(flow);
 
   /* ---- Ordre de barre — seulement avec un but ---------------------------- *
    * « 12° à droite », pas un écart à interpréter. C'est la seule ligne du
@@ -381,6 +404,22 @@ function render() {
     sea.append(r);
   };
   seaLine('Courant', `${fmt.num(st.spd, 1)} nd → ${fmt.heading(st.dir)} ${fmt.cardinal(st.dir)}`);
+
+  /* Les vagues suivent la DÉRIVE réelle du bateau — courant de marée plus
+     fardage — et non le seul courant de marée : c'est cette eau-là qui
+     déplace la coque, et c'est elle qu'on sent. */
+  if (widgets.flow) {
+    const d = stream.driftVector(now, pos, wx);
+    const calm = d.sense === 'slack' || d.spd < 0.15;
+    // Deux étiquettes, une par bord : collées bout à bout, la vitesse sortait
+    // du cadre sur un écran de 320 px et se faisait couper. Mesuré.
+    widgets.flow.label = calm
+      ? 'ÉTALE — l’eau ne porte plus'
+      : `VIENT ${fmt.cardinalFrom(norm360(d.dir + 180)).toUpperCase()}`;
+    widgets.flow.label2 = calm ? '' : `${fmt.num(d.spd, 1)} nd → ${fmt.heading(d.dir)}`;
+    widgets.flow.set({ dir: d.dir, spd: d.spd, sense: d.sense },
+      state.heading?.deg ?? state.fix?.cogDeg);
+  }
   seaLine('Marée', `${fmt.num(tide.height(now), 1)} m · ${tide.rate(now) >= 0 ? 'montante' : 'descendante'}`);
   if (wx) seaLine('Vent', `${fmt.windFrom(wx.windDirDeg)} · ${Math.round(wx.windSpeedKn)} nd`);
 

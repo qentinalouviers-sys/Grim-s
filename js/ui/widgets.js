@@ -1016,3 +1016,197 @@ export class CurrentRose extends Canvas {
     ctx.fillText('NŒUDS', cx, cy + 9);
   }
 }
+
+/* ==========================================================================
+ * Le courant, en vagues
+ * --------------------------------------------------------------------------
+ * D'OÙ VIENT L'EAU. C'est la question qu'on se pose en dérivant, et aucun
+ * chiffre n'y répond vite : « courant 118° » demande de se représenter une
+ * rose, de la tourner mentalement sur son cap, et de conclure. Trois secondes
+ * de regard baissé pour une information qu'on peut voir.
+ *
+ * Alors on la montre. Le bateau est fixe, étrave en haut — comme sur le
+ * compas, où c'est la rose qui tourne. Les vagues traversent l'écran dans le
+ * sens où l'eau porte VRAIMENT, et leur vitesse suit celle du courant : à
+ * l'étale elles s'arrêtent, à trois nœuds elles filent. On lit d'où ça vient
+ * sans lire un seul chiffre.
+ *
+ * ── LES DEUX CONVENTIONS, ÉCRITES TOUTES LES DEUX ─────────────────────────
+ * Le vent se donne d'où il VIENT, le courant vers où il PORTE. Les confondre
+ * inverse l'information de cent-quatre-vingts degrés. Le titre annonce donc
+ * d'où vient l'eau — ce qu'on a demandé, et ce qu'on ressent à bord — et la
+ * ligne du dessous annonce vers où elle porte, avec son cap. Les deux, jamais
+ * l'un à la place de l'autre.
+ *
+ * ── POURQUOI L'ANIMATION S'ARRÊTE ─────────────────────────────────────────
+ * Une boucle d'animation qui tourne dans un onglet caché vide une batterie
+ * sans rien montrer. Celle-ci se met en pause dès que la page passe en
+ * arrière-plan et reprend au retour.
+ * ========================================================================== */
+export class CurrentFlow extends Canvas {
+  constructor(parent, opts = {}) {
+    super(parent, opts.height || 96);
+    this.vec = null;
+    this.headingDeg = null;
+    this.phase = 0;
+    this.last = 0;
+    this.raf = 0;
+    this.onVis = () => (document.hidden ? this.pause() : this.play());
+    document.addEventListener('visibilitychange', this.onVis);
+    this.resize();
+  }
+
+  /**
+   * @param {{dir:number, spd:number, sense?:string}} vec Direction VERS
+   *   laquelle le courant porte, en degrés vrais, et sa vitesse en nœuds.
+   * @param {number} [headingDeg] Cap du bateau. Sans lui, l'écran est orienté
+   *   au nord — c'est moins parlant, mais c'est honnête : on ne prétend pas
+   *   savoir où pointe l'étrave quand le compas se tait.
+   */
+  set(vec, headingDeg) {
+    this.vec = vec;
+    this.headingDeg = headingDeg;
+    if (!this.raf && !document.hidden) this.play();
+    this.draw();
+  }
+
+  play() {
+    if (this.raf) return;
+    this.last = performance.now();
+    const step = (t) => {
+      const dt = Math.min(0.1, (t - this.last) / 1000);
+      this.last = t;
+      // Une vague par 26 px, et 26 px parcourus par nœud et par seconde : à
+      // deux nœuds la crête met une demi-seconde à traverser un intervalle,
+      // ce qui se voit sans donner le mal de mer.
+      this.phase = (this.phase + dt * 26 * Math.max(0.08, this.vec?.spd ?? 0)) % 26;
+      this.draw();
+      this.raf = requestAnimationFrame(step);
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+
+  pause() {
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  }
+
+  destroy() {
+    this.pause();
+    document.removeEventListener('visibilitychange', this.onVis);
+    super.destroy();
+  }
+
+  draw() {
+    const { ctx, w, h } = this;
+    this.clearAll();
+    if (!this.vec) return;
+    const font = getComputedStyle(document.body).fontFamily;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    /* Angle du courant RELATIF à l'étrave. Sans cap connu, on garde le nord en
+     * haut plutôt que d'inventer une orientation. */
+    const rel = norm360(this.vec.dir - (Number.isFinite(this.headingDeg) ? this.headingDeg : 0));
+    const a = ((rel - 90) * Math.PI) / 180;
+
+    const slack = this.vec.sense === 'slack' || (this.vec.spd ?? 0) < 0.15;
+    const colour = slack ? '#64809d' : this.vec.sense === 'ebb' ? '#fb923c' : '#22d3ee';
+
+    /* ---- Les vagues -------------------------------------------------------
+     * Dessinées dans un repère tourné, sur un carré plus grand que le cadre :
+     * une fois pivoté, un rectangle exact laisserait des coins vides. */
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.clip();
+    ctx.translate(cx, cy);
+    ctx.rotate(a + Math.PI / 2);
+    const D = Math.hypot(w, h);
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let y = -D / 2; y < D / 2; y += 26) {
+      const yy = y + this.phase;
+      const t = 1 - Math.abs(yy) / (D / 2);
+      ctx.globalAlpha = Math.max(0, 0.1 + 0.42 * t);
+      ctx.beginPath();
+      // Un chevron par ligne, pointe vers l'aval : c'est la flèche que
+      // l'utilisateur a demandée, répétée, qui devient un courant.
+      for (let x = -D / 2; x < D / 2; x += 34) {
+        ctx.moveTo(x, yy + 5);
+        ctx.lineTo(x + 11, yy - 4);
+        ctx.lineTo(x + 22, yy + 5);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    /* ---- La flèche maîtresse ---------------------------------------------- */
+    if (!slack) {
+      const L = Math.min(h * 0.34, 30);
+      const tx = cx + Math.cos(a) * L;
+      const ty = cy + Math.sin(a) * L;
+      ctx.save();
+      ctx.strokeStyle = colour;
+      ctx.fillStyle = colour;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = colour;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(cx - Math.cos(a) * L, cy - Math.sin(a) * L);
+      ctx.lineTo(tx, ty);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(tx + Math.cos(a) * 9, ty + Math.sin(a) * 9);
+      ctx.lineTo(tx + Math.cos(a + 2.5) * 11, ty + Math.sin(a + 2.5) * 11);
+      ctx.lineTo(tx + Math.cos(a - 2.5) * 11, ty + Math.sin(a - 2.5) * 11);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /* ---- Le bateau, fixe, étrave en haut ---------------------------------- */
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(0, -13);
+    ctx.lineTo(7, 6);
+    ctx.lineTo(0, 2);
+    ctx.lineTo(-7, 6);
+    ctx.closePath();
+    ctx.fillStyle = '#e8f1fa';
+    ctx.strokeStyle = '#0a1421';
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    /* ---- Ce qu'il faut lire ----------------------------------------------- */
+    ctx.fillStyle = 'rgba(10,20,33,.72)';
+    ctx.fillRect(0, h - 20, w, 20);
+    /* Deux étiquettes, une par bord, et une taille qui CÈDE avant le texte :
+     * « VIENT DE L'EST-NORD-EST » plus la vitesse font 250 px à 11 px, pour un
+     * canevas qui en fait 278 sur un iPhone SE — et moins dès qu'on met le
+     * téléphone dans une coque. On rétrécit jusqu'à ce que ça tienne plutôt
+     * que de couper un mot au milieu. */
+    const left = this.label || '';
+    const right = this.label2 || '';
+    let size = 11;
+    ctx.textBaseline = 'middle';
+    while (size > 8) {
+      ctx.font = `800 ${size}px ${font}`;
+      if (ctx.measureText(left).width + ctx.measureText(right).width + 24 <= w) break;
+      size -= 0.5;
+    }
+    ctx.fillStyle = colour;
+    ctx.textAlign = 'left';
+    ctx.fillText(left, 8, h - 10);
+    if (right) {
+      ctx.textAlign = 'right';
+      ctx.fillText(right, w - 8, h - 10);
+    }
+  }
+}
