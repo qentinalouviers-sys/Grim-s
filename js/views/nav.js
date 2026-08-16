@@ -26,7 +26,7 @@ import * as compass from '../sensors/heading.js';
 import * as spots from '../fishing/spots.js';
 import * as route from '../nav/route.js';
 import { openDestinationPicker } from '../ui/destination.js';
-import { openDriveChooser } from './drive.js';
+import { openDriveChooser, helmIcon } from './drive.js';
 import { sunTimes, moonPhase } from '../data/astro.js';
 
 const HOUR = 3600000;
@@ -110,7 +110,8 @@ export function mount(container) {
    * va, alors que la plupart des sorties commencent sans but — on largue les
    * amarres, on verra sur l'eau. Le mode conduite accepte les deux, et c'est
    * lui qui pose la question. */
-  refs.btnDrive = button('🛞 Mode conduite', 'btn-primary btn-lg', openDriveChooser);
+  refs.btnDrive = button('Mode conduite', 'btn-primary btn-lg', openDriveChooser);
+  refs.btnDrive.prepend(helmIcon(21));
   actions.append(refs.btnDrive);
 
   refs.btnGo = button('🎯 Naviguer vers…', 'btn-lg', () => openDestinationPicker());

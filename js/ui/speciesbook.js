@@ -120,7 +120,25 @@ export function openSpeciesBook(opts = {}) {
 
   paintFilters();
   paint();
-  return openSheet(opts.title || 'Les espèces', body);
+  const sheet = openSheet(opts.title || 'Les espèces', body);
+
+  /* La hauteur de l'en-tête collant se MESURE, elle ne se devine pas : les
+   * titres de section doivent s'arrêter juste dessous, et cette hauteur change
+   * avec la largeur de l'écran, la taille de police du système et la moindre
+   * règle qui touche aux pastilles de filtre. Elle était écrite en dur.
+   * On la remesure aussi quand elle bouge — le compteur passe de « 62 espèces »
+   * à « 3 espèces sur 62 », le clavier s'ouvre, l'appareil tourne. */
+  const applyStickyHeight = () => {
+    const h = Math.round(sticky.getBoundingClientRect().height);
+    if (h > 0) body.style.setProperty('--book-sticky-h', `${h}px`);
+  };
+  applyStickyHeight();
+  try {
+    new ResizeObserver(applyStickyHeight).observe(sticky, { box: 'border-box' });
+  } catch {
+    new ResizeObserver(applyStickyHeight).observe(sticky);
+  }
+  return sheet;
 }
 
 /** Intitulé de la section d'une espèce, dans l'ordre du tri. */

@@ -55,6 +55,29 @@ let lock = null;
  * ========================================================================== */
 
 /**
+ * La barre à roue, dessinée. Le même signe que l'onglet NAV, et pour la même
+ * raison : c'est le geste de CONDUIRE le bateau qu'on désigne, pas celui de
+ * chercher le nord. Aucun émoji ne représente une barre — ☸ est une roue du
+ * dharma et n'a pas de poignées, 🛞 est un pneu de voiture. Alors on la
+ * dessine, une fois, et tous les boutons du mode s'en servent.
+ *
+ * @param {number} px Taille en pixels. Le trait s'épaissit avec elle pour que
+ *   la roue garde le même poids visuel qu'un émoji de la même hauteur.
+ */
+export function helmIcon(px = 19) {
+  const span = el('span', 'helm-ico');
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
+      stroke="currentColor" stroke-width="${(1.9 * 19 / px).toFixed(2)}" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.1"/>
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+      <path d="M12 7.9V2.7M12 16.1v5.2M7.9 12H2.7M16.1 12h5.2
+               M9.1 9.1 5.4 5.4M14.9 9.1 18.6 5.4M9.1 14.9 5.4 18.6M14.9 14.9l3.7 3.7"/>
+    </svg>`;
+  return span;
+}
+
+/**
  * Le choix d'entrée. Deux boutons pleine largeur, rien d'autre : à quai ou en
  * sortie de chenal, on ne lit pas un formulaire.
  */

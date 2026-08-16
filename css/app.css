@@ -306,7 +306,14 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   margin-bottom: 8px;
 }
 .card.tight { padding: 9px 11px; }
-.card.flush { padding: 0; overflow: hidden; }
+/* `overflow: clip` et non `hidden`, et ce n'est pas un détail de style :
+   `hidden` fait de la carte un CONTENEUR DE DÉFILEMENT. Un titre de section
+   collant à l'intérieur colle alors à la CARTE — qui ne défile jamais — au
+   lieu de la feuille, et son `top` le décale simplement vers le bas, pile
+   par-dessus une ligne de la liste. C'est le poisson coupé en deux qu'on
+   voyait dans le catalogue. `clip` découpe pareil sans créer de scrollport.
+   `hidden` reste écrit devant comme repli pour les navigateurs anciens. */
+.card.flush { padding: 0; overflow: hidden; overflow: clip; }
 .card-head {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 9px;
@@ -784,8 +791,12 @@ input[type=range]::-moz-range-thumb {
 .list-section {
   position: sticky;
   /* Juste sous l'en-tête collant : champ de recherche + ligne de filtres +
-     compteur. Une section qui glisse dessous cesse de renseigner. */
-  top: 112px;
+     compteur. Une section qui glisse dessous cesse de renseigner.
+     La hauteur est MESURÉE à l'ouverture, pas devinée : elle valait 112 px en
+     dur pour un en-tête qui en fait 130 depuis que les pastilles de filtre
+     respectent les 44 px de cible tactile. Un décalage figé se démode au
+     premier changement de police, de largeur ou de règle. */
+  top: var(--book-sticky-h, 130px);
   z-index: 2;
   padding: 7px 12px;
   background: var(--bg-2);
@@ -1841,3 +1852,8 @@ body.angling .fab { display: none; }
   font-size: 10.5px; font-weight: 500; letter-spacing: 0;
   color: var(--txt-3); text-transform: none;
 }
+
+/* La barre à roue dans un bouton : elle suit la couleur du texte, comme le
+   ferait un émoji monochrome, et s'aligne sur la ligne de base au lieu de
+   flotter au-dessus. */
+.helm-ico { display: inline-grid; place-items: center; line-height: 0; color: currentColor; }

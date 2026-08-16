@@ -26,6 +26,7 @@ import * as fmt from '../core/fmt.js';
 import * as route from '../nav/route.js';
 import * as spots from '../fishing/spots.js';
 import { openDestinationPicker } from '../ui/destination.js';
+import { helmIcon } from './drive.js';
 
 let root;
 let unsubs = [];
@@ -75,7 +76,8 @@ function idleScreen() {
   box.append(el('p', 'muted', 'Choisis un but : des coordonnées saisies au clavier, une de tes marques, une prise de ton journal, ou le retour au port.'));
   box.append(button('🎯 Choisir une destination', 'btn-primary btn-lg', () => openDestinationPicker()));
   // Ou pas de but du tout : on sort, on verra sur l'eau. Le cockpit sait faire.
-  const libre = button('🛞 Conduite libre, sans but', 'btn-lg', () => emit('goto', 'drive'));
+  const libre = button('Conduite libre, sans but', 'btn-lg', () => emit('goto', 'drive'));
+  libre.prepend(helmIcon(19));
   libre.style.marginTop = '8px';
   box.append(libre);
   return box;
@@ -172,7 +174,9 @@ function build() {
    * route est armée, le premier onglet devient PILOTE et l'écran NAV — donc le
    * bouton d'entrée du mode conduite — n'est plus atteignable. Le cockpit
    * devenait inaccessible exactement au moment où il sert. */
-  root.append(button('🛞 Passer en mode conduite', 'btn-primary btn-lg', () => emit('goto', 'drive')));
+  const toDrive = button('Passer en mode conduite', 'btn-primary btn-lg', () => emit('goto', 'drive'));
+  toDrive.prepend(helmIcon(21));
+  root.append(toDrive);
 
   const acts = el('div', 'btn-row');
   acts.style.margin = '8px 0';
