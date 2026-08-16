@@ -48,6 +48,7 @@ import { state, set, emit, on } from './store.js';
 import * as idb from './idb.js';
 import * as sync from './sync.js';
 import * as spots from '../fishing/spots.js';
+import * as places from '../data/places.js';
 import { distance, bearing } from './geo.js';
 
 export const LEVELS = [
@@ -129,7 +130,11 @@ export async function setLevel(id) {
 function positionToPublish(distress) {
   const fix = state.fix;
   if (!fix || !Number.isFinite(fix.lat)) return null;
-  const port = spots.getPort();
+  /* Le port d'attache CHOISI, et pas Dieppe en dur : amarré au Havre, la
+   * distance à Dieppe dépasse le seuil de quai et la position du bateau à son
+   * ponton partait à la flotte. C'est exactement ce que cette règle existe
+   * pour empêcher. */
+  const port = places.home();
   const dPort = distance(fix, port);
 
   // À quai, jamais — quel que soit le niveau, et même en détresse : au ponton

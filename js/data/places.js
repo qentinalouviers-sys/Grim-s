@@ -34,6 +34,7 @@ import * as net from '../core/net.js';
 import * as idb from '../core/idb.js';
 import { emit } from '../core/store.js';
 import { distance } from '../core/geo.js';
+import * as spots from '../fishing/spots.js';
 
 const GEOCODE = 'https://geocoding-api.open-meteo.com/v1/search';
 const KEY = 'place';
@@ -92,6 +93,35 @@ export async function init() {
 }
 
 export const current = () => chosen;
+
+/* --------------------------------------------------------------------------
+ * Le port d'attache
+ * --------------------------------------------------------------------------
+ * UN SEUL port d'attache dans l'app, et c'est celui qu'on a choisi.
+ *
+ * Ce n'était pas le cas, et ça se voyait au pire endroit : on réglait Le Havre
+ * en haut de la cabine, on appuyait sur « Retour au port », et la route partait
+ * sur Dieppe. Deux notions de « port » cohabitaient — celle du jeu de données
+ * de zone, figée sur Dieppe, et celle de l'utilisateur — et c'est la mauvaise
+ * qui commandait le retour. Une commande de retour au port qui vise le mauvais
+ * port n'est pas un défaut d'affichage : c'est un cap faux donné à quelqu'un
+ * qui rentre, éventuellement de nuit ou dans le mauvais temps.
+ *
+ * La fonction rend donc toujours le port choisi. Quand celui-ci EST le port du
+ * jeu de données — le cas de Dieppe — on garde en plus ses champs de modèle
+ * (la normale à la côte, qui sert au fardage et à l'orientation des secteurs) :
+ * ce serait dommage de les perdre en route.
+ * ------------------------------------------------------------------------ */
+
+/** Distance sous laquelle on considère que c'est le même port. */
+const SAME_PORT_M = 3000;
+
+export function home() {
+  const zone = spots.getPort();
+  if (!chosen) return zone;
+  if (distance(zone, chosen) < SAME_PORT_M) return { ...zone, ...chosen };
+  return { ...chosen };
+}
 
 export async function choose(place) {
   chosen = { ...place };

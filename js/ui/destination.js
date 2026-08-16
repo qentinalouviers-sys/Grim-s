@@ -28,6 +28,7 @@ import * as spots from '../fishing/spots.js';
 import * as learning from '../fishing/learning.js';
 import * as record from '../fishing/record.js';
 import * as route from '../nav/route.js';
+import * as places from '../data/places.js';
 
 /**
  * Ouvre le sélecteur de destination.
@@ -345,7 +346,10 @@ function refsPane(onPick) {
   const wrap = el('div');
   const box = el('div', 'card flush');
   const from = state.fix;
-  const port = spots.getPort();
+  /* Le port d'attache est celui CHOISI dans la cabine, pas celui du jeu de
+   * données de zone : régler Le Havre et voir « Retour Dieppe » ici envoyait
+   * au mauvais endroit celui qui rentre. */
+  const port = places.home();
 
   const entries = [
     { emoji: '🏠', title: `Retour ${port.name}`, sub: 'Port d’attache', p: port },

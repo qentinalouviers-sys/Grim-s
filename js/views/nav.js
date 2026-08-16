@@ -103,8 +103,12 @@ export function mount(container) {
   const row1 = el('div', 'btn-row');
   row1.style.marginTop = '8px';
   refs.btnAnchor = button('⚓ Alerte mouillage', '', toggleAnchor);
+  /* Le port d'attache vient de `places.home()` — le port CHOISI en haut de
+   * l'écran, pas celui du jeu de données de zone. Le libellé porte son nom
+   * pour la même raison : un bouton qui dit seulement « au port » ne permet
+   * pas de s'apercevoir qu'il vise le mauvais. */
   refs.btnHome = button('🏠 Retour au port', '', () => {
-    const p = spots.getPort();
+    const p = places.home();
     route.start({ lat: p.lat, lon: p.lon, name: p.name, kind: 'port' });
   });
   row1.append(refs.btnAnchor, refs.btnHome);
@@ -497,6 +501,10 @@ function render() {
   refs.btnAnchor.className = `btn ${state.anchor?.armed ? 'btn-lime' : ''}`;
   refs.btnTrip.textContent = state.trip ? '⏹ Fin de sortie' : '▶︎ Sortie';
   refs.btnTrip.className = `btn ${state.trip ? 'btn-lime' : ''}`;
+  // Écrit à chaque rendu, donc juste après un changement de port : le nom du
+  // but est sur le bouton, on ne peut plus partir sur le mauvais sans le voir.
+  const homePort = places.home();
+  refs.btnHome.textContent = `🏠 Retour ${homePort.name}`;
 
   renderWatches(now, fix);
   refs.tripInfo.style.whiteSpace = 'pre-line';
