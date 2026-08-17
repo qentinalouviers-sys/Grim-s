@@ -84,10 +84,13 @@ jobs:
   deploy:
     name: Publication
     needs: verify
-    # Comme pour Pages : seule la branche par défaut publie. Une branche de
-    # travail mérite ses vérifications, pas un déploiement en production à
-    # chaque poussée intermédiaire.
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    # Contrairement à Pages — qui n'accepte de publier QUE depuis la branche par
+    # défaut, contrainte de la plateforme — Cloudflare n'impose rien. La branche
+    # de développement peut donc publier, ce qui permet d'éprouver l'API en
+    # ligne avant de fusionner. Toute branche non listée ici ne déploie pas.
+    if: >-
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      || github.ref == 'refs/heads/claude/gps-navigation-mode-4qvlxe'
     runs-on: ubuntu-latest
     defaults:
       run:
