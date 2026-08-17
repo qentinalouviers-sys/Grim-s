@@ -5,10 +5,13 @@
 # Le nom du service, la base, les origines autorisées, les migrations — tout
 # est ici, donc tout se relit, se compare et se corrige par un commit.
 #
-# Deux valeurs sont à remplir UNE fois, après avoir créé la base :
-#   npx wrangler d1 create grims
-# recopiez le `database_id` rendu, et déposez le jeton d'API dans les secrets
-# du dépôt GitHub. Rien d'autre ne demande d'intervention manuelle.
+# `database_id` est renseigné : la base existe. Ce n'est pas un secret — c'est
+# un identifiant de ressource, inutilisable sans jeton, et il a sa place dans
+# un fichier versionné. Les secrets, eux, vivent dans les réglages du dépôt.
+#
+# Il reste donc à déposer CLOUDFLARE_API_TOKEN et CLOUDFLARE_ACCOUNT_ID dans
+# Settings → Secrets and variables → Actions. Rien d'autre ne demande
+# d'intervention manuelle.
 # ==========================================================================
 
 name = "grims-api"
@@ -22,7 +25,7 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "grims"
-database_id = "à-remplir-après-wrangler-d1-create"
+database_id = "976054a8-a96f-4f7c-b931-48b8f14d9e23"
 migrations_dir = "migrations"
 
 [vars]

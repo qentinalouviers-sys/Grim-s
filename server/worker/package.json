@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "wrangler dev --env dev --local --port 8788 --ip 127.0.0.1",
     "migrate:local": "wrangler d1 migrations apply grims-dev --env dev --local",
-    "migrate:prod": "wrangler d1 migrations apply grims --remote",
-    "deploy": "wrangler deploy",
+    "migrate:prod": "wrangler d1 migrations apply grims --remote --env=\"\"",
+    "deploy": "wrangler deploy --env=\"\"",
     "test": "node tests/run.mjs"
   },
   "devDependencies": {

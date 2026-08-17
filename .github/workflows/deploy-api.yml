@@ -109,11 +109,15 @@ jobs:
       # d'une colonne que l'ancien schéma n'a pas, jamais l'inverse. Dans
       # l'autre ordre, il existe une fenêtre où le code déployé interroge une
       # table qui n'existe pas encore.
+      # `--env=""` désigne explicitement l'environnement de tête. Le fichier en
+      # définit deux (celui-ci et `dev`, purement local) : sans la mention,
+      # wrangler avertit qu'il devine, et deviner sur un déploiement est
+      # exactement ce qu'on ne veut pas.
       - name: Migrations D1
-        run: npx wrangler d1 migrations apply grims --remote
+        run: npx wrangler d1 migrations apply grims --remote --env=""
 
       - name: Déploiement du Worker
-        run: npx wrangler deploy
+        run: npx wrangler deploy --env=""
 
       # Une sonde après coup : sans elle, un déploiement « réussi » qui rend un
       # 500 à chaque appel passerait pour vert.
