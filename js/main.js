@@ -21,6 +21,7 @@ import * as idb from './core/idb.js';
 import * as presence from './core/presence.js';
 import * as profile from './core/profile.js';
 import * as dom from './ui/dom.js';
+import * as boat from './ui/boat.js';
 import * as sos from './ui/sos.js';
 import * as account from './ui/account.js';
 import * as anchorwatch from './core/anchorwatch.js';
@@ -169,6 +170,42 @@ async function boot() {
   }
   install.maybeOffer();
   lockOrientation();
+  offerBoatSetup();
+}
+
+/* ==========================================================================
+ * Première configuration du bateau
+ * --------------------------------------------------------------------------
+ * Juste après la première connexion, et une seule fois.
+ *
+ * On ne le demande QU'UNE FOIS, même si la fiche reste vide. Redemander à
+ * chaque lancement est la façon la plus sûre de faire fermer un écran sans le
+ * lire — et la fiche reste accessible depuis les réglages, tandis que l'écran
+ * de détresse redemande lui-même ce qui lui manque, au moment où ça compte.
+ *
+ * On attend aussi que le reste soit affiché : ouvrir un formulaire sur une app
+ * encore vide donne l'impression d'un questionnaire à franchir avant d'avoir
+ * vu à quoi elle sert.
+ * ========================================================================== */
+async function offerBoatSetup() {
+  if (!sync.isLoggedIn()) return;
+  if (profile.isComplete()) return;
+  if (await idb.get('kv', 'boatPrompted')) return;
+
+  // Le portail des capteurs passe d'abord : demander l'accès au GPS puis
+  // enchaîner sur un formulaire ferait deux écrans superposés au premier
+  // lancement, et c'est le second qui masquerait le premier.
+  if (!(await idb.get('kv', 'onboarded'))) return;
+
+  await idb.put('kv', 'boatPrompted', true);
+  setTimeout(() => {
+    boat.openBoatForm({
+      firstRun: true,
+      onSaved: (p) => {
+        if (p) dom.toast('Les conseils tiennent compte de ce bateau à partir de maintenant.', 'good');
+      },
+    });
+  }, 900);
 }
 
 /* ==========================================================================

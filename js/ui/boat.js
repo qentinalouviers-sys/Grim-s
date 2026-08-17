@@ -18,10 +18,21 @@
 import { el, clear, button, toast, openSheet, closeSheet } from './dom.js';
 import * as profile from '../core/profile.js';
 
-export function openBoatForm({ onSaved = null } = {}) {
+/**
+ * @param {object}   opts
+ * @param {Function} opts.onSaved   appelé avec le profil enregistré
+ * @param {boolean}  opts.firstRun  première configuration, juste après la
+ *   création du compte : le ton change, un mot explique pourquoi on demande
+ *   tout ça, et « Plus tard » apparaît. Ce n'est pas un questionnaire
+ *   administratif — chaque champ sert à quelque chose, et l'écran doit le dire
+ *   plutôt que de laisser croire à une formalité.
+ */
+export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   const p = profile.get();
   const draft = {
     boatName: p.boatName || '',
+    immat: p.immat || '',
+    mmsi: p.mmsi || '',
     hull: p.hull,
     lengthM: p.lengthM,
     propulsion: p.propulsion,
@@ -32,6 +43,15 @@ export function openBoatForm({ onSaved = null } = {}) {
 
   const body = el('div');
   const summary = el('div', 'tiny');
+
+  if (firstRun) {
+    body.append(el('p', 'tiny',
+      'Une seule fois, et l’app travaille ensuite pour ce bateau-là. Le nom part '
+      + 'dans le message de détresse ; la coque et la longueur décident de ce que '
+      + 'l’app considère comme une mer praticable — une mer de 1,2 m ne veut pas '
+      + 'dire la même chose sous un semi-rigide de 5 m et sous une coque dure de 8 m.'));
+    body.append(el('div', 'hr'));
+  }
 
   /* ---- Nom -------------------------------------------------------------- */
   const f1 = el('div', 'field');
@@ -48,6 +68,50 @@ export function openBoatForm({ onSaved = null } = {}) {
   f1.append(name);
   body.append(f1);
   body.append(el('p', 'tiny', 'C’est ce nom qui part à la VHF dans le message de détresse, et celui qui identifiera le bateau dans la communauté.'));
+
+  /* ---- Immatriculation et MMSI ------------------------------------------
+   * Deux identifiants, deux usages distincts. L'immatriculation est peinte sur
+   * la coque : c'est elle que demandent les affaires maritimes et le CROSS
+   * quand quelqu'un signale un bateau. Le MMSI est celui de la VHF ASN : s'il
+   * est renseigné, un appel de détresse numérique porte l'identité du bateau
+   * sans que personne ait à parler — ce qui compte exactement au moment où on
+   * n'a plus les mains libres.
+   *
+   * Les deux sont facultatifs, et le disent. Un champ obligatoire qu'on ne
+   * connaît pas par cœur fait abandonner le formulaire entier.            */
+  const fImm = el('div', 'field');
+  fImm.append(el('label', null, 'Immatriculation'));
+  const immat = document.createElement('input');
+  immat.type = 'text';
+  immat.value = draft.immat;
+  immat.placeholder = 'Ex. DP 123456';
+  immat.autocapitalize = 'characters';
+  immat.autocorrect = 'off';
+  immat.spellcheck = false;
+  immat.addEventListener('input', () => { draft.immat = immat.value; });
+  fImm.append(immat);
+  body.append(fImm);
+
+  const fMmsi = el('div', 'field');
+  fMmsi.append(el('label', null, 'MMSI de la VHF'));
+  const mmsi = document.createElement('input');
+  mmsi.type = 'text';
+  mmsi.inputMode = 'numeric';
+  mmsi.value = draft.mmsi;
+  mmsi.placeholder = '9 chiffres — si tu as une VHF ASN';
+  mmsi.maxLength = 9;
+  mmsi.addEventListener('input', () => {
+    // Seulement des chiffres : un MMSI mal saisi ne sert à rien, et le corriger
+    // à la volée évite de faire échouer l'enregistrement sur une faute de frappe.
+    mmsi.value = mmsi.value.replace(/\D/g, '').slice(0, 9);
+    draft.mmsi = mmsi.value;
+  });
+  fMmsi.append(mmsi);
+  body.append(fMmsi);
+  body.append(el('p', 'tiny',
+    'Facultatifs tous les deux. L’immatriculation identifie le bateau auprès du '
+    + 'CROSS ; le MMSI permet à la VHF de lancer un appel de détresse numérique '
+    + 'sans avoir à parler.'));
 
   /* ---- Coque ------------------------------------------------------------ */
   body.append(el('div', 'field-label', 'Type de coque'));
@@ -150,13 +214,31 @@ export function openBoatForm({ onSaved = null } = {}) {
   body.append(el('div', 'hr'));
   body.append(summary);
 
-  body.append(button('Enregistrer', 'btn-primary btn-lg', async () => {
+  body.append(button(firstRun ? 'Continuer' : 'Enregistrer', 'btn-primary btn-lg', async () => {
     if (!draft.boatName.trim()) return void toast('Il faut au moins un nom de bateau', 'danger');
-    const saved = await profile.save({ ...draft, boatName: draft.boatName.trim() });
+    const saved = await profile.save({
+      ...draft,
+      boatName: draft.boatName.trim(),
+      immat: draft.immat.trim().toUpperCase(),
+      mmsi: draft.mmsi.trim(),
+    });
     closeSheet();
-    toast('Fiche bateau enregistrée', 'good');
+    toast(firstRun ? `Bienvenue à bord, ${saved.boatName}.` : 'Fiche bateau enregistrée', 'good');
     onSaved?.(saved);
   }));
+
+  /* « Plus tard » n'existe qu'à la première configuration, et il existe pour de
+   * bon : bloquer quelqu'un derrière un formulaire dans une app qui porte un
+   * bouton SOS serait un mauvais échange. La fiche reste accessible depuis les
+   * réglages, et l'écran de détresse redemande ce qui lui manque au moment où
+   * il en a besoin. */
+  if (firstRun) {
+    body.append(button('Plus tard', 'btn-ghost', () => {
+      closeSheet();
+      toast('Tu pourras remplir la fiche à tout moment depuis les réglages.', '');
+      onSaved?.(null);
+    }));
+  }
 
   function paint() {
     for (const b of hullBox.querySelectorAll('[data-hull]')) {
@@ -177,5 +259,5 @@ export function openBoatForm({ onSaved = null } = {}) {
   }
 
   paint();
-  return openSheet('Mon bateau', body);
+  return openSheet(firstRun ? 'Ton bateau' : 'Mon bateau', body);
 }

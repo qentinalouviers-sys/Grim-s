@@ -161,9 +161,18 @@ export function maydayText(fix, settings = {}) {
   const boat = (settings.boatName || 'NOM DU BATEAU').toUpperCase();
   const pob = settings.pob ? `${settings.pob} personne${settings.pob > 1 ? 's' : ''} à bord` : 'NOMBRE DE PERSONNES À BORD';
   const pos = fix ? `${fmt.latDDM(fix.lat)} ${fmt.lonDDM(fix.lon)}` : 'POSITION';
+
+  /* L'immatriculation n'apparaît que si elle est connue. Une ligne
+   * « IMMATRICULATION » en majuscules d'attente, au milieu d'un message qu'on
+   * lit à voix haute sous adrénaline, ferait buter sur un mot inutile : le nom
+   * du bateau suffit à s'identifier, l'immatriculation ne fait que confirmer. */
+  const ident = settings.immat
+    ? `Ici ${boat}, immatriculé ${String(settings.immat).toUpperCase()}`
+    : `Ici ${boat}, ${boat}, ${boat}`;
+
   return [
     'MAYDAY MAYDAY MAYDAY',
-    `Ici ${boat}, ${boat}, ${boat}`,
+    ident,
     `MAYDAY ${boat}`,
     `Ma position : ${pos}`,
     'Nature de la détresse : (voie d’eau / incendie / homme à la mer / échouement)',

@@ -60,6 +60,14 @@ const EMPTY = {
   version: 1,
   id: null,
   boatName: '',
+  /* Immatriculation portée sur la coque — « DP 123456 » dans le quartier de
+   * Dieppe. C'est elle que demandent les affaires maritimes et le CROSS quand
+   * ils cherchent à identifier un bateau signalé. */
+  immat: '',
+  /* MMSI : les neuf chiffres de la VHF ASN. S'il est renseigné, un appel de
+   * détresse numérique porte l'identité du bateau sans que personne ait à
+   * parler — ce qui compte quand on n'a plus les mains libres. */
+  mmsi: '',
   hull: null,
   lengthM: null,
   propulsion: null,
@@ -114,9 +122,17 @@ export async function save(patch) {
   set({ profile: next });
   await idb.put('kv', 'profile', next);
 
-  // Le nom du bateau et l'équipage restent aussi dans les réglages : l'écran
-  // SOS les lit là, et il ne doit dépendre de rien qui puisse manquer.
-  const settings = { ...(state.settings || {}), boatName: next.boatName, pob: next.pob, updatedAt: now };
+  // Le nom du bateau, l'équipage et les identifiants restent aussi dans les
+  // réglages : l'écran SOS les lit là, et il ne doit dépendre de rien qui
+  // puisse manquer au moment où on en a besoin.
+  const settings = {
+    ...(state.settings || {}),
+    boatName: next.boatName,
+    pob: next.pob,
+    immat: next.immat,
+    mmsi: next.mmsi,
+    updatedAt: now,
+  };
   set({ settings });
   await idb.put('kv', 'settings', settings);
 
