@@ -39,7 +39,7 @@ ALLOWED_ORIGINS = "https://qentinalouviers-sys.github.io,http://localhost:8099,h
 
 # Adresse publique du Worker, pour composer le lien de réinitialisation envoyé
 # par courriel. À corriger le jour où un vrai nom de domaine est branché.
-PUBLIC_URL = ""
+PUBLIC_URL = "https://grims-api.qentina-louviers.workers.dev"
 
 # Expéditeur des courriels. Tant qu'il est vide — ou que le secret SMTP_KEY
 # manque — la route « mot de passe oublié » répond 501, et l'app affiche

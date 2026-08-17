@@ -33,7 +33,7 @@ import * as kdf from './kdf.js';
 /* --- URL de l'API. Surchargable en dev via localStorage.grimsApiBase ------- */
 export const API_BASE =
   (typeof localStorage !== 'undefined' && localStorage.getItem('grimsApiBase')) ||
-  'https://grims.eviatek.fr';
+  'https://grims-api.qentina-louviers.workers.dev';
 
 const FETCH_TIMEOUT = 15000;
 

@@ -122,18 +122,26 @@ jobs:
       - name: Déploiement du Worker
         run: npx wrangler deploy --env=""
 
-      # Une sonde après coup : sans elle, un déploiement « réussi » qui rend un
-      # 500 à chaque appel passerait pour vert.
-      - name: Vérification en production
+      # La recette COMPLÈTE contre la production, pas une simple sonde.
+      #
+      # Un `/api/health` vert ne prouve presque rien : le CORS et le passage de
+      # l'en-tête `Authorization` sont précisément ce qui fonctionne partout
+      # ailleurs et casse une fois en ligne. Ils ne se voient qu'en faisant le
+      # vrai parcours, depuis une machine qui n'est pas celle du développement.
+      #
+      # La recette ne touche à aucune donnée existante : elle crée un compte à
+      # l'adresse aléatoire, s'en sert, puis le supprime. Elle laisse seulement
+      # l'adresse IP du runner en limitation de débit une minute, ce qui ne
+      # concerne personne d'autre.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Recette contre la production
         env:
-          API_URL: ${{ vars.API_URL }}
+          # Pas un secret : l'adresse publique du Worker. La variable de dépôt
+          # la remplace si le nom change un jour.
+          API_URL: ${{ vars.API_URL || 'https://grims-api.qentina-louviers.workers.dev' }}
         run: |
-          if [ -z "$API_URL" ]; then
-            echo "Variable API_URL non renseignée — sonde ignorée."
-            echo "Renseignez l'adresse du Worker dans Settings → Variables → Actions"
-            echo "pour que chaque déploiement soit vérifié au lieu d'être supposé bon."
-            exit 0
-          fi
-          code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$API_URL/api/health")
-          cat /tmp/health.json; echo
-          test "$code" = "200"
+          echo "Cible : $API_URL"
+          php ../php/tests/acceptance.php "$API_URL"

@@ -3,7 +3,7 @@
 Le client est livré et fonctionnel dans l'application (`js/core/presence.js`).
 Il lui manque cette route côté serveur, sur la même API que la
 synchronisation — celle que `js/core/sync.js` appelle sur `API_BASE`
-(`https://grims.eviatek.fr` par défaut).
+(`https://grims-api.qentina-louviers.workers.dev` par défaut).
 
 Tant que la route n'existe pas, l'app ne montre **rien** : pas d'onglet vide,
 pas d'erreur en boucle. Le client tente une fois, reçoit un 404, et se tait

@@ -1,7 +1,7 @@
 # Compte et synchronisation — le contrat serveur
 
 Le client est livré et complet dans `js/core/sync.js` et `js/ui/account.js`. Il
-appelle `API_BASE` — `https://grims.eviatek.fr` par défaut, surchargeable en
+appelle `API_BASE` — `https://grims-api.qentina-louviers.workers.dev` par défaut, surchargeable en
 développement par `localStorage.grimsApiBase`.
 
 Ce document décrit **exactement** ce que le serveur doit répondre. Les codes
@@ -18,8 +18,8 @@ synchronisation est un plus, jamais un socle.
 
 - **Toujours du JSON**, y compris sur les erreurs : `{"error": "code_machine"}`.
   Le client lit `error` avant le statut HTTP.
-- **HTTPS obligatoire.** Le client envoie un mot de passe en clair dans le
-  corps ; c'est TLS qui le protège, il n'y a rien d'autre.
+- **HTTPS obligatoire.** Le corps porte une clé qui vaut mot de passe pour qui
+  l'intercepte ; c'est TLS qui la protège, il n'y a rien d'autre.
 - **Le serveur fait foi sur l'heure.** Les horodatages venus du client servent
   à ordonner ses propres enregistrements, jamais à décider d'une expiration.
 - **CORS** : l'app est servie depuis une autre origine (GitHub Pages ou le
@@ -86,13 +86,14 @@ passe pour qui l'intercepte, exactement comme un mot de passe.
 | `email_taken` | un compte existe déjà |
 | `rate_limited` | trop de tentatives depuis cette adresse IP |
 
-Le mot de passe se hache avec **argon2id** ou **bcrypt** (coût ≥ 12). Jamais
-de SHA seul, jamais en clair, jamais réversible : ce fichier de comptes
-contiendra des mots de passe réutilisés ailleurs par leurs propriétaires.
+La clé reçue se hache avant stockage — jamais en clair, jamais réversible.
+**argon2id** ou **bcrypt** (coût ≥ 12) là où le temps processeur le permet ;
+un PBKDF2 court suffit là où il ne le permet pas, pour la raison expliquée en
+0 bis : l'entrée est déjà étirée.
 
-**Minimum huit caractères**, comme le client le vérifie déjà. Ne pas exiger de
-majuscule ni de caractère spécial : ces règles produisent des mots de passe
-plus courts et notés sur un papier.
+**La longueur minimale ne se vérifie plus ici** — huit caractères, tenus par le
+client. Ne pas exiger de majuscule ni de caractère spécial : ces règles
+produisent des mots de passe plus courts et notés sur un papier.
 
 ---
 

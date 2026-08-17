@@ -10,7 +10,14 @@
  *   php -S 127.0.0.1:8787 -t public public/index.php &
  *   php tests/acceptance.php http://127.0.0.1:8787
  *
- * La base est vidée au début : ne la lancez jamais sur une base réelle.
+ * ELLE SE LANCE AUSSI CONTRE LA PRODUCTION, et c'est même là qu'elle sert le
+ * plus : le CORS et le passage de l'en-tête `Authorization` fonctionnent
+ * partout en développement et cassent une fois en ligne. Un `/api/health` vert
+ * ne les éprouve pas.
+ *
+ * Elle ne touche à aucune donnée existante : elle crée un compte à une adresse
+ * tirée au hasard, s'en sert, puis le supprime. Le seul effet qui survit est
+ * l'adresse IP de l'appelant en limitation de débit pendant une minute.
  * ========================================================================== */
 
 declare(strict_types=1);
