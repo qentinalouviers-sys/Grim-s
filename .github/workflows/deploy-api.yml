@@ -10,9 +10,17 @@ name: Déploiement de l'API (Cloudflare Workers)
 #   1. Créer la base :          npx wrangler d1 create grims
 #      puis recopier le `database_id` rendu dans server/worker/wrangler.toml.
 #
-#   2. Déposer deux secrets dans Settings → Secrets and variables → Actions :
+#   2. Déposer les secrets dans Settings → Secrets and variables → Actions :
+#
+#      Indispensables :
 #        CLOUDFLARE_API_TOKEN   jeton d'API, limité aux Workers et à D1
 #        CLOUDFLARE_ACCOUNT_ID  visible sur le tableau de bord Cloudflare
+#
+#      Facultatifs, poussés vers le Worker à chaque déploiement :
+#        ADMIN_EMAILS   adresses des administrateurs, séparées par des virgules.
+#                       Absent, PERSONNE n'administre — c'est le bon défaut.
+#        INVITE_CODE    code d'invitation exigé à l'inscription.
+#                       Absent, l'inscription reste ouverte.
 #
 #      Le jeton se crée sur le tableau de bord Cloudflare, en partant du modèle
 #      « Edit Cloudflare Workers » et en y ajoutant « D1 : Edit ». Ne prenez
@@ -146,6 +154,42 @@ jobs:
 
       - name: Déploiement du Worker
         run: npx wrangler deploy --env=""
+
+      # Les secrets d'exploitation, poussés depuis ceux du dépôt.
+      #
+      # ADMIN_EMAILS et INVITE_CODE ne peuvent pas vivre dans wrangler.toml :
+      # le dépôt est public, les y écrire publierait l'adresse de qui
+      # administre le service et le code qui en ouvre l'accès.
+      #
+      # Ils passaient donc par `wrangler secret put` à la main — ce qui suppose
+      # un terminal, Node et une session Cloudflare. C'est une marche trop
+      # haute pour un réglage qu'on fait une fois : le secret restait absent,
+      # et l'entrée d'administration n'apparaissait jamais. Déposer le secret
+      # dans GitHub se fait depuis un navigateur, téléphone compris.
+      #
+      # Un secret vide ou absent ne pousse RIEN : sans ce garde-fou, un dépôt
+      # qui ne les définit pas les écraserait par du vide à chaque livraison —
+      # et couperait l'administration à la première publication venue.
+      #
+      # La valeur ne transite que par l'entrée standard : elle n'apparaît ni
+      # dans la ligne de commande, ni dans les journaux, ni dans `ps`.
+      - name: Secrets d'exploitation
+        env:
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+          INVITE_CODE: ${{ secrets.INVITE_CODE }}
+        run: |
+          if [ -n "$ADMIN_EMAILS" ]; then
+            printf '%s' "$ADMIN_EMAILS" | npx wrangler secret put ADMIN_EMAILS --env=""
+            echo "ADMIN_EMAILS : posé"
+          else
+            echo "ADMIN_EMAILS : non défini dans le dépôt — inchangé sur le Worker"
+          fi
+          if [ -n "$INVITE_CODE" ]; then
+            printf '%s' "$INVITE_CODE" | npx wrangler secret put INVITE_CODE --env=""
+            echo "INVITE_CODE : posé"
+          else
+            echo "INVITE_CODE : non défini dans le dépôt — inchangé sur le Worker"
+          fi
 
       # La recette COMPLÈTE contre la production, pas une simple sonde.
       #
