@@ -191,6 +191,51 @@ jobs:
             echo "INVITE_CODE : non défini dans le dépôt — inchangé sur le Worker"
           fi
 
+      # Le secret est-il ARRIVÉ ?
+      #
+      # « wrangler secret put a rendu 0 » ne prouve pas que le Worker en tienne
+      # compte : il reste le redémarrage, la bonne cible d'environnement, et le
+      # code qui lit la variable. C'est le genre d'écart qui ne se voit qu'en
+      # interrogeant le service lui-même — et qui, ici, laisse l'administration
+      # inaccessible sans qu'aucune étape ne rougisse.
+      #
+      # On compare donc ce qu'on a poussé à ce que le Worker déclare. Un écart
+      # fait ÉCHOUER la livraison : une administration qu'on croit active et
+      # qui ne l'est pas est pire qu'une panne visible.
+      #
+      # `/api/health` ne rend que des booléens, jamais les adresses : la page
+      # est publique et doit le rester.
+      - name: Le Worker connaît-il ses secrets ?
+        env:
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+          INVITE_CODE: ${{ secrets.INVITE_CODE }}
+          API_URL: ${{ vars.API_URL || 'https://grims-api.qentina-louviers.workers.dev' }}
+        run: |
+          sante=$(curl -sS --max-time 20 "$API_URL/api/health")
+          echo "$sante"
+          lu() { printf '%s' "$1" | node -e "
+            let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{
+              try { console.log(JSON.parse(s)[process.argv[1]] === true ? 'oui' : 'non') }
+              catch { console.log('illisible') }
+            })" "$2"; }
+
+          admin=$(lu "$sante" adminConfigured)
+          invit=$(lu "$sante" invitesOnly)
+          echo "administration active : $admin"
+          echo "inscription sur invitation : $invit"
+
+          if [ -n "$ADMIN_EMAILS" ] && [ "$admin" != "oui" ]; then
+            echo "::error::ADMIN_EMAILS est défini dans le dépôt mais le Worker ne le voit pas — le panneau d'administration resterait inaccessible."
+            exit 1
+          fi
+          if [ -z "$ADMIN_EMAILS" ] && [ "$admin" = "oui" ]; then
+            echo "::warning::Le Worker garde un ADMIN_EMAILS qui ne vient pas de ce dépôt (posé à la main ?)."
+          fi
+          if [ -n "$INVITE_CODE" ] && [ "$invit" != "oui" ]; then
+            echo "::error::INVITE_CODE est défini dans le dépôt mais l'inscription reste ouverte."
+            exit 1
+          fi
+
       # La recette COMPLÈTE contre la production, pas une simple sonde.
       #
       # Un `/api/health` vert ne prouve presque rien : le CORS et le passage de
