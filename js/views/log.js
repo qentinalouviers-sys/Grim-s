@@ -129,6 +129,21 @@ async function render() {
   alertRow.addEventListener('click', () => openAlerts());
   acctCard.append(alertRow);
 
+  /* Cobaturage : sa place est ici parce qu'il tient au compte — une sortie se
+   * propose sous un nom de bateau, et les avis se rattachent à la personne. */
+  const crewRow = el('button', 'list-item');
+  crewRow.type = 'button';
+  const crewMain = el('div', 'list-main');
+  crewMain.append(el('div', 'list-title', '⛵ Cobaturage'));
+  crewMain.append(el('div', 'list-sub',
+    'Embarquer des équipiers en partageant les frais réels de la sortie, ou trouver une place à bord.'));
+  crewRow.append(crewMain, el('span', 'chev', '›'));
+  crewRow.addEventListener('click', async () => {
+    const { openCrew } = await import('../ui/crew.js');
+    openCrew();
+  });
+  acctCard.append(crewRow);
+
   box.append(acctCard);
 
   /* ══ Carnet de sondes ═════════════════════════════════════════════════

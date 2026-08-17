@@ -37,8 +37,13 @@ function depuis(ms) {
 }
 
 export async function openAdmin() {
-  const body = openSheet('Administration');
+  /* `openSheet` rend `{close, back, body}` et attend le contenu en second
+   * argument. Prendre son retour pour l'élément faisait échouer `append` dès
+   * l'ouverture — trouvé en éprouvant l'écran de cobaturage, qui portait la
+   * même faute. */
+  const body = el('div');
   body.append(el('p', 'tiny', 'Chargement…'));
+  openSheet('Administration', body);
 
   let data;
   try {

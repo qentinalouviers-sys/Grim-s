@@ -11,6 +11,7 @@ import { ApiError, corsHeaders, json, readBody } from './http.js';
 import * as auth from './auth.js';
 import * as sync from './sync.js';
 import * as admin from './admin.js';
+import * as crew from './crew.js';
 
 export default {
   async fetch(request, env) {
@@ -73,6 +74,51 @@ export default {
 
         case 'DELETE /api/account':
           return json(await sync.deleteAccount(env, await auth.requireUser(request, env)), 200, cors);
+
+        /* ---- Cobaturage ------------------------------------------------
+         * Toutes authentifiées : une sortie partagée met des gens sur un
+         * bateau ensemble, et cela ne se fait pas sous couvert d'anonymat. */
+        case 'GET /api/crew/trips':
+          return json(await crew.list(env, await auth.requireUser(request, env), url), 200, cors);
+
+        case 'POST /api/crew/publish':
+          return json(
+            await crew.publish(env, await auth.requireUser(request, env), await readBody(request)),
+            200, cors,
+          );
+
+        case 'POST /api/crew/book':
+          return json(
+            await crew.book(env, await auth.requireUser(request, env), await readBody(request)),
+            200, cors,
+          );
+
+        case 'POST /api/crew/decide':
+          return json(
+            await crew.decide(env, await auth.requireUser(request, env), await readBody(request)),
+            200, cors,
+          );
+
+        case 'POST /api/crew/cancel':
+          return json(
+            await crew.cancel(env, await auth.requireUser(request, env), await readBody(request)),
+            200, cors,
+          );
+
+        case 'GET /api/crew/mine':
+          return json(await crew.mine(env, await auth.requireUser(request, env)), 200, cors);
+
+        case 'POST /api/crew/review':
+          return json(
+            await crew.review(env, await auth.requireUser(request, env), await readBody(request)),
+            200, cors,
+          );
+
+        case 'GET /api/crew/reputation':
+          return json(
+            (await auth.requireUser(request, env)) && (await crew.reputation(env, url)),
+            200, cors,
+          );
 
         /* Dit au client s'il doit afficher l'entrée d'administration. Une
          * route à part, sans droit requis : c'est une question sur soi-même,

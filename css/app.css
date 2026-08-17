@@ -1000,6 +1000,30 @@ input[type=range]::-moz-range-thumb {
   font-variant-numeric: tabular-nums;
 }
 
+/* ══ Cobaturage ════════════════════════════════════════════════════════ */
+.crew-head { display: flex; align-items: flex-start; gap: 10px; }
+.crew-head > div:first-child { flex: 1; min-width: 0; }
+.crew-port { font-weight: 650; font-size: 15px; }
+/* Le montant est mis en avant, mais en teinte neutre et non en couleur d'appel :
+   c'est une part de frais, pas un prix — le style ne doit pas suggérer l'inverse. */
+.crew-share {
+  flex: 0 0 auto; font-weight: 700; font-size: 15px;
+  color: var(--txt); font-variant-numeric: tabular-nums;
+}
+.crew-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  margin-top: 6px; font-size: 11.5px; color: var(--txt-3);
+}
+.crew-stars { color: #fbbf24; font-weight: 650; }
+.crew-trip .btn { margin-top: 9px; }
+.crew-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; }
+.crew-calc { background: var(--bg-2); }
+.crew-refused {
+  border-left: 2px solid rgba(239,68,68,.4);
+  padding: 6px 0 6px 10px; margin: 4px 0 12px;
+}
+.crew-term { padding: 3px 0; }
+
 /* ══ Panneau d'administration ══════════════════════════════════════════ */
 .admin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-top: 8px; }
 .admin-tile {

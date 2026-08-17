@@ -98,6 +98,14 @@ jobs:
           # ferait échouer la recette contre la version PHP, qui ne les a pas.
           node tests/admin.mjs http://127.0.0.1:8788 'marée-basse-2026' 'chef@exemple.fr'
 
+          npx wrangler d1 execute grims-dev --env dev --local --command "DELETE FROM attempts"
+
+          # Cobaturage. Le noyau de règles y est éprouvé sans serveur — c'est
+          # lui qui décide si une sortie reste un partage de frais ou devient
+          # du transport de passagers — puis on vérifie que le serveur refuse
+          # ce qu'un client modifié tenterait de forcer.
+          node tests/cobaturage.mjs http://127.0.0.1:8788 'marée-basse-2026'
+
   deploy:
     name: Publication
     needs: verify
