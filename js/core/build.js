@@ -16,4 +16,4 @@
  * l'intégration continue refuse une livraison où les deux ne concordent pas.
  * ========================================================================== */
 
-export const APP_VERSION = 'v1.43.0';
+export const APP_VERSION = 'v1.44.0';

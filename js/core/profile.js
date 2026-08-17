@@ -91,8 +91,41 @@ export function slugify(name) {
 
 export const get = () => state.profile || { ...EMPTY };
 
+/* ==========================================================================
+ * Ce qui est obligatoire, et pourquoi
+ * --------------------------------------------------------------------------
+ * Chaque champ requis l'est parce qu'un autre écran s'en sert, pas pour faire
+ * un dossier. Le nom et l'immatriculation partent dans le message de détresse ;
+ * la coque et la longueur décident de ce que l'app appelle une mer praticable ;
+ * la motorisation et la puissance entrent dans le calcul d'autonomie et de
+ * dérive ; les personnes à bord sont la première question du CROSS.
+ *
+ * Le MMSI reste FACULTATIF, et ce n'est pas un oubli : tous les bateaux n'ont
+ * pas de VHF ASN. Rendre obligatoire un numéro qui n'existe pas ferait inventer
+ * neuf chiffres — et un MMSI faux dans un appel de détresse est pire que pas
+ * de MMSI du tout. Les types de pêche non plus : ils affinent le conseil, ils
+ * ne conditionnent rien.
+ * ========================================================================== */
+export const REQUIRED = [
+  { id: 'boatName', label: 'le nom du bateau' },
+  { id: 'immat', label: 'l’immatriculation' },
+  { id: 'hull', label: 'le type de coque' },
+  { id: 'lengthM', label: 'la longueur' },
+  { id: 'propulsion', label: 'la motorisation' },
+  { id: 'powerHp', label: 'la puissance' },
+  { id: 'pob', label: 'le nombre de personnes à bord' },
+];
+
+/** Les libellés de ce qui manque, dans l'ordre du formulaire. */
+export function missing(p = get()) {
+  return REQUIRED.filter((f) => {
+    const v = p?.[f.id];
+    return v == null || v === '' || (typeof v === 'number' && !(v > 0));
+  }).map((f) => f.label);
+}
+
 /** Le profil est-il assez rempli pour servir — MAYDAY compris ? */
-export const isComplete = (p = get()) => !!(p.boatName && p.hull && p.lengthM);
+export const isComplete = (p = get()) => missing(p).length === 0;
 
 export async function init() {
   const saved = (await idb.get('kv', 'profile')) || null;

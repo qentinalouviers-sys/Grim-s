@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.43.0';
+const VERSION = 'v1.44.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -61,7 +61,6 @@ const SHELL_FILES = [
   'js/data/depth.js',
   'js/data/shomchart.js',
   'js/data/stream.js',
-  'js/data/seamarks.js',
   'js/data/seabed.js',
   'js/data/bathy.js',
   'js/data/wrecks.js',
@@ -105,7 +104,6 @@ const SHELL_FILES = [
   'js/fishing/traces.js',
   'js/fishing/soundings.js',
   'js/views/map.js',
-  'js/views/horizon.js',
   'js/views/fish.js',
   'js/views/log.js',
   'vendor/leaflet/leaflet.js',

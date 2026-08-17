@@ -65,7 +65,6 @@ import * as pilotView from './views/pilot.js';
 import * as driveView from './views/drive.js';
 import * as fishModeView from './views/fishmode.js';
 import * as mapView from './views/map.js';
-import * as horizonView from './views/horizon.js';
 import * as fishView from './views/fish.js';
 import * as logView from './views/log.js';
 
@@ -76,7 +75,6 @@ const VIEWS = {
   drive: driveView,
   'fish-mode': fishModeView,
   map: mapView,
-  horizon: horizonView,
   fish: fishView,
   log: logView,
 };

@@ -142,16 +142,11 @@ async function paintPublish(host) {
    * dont la fiche est visiblement remplie est une impasse : il la rouvre, la
    * voit complète, revient, et lit le même message. Un seul champ manquait —
    * la longueur, avalée par le clavier français dans l'ancien champ numérique. */
-  const p = profile.get();
-  const missing = [
-    !p.boatName && 'le nom du bateau',
-    !p.hull && 'le type de coque',
-    !p.lengthM && 'la longueur',
-  ].filter(Boolean);
+  const missing = profile.missing();
 
   if (missing.length) {
     host.append(el('p', 'tiny',
-      `Il manque ${missing.join(' et ')} dans ta fiche bateau. `
+      `Il manque ${missing.join(', ')} dans ta fiche bateau. `
       + 'Le nom identifie ta sortie et porte tes avis ; la coque et la longueur '
       + 'décident de ce que l’app appelle une mer praticable — ce qui compte '
       + 'quand tu embarques quelqu’un d’autre.'));

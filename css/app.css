@@ -251,7 +251,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 650; letter-spacing: -0.01em; }
   height: calc(var(--tabbar-h) + var(--safe-b));
   padding-bottom: var(--safe-b);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   background: rgba(8,16,27,.96);
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
@@ -1000,6 +1000,17 @@ input[type=range]::-moz-range-thumb {
   font-variant-numeric: tabular-nums;
 }
 
+/* Statut d'un champ, porté par son libellé : la mention reste sous les yeux
+   au moment de remplir, là où un « tous les champs sont obligatoires » en tête
+   d'écran se lit une fois puis s'oublie. */
+.field label .req, .field label .opt {
+  font-weight: 500; letter-spacing: 0; text-transform: none;
+}
+.field label .req { color: #ffb4a2; }
+.field label .opt { color: var(--txt-3); opacity: .75; }
+.req-note { color: #ffb4a2; margin: -4px 0 6px; }
+.opt-note { color: var(--txt-3); opacity: .75; margin: -4px 0 6px; }
+
 /* ══ Cobaturage ════════════════════════════════════════════════════════ */
 .crew-head { display: flex; align-items: flex-start; gap: 10px; }
 .crew-head > div:first-child { flex: 1; min-width: 0; }
@@ -1369,23 +1380,6 @@ input[type=range]::-moz-range-thumb {
   font-size: 15px; font-weight: 650;
 }
 .coord-preview .chip { margin-top: 6px; }
-
-/* ══ Mode horizon ══════════════════════════════════════════════════════ */
-.tap-tempo {
-  width: 100%;
-  min-height: 74px;
-  border-radius: var(--r);
-  background: rgba(167,139,250,.12);
-  border: 1px solid rgba(167,139,250,.45);
-  color: var(--violet);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px;
-  transition: transform .08s ease, background .12s ease;
-}
-.tap-tempo:active { transform: scale(.985); background: rgba(167,139,250,.24); }
-.tap-tempo.on { border-color: var(--lime); color: var(--lime); background: rgba(163,230,53,.12); }
-.tap-main { font-size: 15px; font-weight: 800; letter-spacing: .08em; }
-.tap-sub { font-size: 11.5px; font-weight: 600; opacity: .85; font-variant-numeric: tabular-nums; }
 
 /* ══ Partage par QR ════════════════════════════════════════════════════
    Le code est posé sur du BLANC, toujours, y compris en mode nuit : un

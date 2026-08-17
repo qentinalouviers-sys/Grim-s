@@ -27,6 +27,21 @@ import * as profile from '../core/profile.js';
  *   administratif — chaque champ sert à quelque chose, et l'écran doit le dire
  *   plutôt que de laisser croire à une formalité.
  */
+/**
+ * Libellé de champ, avec son statut.
+ *
+ * Marquer chaque champ vaut mieux qu'un « tous les champs sont obligatoires »
+ * en tête d'écran : cette phrase-là se lit une fois puis disparaît de la
+ * mémoire, alors que la mention reste sous les yeux au moment de remplir.
+ * Et le facultatif est marqué AUSSI — sans quoi on cherche ce qui manque
+ * parmi les champs qu'on avait le droit de laisser vides.
+ */
+function lbl(text, required = true) {
+  const l = el('label', null, text);
+  l.append(el('span', required ? 'req' : 'opt', required ? ' obligatoire' : ' facultatif'));
+  return l;
+}
+
 export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   const p = profile.get();
   const draft = {
@@ -55,7 +70,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
 
   /* ---- Nom -------------------------------------------------------------- */
   const f1 = el('div', 'field');
-  f1.append(el('label', null, 'Nom du bateau'));
+  f1.append(lbl('Nom du bateau'));
   const name = document.createElement('input');
   name.type = 'text';
   name.value = draft.boatName;
@@ -80,7 +95,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
    * Les deux sont facultatifs, et le disent. Un champ obligatoire qu'on ne
    * connaît pas par cœur fait abandonner le formulaire entier.            */
   const fImm = el('div', 'field');
-  fImm.append(el('label', null, 'Immatriculation'));
+  fImm.append(lbl('Immatriculation'));
   const immat = document.createElement('input');
   immat.type = 'text';
   immat.value = draft.immat;
@@ -93,7 +108,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   body.append(fImm);
 
   const fMmsi = el('div', 'field');
-  fMmsi.append(el('label', null, 'MMSI de la VHF'));
+  fMmsi.append(lbl('MMSI de la VHF', false));
   const mmsi = document.createElement('input');
   mmsi.type = 'text';
   mmsi.inputMode = 'numeric';
@@ -115,6 +130,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
 
   /* ---- Coque ------------------------------------------------------------ */
   body.append(el('div', 'field-label', 'Type de coque'));
+  body.append(el('div', 'tiny req-note', 'obligatoire'));
   const hullBox = el('div', 'choice-grid');
   for (const h of profile.HULL_TYPES) {
     const b = el('button', 'choice');
@@ -132,7 +148,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   /* ---- Taille et puissance ---------------------------------------------- */
   const row = el('div', 'grid-2');
   const fLen = el('div', 'field');
-  fLen.append(el('label', null, 'Longueur (m)'));
+  fLen.append(lbl('Longueur (m)'));
   /* Champ TEXTE et non `number` : sur un clavier français, « 6,5 » tapé dans
    * un `type="number"` ressort à « 65 » — la virgule est avalée avant que le
    * code la voie. C'est ce qui laissait la longueur vide, et donc la fiche
@@ -145,7 +161,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   fLen.append(len);
 
   const fPob = el('div', 'field');
-  fPob.append(el('label', null, 'Personnes à bord'));
+  fPob.append(lbl('Personnes à bord'));
   const pob = document.createElement('input');
   pob.type = 'number';
   pob.inputMode = 'numeric';
@@ -161,6 +177,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
 
   /* ---- Motorisation ----------------------------------------------------- */
   body.append(el('div', 'field-label', 'Motorisation'));
+  body.append(el('div', 'tiny req-note', 'obligatoire'));
   const propBox = el('div', 'row wrap');
   for (const m of profile.PROPULSIONS) {
     const b = el('button', 'chip chip-btn', m.name);
@@ -176,7 +193,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
 
   const fHp = el('div', 'field');
   fHp.style.marginTop = '10px';
-  fHp.append(el('label', null, 'Puissance (ch)'));
+  fHp.append(lbl('Puissance (ch)'));
   const hp = document.createElement('input');
   hp.type = 'number';
   hp.inputMode = 'numeric';
@@ -192,6 +209,7 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
 
   /* ---- Types de pêche --------------------------------------------------- */
   body.append(el('div', 'field-label', 'Types de pêche pratiqués'));
+  body.append(el('div', 'tiny opt-note', 'facultatif — affine le conseil'));
   const fishBox = el('div', 'row wrap');
   for (const f of profile.FISHING_TYPES) {
     const b = el('button', 'chip chip-btn', f.name);
@@ -212,7 +230,13 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   body.append(summary);
 
   body.append(button(firstRun ? 'Continuer' : 'Enregistrer', 'btn-primary btn-lg', async () => {
-    if (!draft.boatName.trim()) return void toast('Il faut au moins un nom de bateau', 'danger');
+    /* On refuse en NOMMANT ce qui manque. « Il faut au moins un nom » laissait
+     * croire que le reste était accessoire, alors que la longueur conditionne
+     * les seuils de mer et que l'immatriculation part dans le MAYDAY. */
+    const manque = profile.missing({ ...draft, boatName: draft.boatName.trim() });
+    if (manque.length) {
+      return void toast(`Il manque ${manque.slice(0, 2).join(' et ')}${manque.length > 2 ? ` (+${manque.length - 2})` : ''}.`, 'danger');
+    }
     const saved = await profile.save({
       ...draft,
       boatName: draft.boatName.trim(),
