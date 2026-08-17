@@ -81,6 +81,18 @@ jobs:
           # présence dans le code.
           GRIMS_INVITE='marée-basse-2026' php ../php/tests/acceptance.php http://127.0.0.1:8788
 
+          # La recette se TERMINE en épuisant volontairement la limitation de
+          # débit — c'est sa dernière vérification. Le test suivant part donc
+          # d'une adresse IP déjà bloquée pour une minute, et échouait en
+          # `rate_limited` sur des connexions parfaitement valides.
+          #
+          # On vide le compteur au lieu d'attendre soixante secondes, et au lieu
+          # de relever le plafond : cette limite est la seule chose qui rende
+          # inutile l'essai systématique des mots de passe, elle ne s'assouplit
+          # pas pour arranger un test. C'est une base de développement locale,
+          # la vider n'a aucun effet sur la production.
+          npx wrangler d1 execute grims-dev --env dev --local --command "DELETE FROM attempts"
+
           # Administration et suspension. Séparé de la recette de contrat :
           # ces routes n'existent que sur cette implémentation, et les mêler
           # ferait échouer la recette contre la version PHP, qui ne les a pas.
