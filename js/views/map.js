@@ -687,6 +687,14 @@ function menuItem(glyph, name, hint, onClick, toggle = false) {
     b.append(s);
   }
   b.addEventListener('click', () => {
+    /* Entrée marquée « à venir » : on n'exécute pas l'action, et on DIT
+     * pourquoi. Un bouton qui ne réagit pas se prend pour une panne — la
+     * personne appuie trois fois puis se demande si l'app est cassée. */
+    if (b.dataset.soon) {
+      toast(b.dataset.soon);
+      navigator.vibrate?.(12);
+      return;
+    }
     onClick();
     // Une couche, on en enchaîne souvent deux ou trois : le menu reste ouvert
     // et l'état change sous le doigt. Une action, elle, s'exécute et rend la
@@ -694,6 +702,37 @@ function menuItem(glyph, name, hint, onClick, toggle = false) {
     if (!toggle) closeMenu();
   });
   return b;
+}
+
+/**
+ * Marque une entrée « à venir », ou lui rend son état normal.
+ *
+ * `reason` non vide : la pastille apparaît, le toucher n'active plus rien et
+ * explique ce qui manque. `reason` vide : tout redevient normal.
+ *
+ * Cet état se CALCULE à chaque ouverture du menu, à partir de la disponibilité
+ * réelle de la donnée — jamais d'une liste écrite en dur. Le jour où le modèle
+ * de fonds est importé ou la clé SHOM saisie, la pastille disparaît d'elle-même
+ * et personne n'a à penser à l'enlever.
+ */
+function markSoon(item, reason) {
+  if (!item) return;
+  const on = !!reason;
+  item.dataset.soon = reason || '';
+  if (!reason) delete item.dataset.soon;
+  item.classList.toggle('soon', on);
+  /* `aria-disabled` et non `disabled` : un bouton désactivé n'est plus
+   * atteignable au clavier ni annonçable, alors qu'ici il reste porteur
+   * d'information — et son appui long ouvre toujours l'installation, seule
+   * porte d'entrée pour rendre la fonction disponible. */
+  item.setAttribute('aria-disabled', on ? 'true' : 'false');
+  let badge = item.querySelector('.map-mi-soon');
+  if (on && !badge) {
+    badge = el('span', 'map-mi-soon', 'à venir');
+    item.append(badge);
+  } else if (!on && badge) {
+    badge.remove();
+  }
 }
 
 /** Reflète l'état d'une couche : la case, la couleur, et le mot pour l'oreille
@@ -718,8 +757,37 @@ function setMenu(open) {
   // lignes sur huit. Elle revient dès que le menu se referme.
   if (refs.groundLegend) refs.groundLegend.hidden = ui.menu;
   if (!ui.menu) return;
+  refreshSoon();
   placeMenu();
   navigator.vibrate?.(8);
+}
+
+/**
+ * Recalcule les entrées « à venir » à chaque ouverture du menu.
+ *
+ * Deux fonctions attendent une donnée que le dépôt ne contient pas et que
+ * l'app ne peut pas aller chercher seule : le modèle de fonds (un fichier du
+ * SHOM à importer) et la carte marine officielle (une clé de service). Sans
+ * elles, ces entrées répondaient par un écran d'installation — utile pour qui
+ * sait de quoi il s'agit, déroutant pour tout le monde.
+ *
+ * L'appui long, lui, ouvre toujours l'installation : c'est le seul chemin pour
+ * rendre la fonction disponible, et le supprimer condamnerait ces deux
+ * couches pour de bon.
+ */
+function refreshSoon() {
+  markSoon(
+    refs.btnIso,
+    isobaths.available()
+      ? ''
+      : 'Lignes de fond : il manque le modèle de profondeurs du SHOM. Appui long pour l’importer.',
+  );
+  markSoon(
+    refs.btnShom,
+    shom.ready()
+      ? ''
+      : 'Carte marine SHOM : elle demande une clé du service officiel. Appui long pour la saisir.',
+  );
 }
 
 /**

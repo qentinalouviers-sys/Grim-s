@@ -20,7 +20,7 @@
  * frais et prend une décision de mer sur une prévision de la veille.
  * ========================================================================== */
 
-const VERSION = 'v1.38.0';
+const VERSION = 'v1.39.0';
 const SHELL = `shell-${VERSION}`;
 const DATA = `data-${VERSION}`;
 const VENDOR = 'vendor-v1';
@@ -50,6 +50,7 @@ const SHELL_FILES = [
   'js/core/kdf.js',
   'js/ui/account.js',
   'js/ui/authgate.js',
+  'js/ui/admin.js',
   'js/data/astro.js',
   'js/data/harmonics.js',
   'js/data/tide.js',

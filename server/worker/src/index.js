@@ -10,6 +10,7 @@
 import { ApiError, corsHeaders, json, readBody } from './http.js';
 import * as auth from './auth.js';
 import * as sync from './sync.js';
+import * as admin from './admin.js';
 
 export default {
   async fetch(request, env) {
@@ -72,6 +73,33 @@ export default {
 
         case 'DELETE /api/account':
           return json(await sync.deleteAccount(env, await auth.requireUser(request, env)), 200, cors);
+
+        /* Dit au client s'il doit afficher l'entrée d'administration. Une
+         * route à part, sans droit requis : c'est une question sur soi-même,
+         * et la poser ne doit pas produire un 403 dans les journaux à chaque
+         * ouverture de l'écran de compte. */
+        case 'GET /api/me': {
+          const me = await auth.requireUser(request, env);
+          return json({ ...me, admin: admin.isAdmin(env, me) }, 200, cors);
+        }
+
+        case 'GET /api/admin/overview': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await admin.overview(env), 200, cors);
+        }
+
+        case 'GET /api/admin/users': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await admin.users(env, url), 200, cors);
+        }
+
+        case 'POST /api/admin/suspend': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await admin.suspend(env, me, await readBody(request)), 200, cors);
+        }
 
         default:
           return json({ error: 'not_found' }, 404, cors);

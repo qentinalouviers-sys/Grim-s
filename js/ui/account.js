@@ -63,6 +63,24 @@ function renderConnected(body) {
   }));
   body.append(acts);
 
+  /* Administration : l'entrée n'apparaît que si le SERVEUR reconnaît ce compte
+   * comme administrateur. On ne le déduit pas d'un champ local — un client qui
+   * en déciderait seul serait trivial à convaincre du contraire. Ce que la
+   * réponse change, c'est l'affichage ; les routes, elles, refusent de toute
+   * façon. Et si le réseau manque, l'entrée ne s'affiche pas : administrer
+   * sans serveur n'a de toute manière aucun sens. */
+  const adminHost = el('div');
+  body.append(adminHost);
+  sync.whoAmI().then((me) => {
+    if (!me?.admin) return;
+    const row = el('div', 'btn-row');
+    row.append(button('🛠 Panneau d’administration', 'btn-ghost', async () => {
+      const { openAdmin } = await import('./admin.js');
+      openAdmin();
+    }));
+    adminHost.append(row);
+  });
+
   body.append(el('p', 'tiny',
     'La déconnexion ne supprime rien : tes données restent sur cet appareil. Elles ne seront simplement plus synchronisées.'));
 

@@ -156,7 +156,7 @@ export async function requireUser(request, env) {
   if (!token) fail('unauthorized', 401);
 
   const row = await env.DB.prepare(
-    `SELECT t.token_hash, t.expires_at, t.last_used_at, u.id, u.email, u.name
+    `SELECT t.token_hash, t.expires_at, t.last_used_at, u.id, u.email, u.name, u.suspended
        FROM tokens t JOIN users u ON u.id = t.user_id
       WHERE t.token_hash = ?1`,
   )
@@ -164,6 +164,15 @@ export async function requireUser(request, env) {
     .first();
 
   if (!row) fail('unauthorized', 401);
+
+  /* Compte suspendu : 403 et un code à lui, pas 401.
+   *
+   * Le 401 veut dire « ta session est morte, reconnecte-toi » — un conseil
+   * absurde ici, puisque la connexion échouera aussi. Le client reconnaît ce
+   * code-ci, ferme la session locale et affiche la raison. Sans lui, la
+   * synchro échouerait en silence toutes les cinq minutes pendant que l'écran
+   * afficherait « connecté ». */
+  if (row.suspended === 1) fail('account_suspended', 403);
 
   const now = Math.floor(Date.now() / 1000);
   if (row.expires_at < now) {
@@ -255,7 +264,7 @@ export async function login(request, env, body) {
   assertStretched(body.password);
 
   const u = await env.DB.prepare(
-    'SELECT id, email, name, pass_hash, fail_count, locked_until FROM users WHERE email_key = ?1',
+    'SELECT id, email, name, pass_hash, fail_count, locked_until, suspended FROM users WHERE email_key = ?1',
   )
     .bind(email.toLowerCase())
     .first();
@@ -284,6 +293,11 @@ export async function login(request, env, body) {
      * distinguer les deux revient à publier qui a un compte. */
     fail('bad_credentials', 401);
   }
+
+  /* Le contrôle de suspension vient APRÈS la vérification du mot de passe, et
+   * pas avant : répondre « ce compte est suspendu » à qui ne connaît pas le
+   * mot de passe révélerait à la fois l'existence du compte et son état. */
+  if (u.suspended === 1) fail('account_suspended', 403);
 
   if (u.fail_count !== 0) {
     await env.DB.prepare('UPDATE users SET fail_count = 0, locked_until = 0 WHERE id = ?1')

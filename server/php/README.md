@@ -12,6 +12,14 @@ passe. Aucune bibliothèque à installer, aucun `composer`, aucun `npm` — du P
 > champ `password` porte une clé dérivée par le navigateur, jamais un mot de
 > passe (voir la section 0 bis du contrat) — donc un compte créé sur l'une
 > s'ouvre sur l'autre.
+>
+> **Une exception, assumée : l'administration.** Le panneau d'administration
+> et la suspension de compte (`/api/me`, `/api/admin/*`, colonne `suspended`)
+> n'existent que côté Workers. Les ajouter ici doublerait une surface
+> sensible — droits, suspension, écriture sur les comptes — pour une
+> implémentation qui ne tourne nulle part. Si vous basculez un jour sur ce
+> serveur-ci, il faudra les porter : la recette de contrat, elle, passe sur les
+> deux et ne couvre pas ces routes.
 
 Elle tourne sur **SQLite** pour développer et sur **MySQL** en production. Le
 code métier ignore lequel des deux est en dessous : seul `config.php` change.

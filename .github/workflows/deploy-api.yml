@@ -81,6 +81,11 @@ jobs:
           # présence dans le code.
           GRIMS_INVITE='marée-basse-2026' php ../php/tests/acceptance.php http://127.0.0.1:8788
 
+          # Administration et suspension. Séparé de la recette de contrat :
+          # ces routes n'existent que sur cette implémentation, et les mêler
+          # ferait échouer la recette contre la version PHP, qui ne les a pas.
+          node tests/admin.mjs http://127.0.0.1:8788 'marée-basse-2026' 'chef@exemple.fr'
+
   deploy:
     name: Publication
     needs: verify

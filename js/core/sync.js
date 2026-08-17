@@ -53,6 +53,23 @@ export const onDone = (fn) => on('sync:done', fn);
 export const onStretched = (fn) => on('auth:stretched', fn);
 
 /**
+ * L'appelant administre-t-il ce serveur ?
+ *
+ * On le demande au serveur plutôt que de le déduire d'un champ de la session :
+ * un client qui déciderait lui-même serait trivial à convaincre du contraire,
+ * et les routes d'administration refuseraient de toute façon. Ce que ça change,
+ * c'est seulement l'affichage de l'entrée.
+ */
+export async function whoAmI() {
+  if (!isLoggedIn()) return null;
+  try {
+    return await api('/api/me');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Appel authentifié pour les autres modules — la présence de flotte s'appuie
  * dessus. On expose l'appel, pas le jeton : personne d'autre que ce module ne
  * doit avoir à savoir comment on s'authentifie.
@@ -84,6 +101,14 @@ async function api(path, { method = 'GET', body = null } = {}) {
       if (res.status === 401 && auth?.token && !path.startsWith('/api/auth/')) {
         await persistAuth(null);
         emit('account:expired');
+      }
+      /* COMPTE SUSPENDU. Distinct du 401, et traité à part : « reconnecte-toi »
+       * serait un conseil absurde, puisque la connexion échouera aussi. On
+       * ferme la session locale — sans quoi l'écran afficherait « connecté »
+       * pendant que chaque synchro échoue — et on dit la vraie raison. */
+      if (res.status === 403 && data?.error === 'account_suspended' && auth?.token) {
+        await persistAuth(null);
+        emit('account:suspended');
       }
       const err = new Error(data?.error || `HTTP ${res.status}`);
       err.code = data?.error;

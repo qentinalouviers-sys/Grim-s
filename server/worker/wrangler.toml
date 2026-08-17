@@ -71,10 +71,15 @@ SMTP_URL = ""
 # ==========================================================================
 [env.dev]
 [env.dev.vars]
-# Valeur de développement, volontairement en clair : elle ne protège rien et
-# sert à ce que la recette puisse éprouver la porte. La vraie se dépose en
-# secret, jamais ici.
+# Valeurs de développement, volontairement en clair : elles ne protègent rien
+# et servent à ce que la recette puisse éprouver la porte d'invitation et les
+# droits d'administration. Les vraies se déposent en secret, jamais ici.
+#
+# ADMIN_EMAILS surtout : ce fichier est versionné dans un dépôt PUBLIC, et y
+# écrire une adresse personnelle revient à la publier pour les moissonneurs de
+# courriels. En production :  npx wrangler secret put ADMIN_EMAILS
 INVITE_CODE = "marée-basse-2026"
+ADMIN_EMAILS = "chef@exemple.fr"
 ALLOWED_ORIGINS = "http://localhost:8099,http://127.0.0.1:8099"
 PUBLIC_URL = "http://127.0.0.1:8788"
 MAIL_FROM = ""

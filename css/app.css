@@ -635,6 +635,26 @@ canvas { display: block; max-width: 100%; }
 .map-mi.on .map-mi-state {
   color: #061019; border-color: var(--cyan); background: var(--cyan);
 }
+
+/* ── Entrées « à venir » ───────────────────────────────────────────────
+   Atténuées, mais pas au point de devenir illisibles : elles disent ce que
+   l'app saura faire, et un texte qu'on ne peut plus lire n'apprend rien.
+   La pastille reste à pleine opacité — c'est elle qui porte l'information. */
+.map-mi.soon { opacity: .55; }
+.map-mi.soon .map-mi-state { display: none; }
+.map-mi-soon {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 9.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #ffd9a8;
+  background: rgba(245,158,11,.16);
+  border: 1px solid rgba(245,158,11,.42);
+  white-space: nowrap;
+  opacity: 1;
+}
 .map-panel {
   background: rgba(8,16,27,.94);
   border: 1px solid var(--line);
@@ -958,6 +978,58 @@ input[type=range]::-moz-range-thumb {
   .ag-field { margin-bottom: 8px; }
   .ag-err:empty { display: none; }
   .auth-note { display: none; }
+}
+
+/* ══ Panneau d'administration ══════════════════════════════════════════ */
+.admin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; margin-top: 8px; }
+.admin-tile {
+  background: var(--bg-2); border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm); padding: 10px 11px;
+}
+.admin-tile-val { font-size: 23px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.admin-tile-lab { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+
+.admin-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 6px 0; border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+.admin-row:last-of-type { border-bottom: 0; }
+.admin-row-k { color: var(--txt-2); }
+.admin-row-v { color: var(--txt); font-variant-numeric: tabular-nums; }
+
+.admin-search {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 9px 11px;
+  font-size: 16px;   /* 16 px : en dessous, iOS zoome à la mise au point */
+  color: var(--txt); margin: 8px 0 4px; min-height: 44px;
+}
+
+.admin-user {
+  border: 1px solid var(--line-soft); border-radius: var(--r-sm);
+  padding: 10px 11px; margin-top: 7px;
+  background: rgba(16,29,46,.45);
+}
+/* Un compte suspendu doit se repérer sans lire : la bordure suffit d'un coup
+   d'œil dans une liste longue. */
+.admin-user.is-suspended { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.07); }
+.admin-user-head { display: flex; align-items: flex-start; gap: 8px; }
+.admin-user-id { min-width: 0; flex: 1; }
+.admin-user-name { font-weight: 650; font-size: 14px; }
+.admin-user-mail {
+  font-size: 11.5px; color: var(--txt-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-user-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  margin-top: 6px; font-size: 11px; color: var(--txt-3);
+}
+.admin-badge {
+  flex: 0 0 auto;
+  font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  padding: 3px 7px; border-radius: 999px;
+  color: #ffb4a2; background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.45);
 }
 
 /* ══ Toasts ════════════════════════════════════════════════════════════ */
