@@ -17,6 +17,17 @@ import * as sync from '../core/sync.js';
 
 const nf = new Intl.NumberFormat('fr-FR');
 
+/* Libellés lisibles. Le serveur rend les identifiants bruts — c'est lui qui a
+ * raison : traduire côté serveur figerait le vocabulaire de l'app dans la base. */
+const HULL = {
+  'coque-dure': 'Coque dure', 'semi-rigide': 'Semi-rigide',
+  pneumatique: 'Pneumatique', voilier: 'Voilier',
+};
+const PROP = {
+  'hb-2t': 'Hors-bord 2T', 'hb-4t': 'Hors-bord 4T',
+  'in-board': 'In-board', electrique: 'Électrique', voile: 'Voile',
+};
+
 /** Poids lisible. Un carnet de sondes se compte en centaines de kilooctets. */
 function poids(o) {
   if (!o) return '0 o';
@@ -146,10 +157,32 @@ function userRow(u, us) {
   if (u.suspendu) head.append(el('span', 'admin-badge', 'suspendu'));
   row.append(head);
 
+  /* La fiche bateau, quand elle est renseignée. C'est de l'identité — ce qui
+   * flotte sous ce compte — et pas de l'activité : rien ici ne dit où cette
+   * personne pêche, et le serveur ne le rend pas. */
+  if (u.fiche) {
+    const bits = [
+      u.fiche.coque && HULL[u.fiche.coque],
+      u.fiche.longueurM && `${String(u.fiche.longueurM).replace('.', ',')} m`,
+      u.fiche.motorisation && PROP[u.fiche.motorisation],
+      u.fiche.puissanceCh && `${u.fiche.puissanceCh} ch`,
+      u.fiche.equipage && `${u.fiche.equipage} à bord`,
+    ].filter(Boolean);
+    if (bits.length) row.append(el('div', 'admin-boat', bits.join(' · ')));
+  }
+
   const meta = el('div', 'admin-user-meta');
   meta.append(el('span', null, `inscrit le ${new Date(u.inscritLe).toLocaleDateString('fr-FR')}`));
-  meta.append(el('span', null, `vu ${depuis(u.derniereVenue)}`));
+  // « vu jamais » se lisait mal quand la session n'a jamais resservi.
+  meta.append(el('span', null, u.derniereVenue ? `vu ${depuis(u.derniereVenue)}` : 'jamais revenu'));
   meta.append(el('span', null, `${nf.format(u.enregistrements)} enreg.`));
+
+  const c = u.cobaturage;
+  if (c && (c.sorties || c.embarquements || c.note)) {
+    if (c.sorties) meta.append(el('span', null, `${c.sorties} sortie${c.sorties > 1 ? 's' : ''} proposée${c.sorties > 1 ? 's' : ''}`));
+    if (c.embarquements) meta.append(el('span', null, `${c.embarquements} embarquement${c.embarquements > 1 ? 's' : ''}`));
+    if (c.note) meta.append(el('span', 'admin-note', `★ ${String(c.note.moyenne).replace('.', ',')} (${c.note.n})`));
+  }
   row.append(meta);
 
   if (u.suspendu && u.motif) row.append(el('div', 'tiny c-red', `Motif : ${u.motif}`));

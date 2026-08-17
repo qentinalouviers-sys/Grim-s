@@ -109,12 +109,28 @@ export async function users(env, url) {
   const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
   const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
 
-  /* Aucune jointure sur `data`. La sous-requête compte les lignes du compte,
-   * elle n'en rapporte pas le contenu. */
+  /* UNE SEULE COLLECTION EST LUE : `profile`, et pour ses seuls champs
+   * d'identité — le bateau, sa coque, sa taille, sa motorisation.
+   *
+   * La ligne est celle-ci : l'IDENTITÉ oui, l'ACTIVITÉ jamais. Savoir quels
+   * bateaux fréquentent le service est nécessaire pour l'administrer, a
+   * fortiori depuis que des gens embarquent chez d'autres. Savoir où ils
+   * pêchent ne l'est pas — les marques, les sondes, les traces et les prises
+   * restent hors d'atteinte, et aucune requête de ce fichier ne les touche.
+   *
+   * L'immatriculation et le MMSI ne sortent pas non plus : ils ne servent à
+   * aucune décision d'administration, et un identifiant qu'on n'a pas besoin
+   * de lire est un identifiant qu'on ne lit pas. */
   const sql = `
     SELECT u.id, u.email, u.name, u.created_at, u.suspended, u.suspended_at, u.suspended_reason,
            (SELECT MAX(last_used_at) FROM tokens t WHERE t.user_id = u.id) AS derniere_venue,
-           (SELECT COUNT(*) FROM records r WHERE r.user_id = u.id AND r.deleted = 0) AS enregistrements
+           (SELECT COUNT(*) FROM records r WHERE r.user_id = u.id AND r.deleted = 0) AS enregistrements,
+           (SELECT r.data FROM records r
+             WHERE r.user_id = u.id AND r.collection = 'profile' AND r.deleted = 0) AS profil,
+           (SELECT COUNT(*) FROM trips t WHERE t.captain_id = u.id) AS sorties,
+           (SELECT COUNT(*) FROM bookings b WHERE b.user_id = u.id AND b.status = 'accepted') AS embarquements,
+           (SELECT AVG(stars) FROM reviews rv WHERE rv.target_id = u.id) AS note_moy,
+           (SELECT COUNT(*) FROM reviews rv WHERE rv.target_id = u.id) AS note_n
       FROM users u
      ${q ? 'WHERE u.email_key LIKE ?3 OR LOWER(COALESCE(u.name, \'\')) LIKE ?3' : ''}
      ORDER BY u.created_at DESC
@@ -131,15 +147,46 @@ export async function users(env, url) {
       id: u.id,
       email: u.email,
       bateau: u.name,
+      fiche: boatIdentity(u.profil),
       inscritLe: u.created_at * 1000,
       derniereVenue: u.derniere_venue ? u.derniere_venue * 1000 : null,
       enregistrements: u.enregistrements,
+      cobaturage: {
+        sorties: u.sorties || 0,
+        embarquements: u.embarquements || 0,
+        note: u.note_n ? { moyenne: Math.round(u.note_moy * 10) / 10, n: u.note_n } : null,
+      },
       suspendu: u.suspended === 1,
       suspenduLe: u.suspended_at ? u.suspended_at * 1000 : null,
       motif: u.suspended_reason || null,
     })),
     offset,
     limit,
+  };
+}
+
+/**
+ * Extrait du profil ses seuls champs d'identité.
+ *
+ * On liste ce qu'on prend plutôt que ce qu'on écarte : une liste blanche
+ * survit à l'ajout d'un champ dans le profil, une liste noire non — le jour où
+ * quelqu'un ajoute une donnée sensible à la fiche, elle sortirait toute seule.
+ */
+function boatIdentity(json) {
+  if (!json) return null;
+  let p;
+  try {
+    p = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  return {
+    nom: p?.boatName || null,
+    coque: p?.hull || null,
+    longueurM: Number.isFinite(p?.lengthM) ? p.lengthM : null,
+    motorisation: p?.propulsion || null,
+    puissanceCh: Number.isFinite(p?.powerHp) ? p.powerHp : null,
+    equipage: Number.isFinite(p?.pob) ? p.pob : null,
   };
 }
 

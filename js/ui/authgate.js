@@ -179,6 +179,16 @@ export function requireAuth() {
 export function lock() {
   const gate = $('auth-gate');
   if (!gate || !gate.hidden) return;
+
+  /* ON RÉARME LA SORTIE.
+   *
+   * `resolveEntry` est posé par `requireAuth()` au démarrage, et consommé à la
+   * première connexion. Sans cette ligne, une déconnexion rouvrait le portail
+   * avec une sortie déjà consommée : le formulaire acceptait la connexion, la
+   * session s'ouvrait pour de bon… et le portail restait affiché par-dessus.
+   * L'app devenait inaccessible jusqu'au rechargement, et rien à l'écran ne
+   * disait quoi faire. */
+  resolveEntry = () => dismiss(gate);
   reveal(gate);
 }
 
@@ -355,6 +365,16 @@ function message(ex) {
 
 /* Déconnexion et session expirée ramènent au portail. Une app ouverte mais
  * déconnectée n'a plus rien à montrer : ses écrans se videraient un par un
- * sans que rien n'explique pourquoi. */
-on('account:changed', (user) => { if (!user) lock(); });
+ * sans que rien n'explique pourquoi.
+ *
+ * Et l'inverse : dès qu'une session existe, le portail s'efface — d'où qu'elle
+ * vienne. C'est la seconde moitié du filet, celle qui garantit qu'on ne peut
+ * pas rester bloqué devant un formulaire qui vient pourtant de réussir. */
+on('account:changed', (user) => {
+  if (!user) lock();
+  else {
+    const gate = $('auth-gate');
+    if (gate && !gate.hidden) dismiss(gate);
+  }
+});
 on('account:expired', () => lock());

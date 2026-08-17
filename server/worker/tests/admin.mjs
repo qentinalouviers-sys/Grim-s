@@ -115,8 +115,41 @@ check('avec le nom du bateau', row?.bateau === 'Le Corsaire', JSON.stringify(row
 check('et le nombre d’enregistrements', row?.enregistrements >= 1, JSON.stringify(row?.enregistrements));
 
 const dump = JSON.stringify(list.body) + JSON.stringify(ov.body);
-check('AUCUNE donnée de compte ne fuit dans l’administration',
+check('AUCUNE donnée de pêche ne fuit dans l’administration',
   !dump.includes('LE-COIN-A-BARS-SECRET') && !dump.includes('49.93'), 'une marque est apparue dans la réponse');
+
+/* ---- L'identité du bateau, oui — l'activité de pêche, jamais -----------
+ * Le compte dépose une fiche bateau ET une sonde. L'administration doit
+ * rendre la première et ignorer la seconde. C'est la ligne de tout le
+ * projet, et elle ne se tient que si elle est vérifiée. */
+await req('POST', '/api/sync/push', {
+  token: userTok,
+  body: { changes: [
+    { collection: 'profile', id: 'profile', updatedAt: Date.now(), deleted: false,
+      data: { boatName: 'Le Corsaire', hull: 'semi-rigide', lengthM: 6.5,
+              propulsion: 'hb-4t', powerHp: 115, pob: 3,
+              immat: 'DP 999999', mmsi: '227000111', updatedAt: Date.now() } },
+    { collection: 'soundings', id: 'soundings', updatedAt: Date.now(), deleted: false,
+      data: [{ id: 's1', lat: 49.9312, lon: 1.0781, zeroM: 17.5, note: 'TETE-DE-RIDIN' }] },
+  ] },
+});
+
+const list2 = await req('GET', '/api/admin/users?limit=200', { token: adminTok });
+const row2 = list2.body?.users?.find((u) => u.email === userMail);
+check('la fiche bateau remonte', row2?.fiche?.longueurM === 6.5 && row2?.fiche?.coque === 'semi-rigide', JSON.stringify(row2?.fiche));
+check('avec la motorisation et l’équipage', row2?.fiche?.puissanceCh === 115 && row2?.fiche?.equipage === 3, JSON.stringify(row2?.fiche));
+
+const dump2 = JSON.stringify(list2.body);
+check('la SONDE ne fuit pas', !dump2.includes('TETE-DE-RIDIN') && !dump2.includes('17.5'), 'une sonde est apparue');
+/* Liste blanche et non liste noire : le jour où quelqu'un ajoute un champ
+ * sensible au profil, il ne sort pas tout seul. */
+check('l’immatriculation et le MMSI ne sortent PAS',
+  !dump2.includes('DP 999999') && !dump2.includes('227000111'), 'un identifiant est sorti');
+
+const h = await req('GET', '/api/health');
+check('/api/health dit si l’administration est configurée', h.body?.adminConfigured === true, JSON.stringify(h.body));
+check('et si l’inscription est sur invitation', h.body?.invitesOnly === true, JSON.stringify(h.body));
+check('sans jamais rendre les adresses', !JSON.stringify(h.body).includes('@'), JSON.stringify(h.body));
 
 /* ====================================================================== */
 section('3. Suspendre suspend vraiment');

@@ -35,6 +35,12 @@ export default {
               driver: 'd1',
               runtime: 'workers',
               records: (await env.DB.prepare('SELECT COUNT(*) AS n FROM records').first())?.n ?? 0,
+              /* Un booléen, jamais les adresses. Sans lui, un propriétaire qui
+               * ne voit pas son panneau d'administration ne peut pas savoir si
+               * c'est le secret qui manque ou son compte qui n'y figure pas —
+               * et il n'a aucun moyen de trancher depuis son téléphone. */
+              adminConfigured: !!String(env.ADMIN_EMAILS || '').trim(),
+              invitesOnly: !!String(env.INVITE_CODE || '').trim(),
             },
             200,
             cors,
