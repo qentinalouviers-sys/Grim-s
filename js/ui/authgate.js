@@ -26,6 +26,7 @@
 
 import * as sync from '../core/sync.js';
 import { on } from '../core/store.js';
+import { APP_VERSION } from '../core/build.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -198,6 +199,8 @@ function reveal(gate) {
   if (!gate) return;
   gate.hidden = false;
   gate.classList.remove('is-leaving');
+  const ver = $('auth-ver');
+  if (ver) ver.textContent = APP_VERSION;
   if (!anim) {
     anim = new Sea($('auth-sea'));
     anim.start();

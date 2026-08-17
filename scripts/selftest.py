@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -339,6 +340,33 @@ console.log(JSON.stringify(out));
         check(not bad, f"{len(rows)} codes relus à l'identique (v{min(r['version'] for r in rows)}"
                        f"–v{max(r['version'] for r in rows)})"
                        + ("" if not bad else f" — échecs : {[(r['level'], r['text'][:20]) for r in bad]}"))
+
+# ═══════════════════════════════════════════════════════════════════════════
+print("\n7. Version affichée = version des caches")
+# --------------------------------------------------------------------------
+# La chaîne existe à deux endroits : sw.js, qui décide du renouvellement des
+# caches, et core/build.js, que l'app affiche. Elles ont divergé de quatre
+# livraisons — sw.js en v1.40.0, build.js resté en v1.36.0 — et l'app annonçait
+# donc une version qu'elle n'exécutait plus.
+#
+# C'est le pire genre d'écart : il ne casse rien, il MENT. On corrige un défaut
+# déjà livré parce que l'utilisateur lit un vieux numéro, ou on croit une
+# correction reçue alors qu'elle ne l'est pas. Un commentaire disant « doit
+# suivre » ne suffit pas ; ce contrôle-ci, si.
+def _read(*parts: str) -> str:
+    with open(os.path.join(ROOT, *parts), encoding="utf-8") as fh:
+        return fh.read()
+
+_sw = re.search(r"const VERSION = '([^']+)'", _read("sw.js"))
+_bd = re.search(r"APP_VERSION = '([^']+)'", _read("js", "core", "build.js"))
+check(bool(_sw and _bd), "les deux constantes de version sont trouvables")
+if _sw and _bd:
+    check(
+        _sw.group(1) == _bd.group(1),
+        f"sw.js et build.js annoncent la même version ({_sw.group(1)})"
+        if _sw.group(1) == _bd.group(1)
+        else f"DIVERGENCE — sw.js dit {_sw.group(1)}, build.js dit {_bd.group(1)}",
+    )
 
 # ═══════════════════════════════════════════════════════════════════════════
 print()

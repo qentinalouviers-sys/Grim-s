@@ -851,8 +851,14 @@ function registerServiceWorker() {
             // l'ancien jusqu'au rechargement. Proposer un bouton plutôt qu'une
             // consigne — « relance l'app » est une manœuvre ambiguë sur une PWA
             // installée, et une correction qu'on n'exécute pas n'existe pas.
+            /* On n'annonce PAS de numéro ici. `APP_VERSION` est la version du
+             * code en train de tourner, c'est-à-dire l'ANCIENNE : la bannière
+             * proclamait donc « version v1.36.0 téléchargée » au moment précis
+             * où la v1.40.0 venait d'arriver. La nouvelle version n'est pas
+             * lisible depuis cette page — elle vit dans le worker en attente —
+             * alors on dit ce qu'on sait, et rien de plus. */
             const b = dom.banner(
-              `Version ${APP_VERSION} téléchargée.`,
+              'Une nouvelle version est prête.',
               'info',
               { id: 'update' },
             );

@@ -19,6 +19,7 @@ import * as spots from '../fishing/spots.js';
 import * as stream from '../data/stream.js';
 import * as tide from '../data/tide.js';
 import * as idb from '../core/idb.js';
+import { APP_VERSION } from '../core/build.js';
 import * as record from '../fishing/record.js';
 import * as account from '../ui/account.js';
 import * as sync from '../core/sync.js';
@@ -336,6 +337,21 @@ async function render() {
     { hint: stream.config().calibrated ? 'calibré' : 'non calibré' }));
   box.append(collapsible('RÉGLAGES & DONNÉES', await settingsCard()));
   box.append(collapsible('SOURCES & MENTIONS', aboutCard()));
+
+  /* --- Le numéro de version, en pied de page ----------------------------
+   * Il figure aussi dans les réglages, mais cette section-là est repliée par
+   * défaut : quand on se demande « la mise à jour est-elle passée ? », on ne
+   * commence pas par déplier un panneau. Ici, il suffit de descendre.
+   *
+   * Touchable : un appui recharge la page, ce qui applique une mise à jour
+   * déjà téléchargée mais en attente. C'est la manœuvre qu'on cherche à faire
+   * exactement au moment où on regarde ce numéro. */
+  const foot = el('button', 'log-version');
+  foot.type = 'button';
+  foot.textContent = `Grim’s Compagnon ${APP_VERSION}`;
+  foot.title = 'Toucher pour recharger et appliquer une éventuelle mise à jour';
+  foot.addEventListener('click', () => location.reload());
+  box.append(foot);
 }
 
 /* ==========================================================================
@@ -422,6 +438,34 @@ function leewayForm() {
  * ========================================================================== */
 async function settingsCard() {
   const c = el('div', 'card');
+
+  /* --- La version, en haut et lisible ------------------------------------
+   * Une app hors ligne est servie depuis un cache : rien ne garantit que
+   * l'écran qu'on regarde vienne de la dernière livraison. Sans ce numéro,
+   * « c'est corrigé » et « je vois le correctif » sont indiscernables, et on
+   * passe son temps à corriger du code que personne n'exécute.
+   *
+   * Elle vivait jusqu'ici dans le diagnostic du compas et dans le texte de
+   * partage — deux endroits où on ne va pas quand on se demande justement si
+   * la mise à jour est passée. */
+  const ver = el('div', 'row');
+  ver.style.justifyContent = 'space-between';
+  ver.append(el('span', 'tiny', 'Version de l’app'));
+  const verChip = el('span', 'chip good', APP_VERSION);
+  ver.append(verChip);
+  c.append(ver);
+
+  /* Une mise à jour peut être téléchargée et attendre le rechargement : le
+   * numéro affiché reste alors l'ancien, ce qui est exact mais déroutant.
+   * On le dit, avec le bouton qui règle la question. */
+  navigator.serviceWorker?.getRegistration?.().then((reg) => {
+    if (!reg?.waiting) return;
+    verChip.className = 'chip warn';
+    const row = el('div', 'row');
+    row.append(el('span', 'tiny', 'Une version plus récente est prête.'));
+    row.append(button('Appliquer', 'btn-sm', () => location.reload()));
+    ver.after(row);
+  }).catch(() => {});
 
   const info = tide.info();
   const src = el('div', 'row');
