@@ -190,8 +190,36 @@ export async function requireUser(request, env) {
 const emailOk = (e) =>
   typeof e === 'string' && e.length <= 190 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
+/* ==========================================================================
+ * Qui a le droit de créer un compte
+ * --------------------------------------------------------------------------
+ * Une API ouverte sur Internet dont l'inscription est libre finit par héberger
+ * les données de gens qu'on n'a pas invités — sur son quota, et bientôt sur sa
+ * carte de flotte. Ils ne peuvent pas lire les données des autres : chaque
+ * requête est filtrée par `user_id`, et ce filtre est dans la requête, pas
+ * dans une politique d'accès qu'on pourrait oublier de poser. Mais ils
+ * occupent la place.
+ *
+ * `INVITE_CODE` ferme la porte. Vide, l'inscription reste ouverte — c'est le
+ * comportement d'avant, conservé pour ne pas casser une installation qui
+ * marche. Renseigné, il faut le présenter.
+ *
+ * La comparaison est à temps constant : un `===` s'arrête au premier caractère
+ * différent, et la durée trahit alors combien de tête est juste. Sur un code
+ * qu'on peut essayer en boucle, ça se mesure.
+ * ========================================================================== */
+function checkInvite(env, body) {
+  const expected = String(env.INVITE_CODE || '');
+  if (!expected) return;
+
+  const given = String(body.invite || '').trim();
+  if (!given) fail('invite_required', 403);
+  if (!timingSafeEqual(given, expected)) fail('invite_invalid', 403);
+}
+
 export async function register(request, env, body) {
   await throttle(env, request, 'register');
+  checkInvite(env, body);
 
   const email = String(body.email || '').trim();
   const name = body.name == null ? null : String(body.name).trim() || null;

@@ -109,10 +109,17 @@ function renderLogin(body) {
   const eName = mkField('Nom du bateau (facultatif)', 'text', {
     name: 'nickname', autocomplete: 'off', autocapitalize: 'words', placeholder: 'Ex. Grim’s',
   });
+  /* Le code d'invitation n'apparaît qu'après un refus du serveur. Sur une
+   * installation ouverte, il n'y a rien à demander — et un champ vide de plus
+   * sur un formulaire d'inscription se lit comme une obligation. */
+  const eInvite = mkField('Code d’invitation', 'text', {
+    name: 'invite', autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off',
+  });
   ePass2.field.hidden = true;
   eName.field.hidden = true;
+  eInvite.field.hidden = true;
 
-  body.append(eMail.field, ePass.field, ePass2.field, eName.field);
+  body.append(eMail.field, ePass.field, ePass2.field, eName.field, eInvite.field);
 
   const err = el('div', 'tiny c-red');
   err.style.minHeight = '1.2em';
@@ -211,7 +218,8 @@ function renderLogin(body) {
 
     try {
       if (creating) {
-        await sync.register(mail, pass, eName.input.value.trim() || null);
+        await sync.register(mail, pass, eName.input.value.trim() || null,
+          eInvite.input.value.trim() || null);
         toast('Compte créé — synchronisation de tes données…', 'good');
       } else {
         await sync.login(mail, pass);
@@ -219,6 +227,12 @@ function renderLogin(body) {
       }
       closeSheet();
     } catch (ex) {
+      /* Ce serveur n'accepte que les invités : on découvre le champ plutôt que
+       * de renvoyer un message sur une case qui n'existe pas à l'écran. */
+      if (ex?.code === 'invite_required' || ex?.code === 'invite_invalid') {
+        eInvite.field.hidden = false;
+        eInvite.input.focus();
+      }
       err.textContent = message(ex);
       btn.disabled = false;
       btn.textContent = label;
@@ -245,6 +259,8 @@ function message(ex) {
     case 'rate_limited': return 'Trop de tentatives. Attends une minute.';
     case 'account_locked': return 'Compte bloqué après trop d’essais. Réessaie plus tard.';
     case 'email_taken': return 'Un compte existe déjà avec cet e-mail.';
+    case 'invite_required': return 'Ce serveur est sur invitation. Saisis le code qu’on t’a donné.';
+    case 'invite_invalid': return 'Ce code d’invitation n’est pas le bon.';
     case 'bad_credentials': return 'E-mail ou mot de passe incorrect.';
     case 'timeout': return 'Pas de réponse du serveur. Réessaie avec du réseau.';
     default: return ex?.message === 'Failed to fetch' ? 'Serveur injoignable. Vérifie le réseau.' : (ex?.message || 'Erreur.');

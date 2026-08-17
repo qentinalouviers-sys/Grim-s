@@ -141,9 +141,18 @@ async function secretFor(email, password) {
   }
 }
 
-export async function register(email, password, name = null) {
+/**
+ * @param {string|null} invite code d'invitation, quand le serveur en exige un.
+ *   L'écran ne montre le champ qu'après un refus `invite_required` : sur un
+ *   serveur ouvert, il n'a rien à demander, et un champ vide de plus sur un
+ *   formulaire d'inscription n'aide personne.
+ */
+export async function register(email, password, name = null, invite = null) {
   const secret = await secretFor(email, password);
-  const r = await api('/api/auth/register', { method: 'POST', body: { email, password: secret, name } });
+  const r = await api('/api/auth/register', {
+    method: 'POST',
+    body: { email, password: secret, name, ...(invite ? { invite } : {}) },
+  });
   await persistAuth(r);
   await sync(); // le compte vient de naître : on monte ce qui existe déjà en local
   return r.user;

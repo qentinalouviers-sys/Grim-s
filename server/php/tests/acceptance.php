@@ -101,6 +101,14 @@ function section(string $t): void
 $mail = 'test+' . bin2hex(random_bytes(4)) . '@exemple.fr';
 $pw = 'motdepasse';
 
+/* Si le serveur testé exige une invitation, tout le déroulé principal doit la
+ * présenter : le contrôle du code passe AVANT celui de l'adresse et du mot de
+ * passe, donc sans lui chaque test d'inscription vérifierait la porte au lieu
+ * de ce qu'il vise. La section 11 est la seule à l'omettre, exprès. */
+$invite = getenv('GRIMS_INVITE') ?: '';
+$withInvite = static fn (array $b): array => $GLOBALS['invite'] === ''
+    ? $b : $b + ['invite' => $GLOBALS['invite']];
+
 /* ========================================================================== */
 section('1. Sonde et route inconnue');
 
@@ -138,7 +146,7 @@ check('origine inconnue → pas d\'Allow-Origin permissif', stripos($r['headers'
 /* ========================================================================== */
 section('3. Inscription');
 
-$r = req('POST', '/api/auth/register', ['email' => 'pas-une-adresse', 'password' => derive('pas-une-adresse', 'motdepasse')]);
+$r = req('POST', '/api/auth/register', $withInvite(['email' => 'pas-une-adresse', 'password' => derive('pas-une-adresse', 'motdepasse')]));
 check('adresse invalide → invalid_email', ($r['body']['error'] ?? '') === 'invalid_email', json_encode($r['body']));
 
 /* Le serveur ne voit plus jamais un mot de passe : il ne peut donc plus en
@@ -146,18 +154,18 @@ check('adresse invalide → invalid_email', ($r['body']['error'] ?? '') === 'inv
  * en revanche, c'est un mot de passe brut : sans cette barrière, un client
  * ancien ou bricolé ferait stocker un vrai mot de passe derrière un hachage
  * bien trop court, et personne ne s'en apercevrait avant la fuite. */
-$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => 'motdepasse']);
+$r = req('POST', '/api/auth/register', $withInvite(['email' => $mail, 'password' => 'motdepasse']));
 check('mot de passe BRUT refusé → client_outdated', ($r['body']['error'] ?? '') === 'client_outdated', json_encode($r['body']));
 
-$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => str_repeat('z', 64)]);
+$r = req('POST', '/api/auth/register', $withInvite(['email' => $mail, 'password' => str_repeat('z', 64)]));
 check('clé mal formée (hexa invalide) refusée', ($r['body']['error'] ?? '') === 'client_outdated', json_encode($r['body']));
 
-$r = req('POST', '/api/auth/register', ['email' => $mail, 'password' => derive($mail, $pw), 'name' => "Grim's"]);
+$r = req('POST', '/api/auth/register', $withInvite(['email' => $mail, 'password' => derive($mail, $pw), 'name' => "Grim's"]));
 $tokenA = $r['body']['token'] ?? null;
 check('inscription → jeton', $r['status'] === 200 && is_string($tokenA) && strlen($tokenA) === 64, json_encode($r['body']));
 check('inscription → utilisateur complet', ($r['body']['user']['email'] ?? '') === $mail && ($r['body']['user']['name'] ?? '') === "Grim's");
 
-$r = req('POST', '/api/auth/register', ['email' => strtoupper($mail), 'password' => derive($mail, $pw)]);
+$r = req('POST', '/api/auth/register', $withInvite(['email' => strtoupper($mail), 'password' => derive($mail, $pw)]));
 check('même adresse en majuscules → email_taken', ($r['body']['error'] ?? '') === 'email_taken', json_encode($r['body']));
 
 /* ========================================================================== */
@@ -308,7 +316,48 @@ $r = req('GET', '/api/sync/pull?since=0', null, $tokenA);
 check('après suppression, le jeton est mort', $r['status'] === 401);
 
 /* ========================================================================== */
-section('11. Limitation de débit (en dernier : elle bloque l\'adresse une minute)');
+section('11. Inscription sur invitation');
+
+/* Ne s'exécute que si le serveur testé est configuré avec un code. Sur une
+ * installation ouverte, ces vérifications n'ont pas d'objet — et un test qui
+ * échoue « normalement » finit par ne plus être lu du tout. */
+if ($invite === '') {
+    echo "       (aucun code fourni — passez GRIMS_INVITE=… pour tester la porte)\n";
+} else {
+    /* La section 3 a déjà consommé le quota d'inscriptions de la minute, et
+     * cette section-ci en demande quatre de plus. On attend plutôt que de
+     * relever le plafond : cette limite est la seule chose qui rend inutile
+     * l'essai systématique des codes d'invitation, elle ne s'assouplit pas
+     * pour arranger un test. */
+    echo "       attente de la fenêtre de limitation (61 s)…\n";
+    sleep(61);
+
+    $m2 = 'inv+' . bin2hex(random_bytes(4)) . '@exemple.fr';
+
+    $r = req('POST', '/api/auth/register', ['email' => $m2, 'password' => derive($m2, $pw)]);
+    check('sans code → invite_required 403',
+        $r['status'] === 403 && ($r['body']['error'] ?? '') === 'invite_required', json_encode($r['body']));
+
+    $r = req('POST', '/api/auth/register', ['email' => $m2, 'password' => derive($m2, $pw), 'invite' => 'pas-le-bon']);
+    check('mauvais code → invite_invalid 403',
+        $r['status'] === 403 && ($r['body']['error'] ?? '') === 'invite_invalid', json_encode($r['body']));
+
+    /* La vérification qui compte vraiment : un refus ne doit pas avoir créé le
+     * compte quand même. Une porte qui dit non mais laisse entrer est pire
+     * qu'une porte ouverte — on croit être protégé. */
+    $r = req('POST', '/api/auth/login', ['email' => $m2, 'password' => derive($m2, $pw)]);
+    check('AUCUN compte n\'a été créé par les refus',
+        ($r['body']['error'] ?? '') === 'bad_credentials', json_encode($r['body']));
+
+    $r = req('POST', '/api/auth/register', ['email' => $m2, 'password' => derive($m2, $pw), 'invite' => $invite]);
+    check('bon code → inscription acceptée', $r['status'] === 200 && !empty($r['body']['token']), json_encode($r['body']));
+
+    $r = req('DELETE', '/api/account', null, $r['body']['token'] ?? null);
+    check('ménage du compte de test', $r['status'] === 200);
+}
+
+/* ========================================================================== */
+section('12. Limitation de débit (en dernier : elle bloque l\'adresse une minute)');
 
 $codes = [];
 for ($i = 0; $i < 9; $i++) {

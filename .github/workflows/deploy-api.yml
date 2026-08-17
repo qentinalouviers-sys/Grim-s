@@ -76,7 +76,10 @@ jobs:
             curl -sf http://127.0.0.1:8788/api/health > /dev/null && break
             sleep 2
           done
-          php ../php/tests/acceptance.php http://127.0.0.1:8788
+          # Le code correspond à celui de [env.dev.vars] : la recette peut donc
+          # éprouver la porte d'invitation, et pas seulement constater sa
+          # présence dans le code.
+          GRIMS_INVITE='marée-basse-2026' php ../php/tests/acceptance.php http://127.0.0.1:8788
 
   deploy:
     name: Publication

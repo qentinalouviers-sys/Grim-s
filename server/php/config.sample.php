@@ -75,4 +75,8 @@ return [
      * limitation en le forgeant lui-même.
      * -------------------------------------------------------------------- */
     'trust_proxy' => false,
+
+    /* Vide : l'inscription est ouverte à qui connaît l'adresse de l'API.
+     * Renseigné : il faut présenter ce code pour créer un compte. */
+    'invite_code' => '',
 ];

@@ -47,15 +47,31 @@ MAIL_FROM = ""
 # il ne peut pas parler SMTP, seulement appeler une API.
 SMTP_URL = ""
 
-# Le secret SMTP_KEY ne s'écrit PAS ici — un fichier versionné n'est pas un
-# coffre. Il se dépose par `npx wrangler secret put SMTP_KEY`, ou depuis
-# l'action GitHub.
+# Ni SMTP_KEY ni INVITE_CODE ne s'écrivent ici — un fichier versionné n'est pas
+# un coffre. Ils se déposent par :
+#
+#   npx wrangler secret put INVITE_CODE
+#   npx wrangler secret put SMTP_KEY
+#
+# INVITE_CODE ferme l'inscription : sans lui, n'importe qui connaissant
+# l'adresse de l'API peut se créer un compte et stocker ses données dans cette
+# base. Il ne pourra pas lire celles des autres — le filtre par compte est dans
+# chaque requête, pas dans un réglage qu'on peut oublier de poser — mais il
+# occupera la place, et il apparaîtra sur la carte de flotte le jour où elle
+# existera.
+#
+# Laisser INVITE_CODE absent garde l'inscription ouverte. C'est un choix
+# légitime pour une app publique ; c'en est un pour un usage entre connaissances.
 
 # ==========================================================================
 # Environnement de recette local (wrangler dev --local), sans réseau ni compte.
 # ==========================================================================
 [env.dev]
 [env.dev.vars]
+# Valeur de développement, volontairement en clair : elle ne protège rien et
+# sert à ce que la recette puisse éprouver la porte. La vraie se dépose en
+# secret, jamais ici.
+INVITE_CODE = "marée-basse-2026"
 ALLOWED_ORIGINS = "http://localhost:8099,http://127.0.0.1:8099"
 PUBLIC_URL = "http://127.0.0.1:8788"
 MAIL_FROM = ""

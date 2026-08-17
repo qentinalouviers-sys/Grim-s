@@ -67,6 +67,23 @@ dépôt GitHub :
 Ne prenez pas un jeton global. Celui-ci ne doit pouvoir toucher qu'à cette API :
 si un jour il fuit, il ne doit pas emporter le domaine avec lui.
 
+**c. Fermer l'inscription**, si l'API n'a pas vocation à accueillir des
+inconnus :
+
+```sh
+npx wrangler secret put INVITE_CODE
+```
+
+Sans ce secret, l'inscription est **ouverte** : qui connaît l'adresse de l'API
+peut se créer un compte. Il ne lira les données de personne — chaque requête
+est filtrée par compte, et ce filtre est dans la requête elle-même, pas dans
+une politique d'accès qu'on pourrait oublier de poser — mais il occupera la
+place dans la base, et il apparaîtra sur la carte de flotte le jour où elle
+existera.
+
+Avec le secret, l'app découvre le champ « code d'invitation » seulement après
+un refus du serveur : sur une installation ouverte, elle ne demande rien.
+
 Ensuite, `.github/workflows/deploy-api.yml` applique les migrations puis déploie
 à chaque poussée sur la branche par défaut qui touche à `server/worker/`.
 

@@ -199,10 +199,40 @@ JS;
      * Routes
      * ==================================================================== */
 
+    /**
+     * Qui a le droit de créer un compte.
+     *
+     * Une API ouverte dont l'inscription est libre finit par héberger les
+     * données de gens qu'on n'a pas invités — sur son quota, et bientôt sur sa
+     * carte de flotte. Ils ne lisent pas les données des autres : le filtre
+     * `user_id` est dans chaque requête, pas dans un réglage qu'on peut
+     * oublier. Mais ils occupent la place.
+     *
+     * `invite_code` vide : l'inscription reste ouverte, comme avant.
+     * `hash_equals` compare à temps constant — un `===` s'arrête au premier
+     * caractère différent, et sur un code qu'on essaie en boucle, la durée
+     * finit par dire combien de tête est juste.
+     */
+    private static function checkInvite(array $b): void
+    {
+        $expected = (string) (self::$cfg['invite_code'] ?? '');
+        if ($expected === '') {
+            return;
+        }
+        $given = trim((string) ($b['invite'] ?? ''));
+        if ($given === '') {
+            Http::fail('invite_required', 403);
+        }
+        if (!hash_equals($expected, $given)) {
+            Http::fail('invite_invalid', 403);
+        }
+    }
+
     public static function register(): never
     {
         self::throttle('register');
         $b = Http::body();
+        self::checkInvite($b);
 
         $email = trim((string) ($b['email'] ?? ''));
         $password = (string) ($b['password'] ?? '');
