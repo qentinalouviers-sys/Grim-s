@@ -19,7 +19,7 @@
  * ========================================================================== */
 
 import { state, subscribe, set, on, emit } from '../core/store.js';
-import { el, clear, button, toast, openSheet, closeSheet } from '../ui/dom.js';
+import { el, clear, button, toast, openSheet, closeSheet, decimalInput } from '../ui/dom.js';
 import * as fmt from '../core/fmt.js';
 import { distance, bearing, destination as project, toGPX } from '../core/geo.js';
 import * as presence from '../core/presence.js';
@@ -1377,10 +1377,15 @@ function newSpotForm(pos) {
   name.placeholder = 'Ex. Tête de ridin nord';
   mk('Nom', name);
 
-  const depth = document.createElement('input');
-  depth.type = 'number';
-  depth.inputMode = 'decimal';
-  depth.placeholder = 'Sonde en mètres (carte)';
+  /* Champ décimal maison : dans un `type="number"`, « 12,5 » tapé sur un
+   * clavier français ressort à « 125 » — cent vingt-cinq mètres de fond au
+   * lieu de douze et demi, entrés en silence dans une marque qu'on relira en
+   * mer. Voir `ui/dom.js`. */
+  let depthM = null;
+  const depth = decimalInput({
+    placeholder: 'Sonde en mètres (carte)',
+    onInput: (n) => { depthM = n; },
+  });
   mk('Profondeur', depth);
 
   const habitats = ['epave', 'roche', 'ridin', 'banc-de-sable', 'sable', 'sable-coquillier', 'vase', 'sablo-vaseux', 'chenal', 'tombant', 'veine', 'pleine-eau'];
@@ -1423,7 +1428,7 @@ function newSpotForm(pos) {
       name: name.value.trim() || `Marque ${new Date().toLocaleDateString('fr-FR')}`,
       lat: pos.lat,
       lon: pos.lon,
-      depthM: depth.value ? [Number(depth.value), Number(depth.value)] : null,
+      depthM: depthM != null ? [depthM, depthM] : null,
       habitat: [...chosen],
       note: note.value.trim(),
     });
@@ -1459,18 +1464,19 @@ function editSpotForm(s) {
   note.placeholder = 'Ce qui marche, quand, avec quoi, la sonde, le fond…';
   mk('Description', note);
 
-  const depth = document.createElement('input');
-  depth.type = 'number';
-  depth.inputMode = 'decimal';
-  depth.value = Array.isArray(s.depthM) ? String(s.depthM[0]) : '';
-  depth.placeholder = 'Sonde en mètres (carte)';
+  let depthM = Array.isArray(s.depthM) ? s.depthM[0] : null;
+  const depth = decimalInput({
+    value: depthM,
+    placeholder: 'Sonde en mètres (carte)',
+    onInput: (n) => { depthM = n; },
+  });
   mk('Profondeur', depth);
 
   body.append(button('Enregistrer', 'btn-primary btn-lg', async () => {
     await spots.updateSpot(s.id, {
       name: name.value.trim() || s.name,
       note: note.value.trim(),
-      depthM: depth.value ? [Number(depth.value), Number(depth.value)] : s.depthM,
+      depthM: depthM != null ? [depthM, depthM] : s.depthM,
     });
     closeSheet();
     drawSpots();

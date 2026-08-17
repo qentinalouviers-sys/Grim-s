@@ -81,6 +81,42 @@ export function collapsible(title, content, { open = false, hint = null } = {}) 
   return d;
 }
 
+/* ==========================================================================
+ * Champ décimal — et pourquoi ce n'est PAS un `type="number"`
+ * --------------------------------------------------------------------------
+ * Sur un clavier français, on tape « 6,5 ». Un `<input type="number">` ne
+ * l'accepte pas : mesuré dans Chromium, la valeur « 6,5 » ressort à `""`, et
+ * la saisie au clavier de « 6,5 » ressort à `"65"` — la virgule est avalée en
+ * silence.
+ *
+ * Conséquences vues en vrai : une longueur de bateau qui restait vide, si bien
+ * que la fiche passait pour incomplète alors qu'elle était remplie ; et une
+ * participation aux frais de « 12,50 » qui serait devenue 1250 €.
+ *
+ * Un `.replace(',', '.')` dans le gestionnaire ne répare rien : il n'y a plus
+ * de virgule à remplacer quand il s'exécute. Il faut donc un champ texte, avec
+ * le clavier numérique demandé par `inputmode`, et la conversion faite ici.
+ * ========================================================================== */
+export function decimalInput({ value = null, placeholder = '', onInput } = {}) {
+  const i = document.createElement('input');
+  i.type = 'text';
+  i.inputMode = 'decimal';
+  i.autocomplete = 'off';
+  i.value = value == null || value === '' ? '' : String(value).replace('.', ',');
+  i.placeholder = placeholder;
+
+  i.addEventListener('input', () => {
+    // On nettoie ce qui n'est ni chiffre ni séparateur, sans réécrire le champ
+    // pendant la frappe : remplacer la valeur sous les doigts déplace le
+    // curseur et rend la saisie impraticable.
+    const raw = i.value.replace(/[^\d.,]/g, '').replace(',', '.');
+    const n = raw === '' || raw === '.' ? null : Number(raw);
+    onInput?.(Number.isFinite(n) ? n : null, i.value);
+  });
+
+  return i;
+}
+
 export function button(label, cls = '', onClick) {
   const b = el('button', `btn ${cls}`, label);
   b.type = 'button';

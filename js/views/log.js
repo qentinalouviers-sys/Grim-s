@@ -428,8 +428,8 @@ function leewayForm() {
   const f = el('div', 'field');
   f.append(el('label', null, 'Fardage (% du vent)'));
   const input = document.createElement('input');
-  input.type = 'number';
-  input.step = '0.5';
+  input.type = 'text';
+  input.inputMode = 'decimal';
   input.min = '0';
   input.max = '10';
   input.value = String(cfg.leewayPct);
@@ -438,7 +438,7 @@ function leewayForm() {
   body.append(f);
 
   body.append(button('Appliquer', 'btn-primary btn-lg', async () => {
-    const v = Math.max(0, Math.min(10, Number(input.value) || 3.5));
+    const v = Math.max(0, Math.min(10, Number(String(input.value).replace(',', '.')) || 3.5));
     const next = stream.setConfig({ leewayPct: v });
     await idb.put('kv', 'driftCalibration', next);
     closeSheet();

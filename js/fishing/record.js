@@ -564,7 +564,9 @@ export function openDetailForm(preselect = null) {
   });
 
   const len = document.createElement('input');
-  len.type = 'number';
+  // Texte et non `number` : un bar de 42,5 cm tapé sur un clavier français
+  // ressortait à 425 cm dans un champ numérique.
+  len.type = 'text';
   len.inputMode = 'decimal';
   len.placeholder = 'cm';
   mk('Taille', len);
@@ -623,7 +625,7 @@ export function openDetailForm(preselect = null) {
     await record(id, {
       name,
       extra: {
-        lengthCm: len.value ? Number(len.value) : null,
+        lengthCm: len.value ? Number(String(len.value).replace(',', '.')) || null : null,
         count: Math.max(1, Number(cnt.value) || 1),
         released,
         spotId: spotSel.value || null,

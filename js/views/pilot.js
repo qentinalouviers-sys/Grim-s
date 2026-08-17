@@ -397,7 +397,7 @@ function openSettings() {
 
   body.append(button('Enregistrer', 'btn-primary btn-lg', () => {
     route.setArrivalRadius(Number(radius.value) || route.DEFAULT_ARRIVAL_M);
-    const kn = Math.max(1, Math.min(40, Number(cruise.value) || route.DEFAULT_CRUISE_KN));
+    const kn = Math.max(1, Math.min(40, Number(String(cruise.value).replace(',', '.')) || route.DEFAULT_CRUISE_KN));
     set({ nav: { ...state.nav, cruiseKn: kn } });
     closeSheet();
     render();

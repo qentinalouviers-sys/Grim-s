@@ -14,7 +14,7 @@
  * assurance commerciale. Voir `core/cobaturage.js`, qui porte les règles.
  * ========================================================================== */
 
-import { el, clear, button, toast, openSheet, closeSheet } from './dom.js';
+import { el, clear, button, toast, openSheet, closeSheet, decimalInput } from './dom.js';
 import * as sync from '../core/sync.js';
 import * as profile from '../core/profile.js';
 import * as places from '../data/places.js';
@@ -138,9 +138,24 @@ async function paintPublish(host) {
   /* La fiche bateau d'abord : une sortie se propose sous un nom de bateau, et
    * la note du capitaine s'y rattache. Sans elle, l'équipier ne voit qu'un
    * identifiant. */
-  if (!profile.isComplete()) {
-    host.append(el('p', 'tiny', 'Renseigne d’abord ta fiche bateau : c’est sous ce nom que ta sortie apparaîtra, et c’est lui qui portera tes avis.'));
-    host.append(button('Remplir la fiche bateau', 'btn-primary', async () => {
+  /* On NOMME ce qui manque. « Renseigne ta fiche bateau » affiché à quelqu'un
+   * dont la fiche est visiblement remplie est une impasse : il la rouvre, la
+   * voit complète, revient, et lit le même message. Un seul champ manquait —
+   * la longueur, avalée par le clavier français dans l'ancien champ numérique. */
+  const p = profile.get();
+  const missing = [
+    !p.boatName && 'le nom du bateau',
+    !p.hull && 'le type de coque',
+    !p.lengthM && 'la longueur',
+  ].filter(Boolean);
+
+  if (missing.length) {
+    host.append(el('p', 'tiny',
+      `Il manque ${missing.join(' et ')} dans ta fiche bateau. `
+      + 'Le nom identifie ta sortie et porte tes avis ; la coque et la longueur '
+      + 'décident de ce que l’app appelle une mer praticable — ce qui compte '
+      + 'quand tu embarques quelqu’un d’autre.'));
+    host.append(button('Compléter la fiche bateau', 'btn-primary', async () => {
       const { openBoatForm } = await import('./boat.js');
       closeSheet();
       openBoatForm({ onSaved: () => openCrew() });
@@ -177,17 +192,23 @@ async function paintPublish(host) {
 
   host.append(f('Port de départ', null, inp('text', draft.port, (v) => { draft.port = v; })));
   host.append(f('Départ', null, inp('datetime-local', '', (v) => { draft.departsAt = v; paint(); })));
-  host.append(f('Durée (h)', null, inp('number', draft.hours, (v) => { draft.hours = Number(v); }, { min: 1, max: 24, step: 0.5 })));
+  host.append(f('Durée (h)', null, decimalInput({
+    value: draft.hours, placeholder: '5', onInput: (n) => { draft.hours = n ?? 0; },
+  })));
   host.append(f('Places pour équipiers', 'Toi non compris — tu es déjà à bord.',
     inp('number', draft.seats, (v) => { draft.seats = Number(v); paint(); }, { min: 1, max: 11 })));
   host.append(f('Type de pêche', null, inp('text', '', (v) => { draft.fishing = v; }, { placeholder: 'Ex. leurres, dérive sur épave' })));
 
   host.append(el('div', 'field-label', 'Frais réels de la sortie'));
   for (const it of cob.COST_ITEMS) {
-    host.append(f(it.name, it.hint, inp('number', '', (v) => {
-      draft.costs[it.id] = Math.round((Number(v) || 0) * 100);
-      paint();
-    }, { min: 0, step: '0.01', inputMode: 'decimal', placeholder: '€' })));
+    /* Champ décimal maison : « 12,50 » dans un `type="number"` ressort à
+     * « 1250 » sur un clavier français, soit mille deux cent cinquante euros
+     * de carburant. Le garde-fou de montant aberrant l'aurait attrapé, mais
+     * après coup et sans dire pourquoi. */
+    host.append(f(it.name, it.hint, decimalInput({
+      placeholder: '€',
+      onInput: (n) => { draft.costs[it.id] = Math.round((n || 0) * 100); paint(); },
+    })));
   }
 
   /* Les postes refusés sont MONTRÉS, pas tus. Quelqu'un de bonne foi qui ne

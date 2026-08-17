@@ -15,7 +15,7 @@
  * fabrique une confiance fausse. Voir core/profile.js.
  * ========================================================================== */
 
-import { el, clear, button, toast, openSheet, closeSheet } from './dom.js';
+import { el, clear, button, toast, openSheet, closeSheet, decimalInput } from './dom.js';
 import * as profile from '../core/profile.js';
 
 /**
@@ -133,17 +133,14 @@ export function openBoatForm({ onSaved = null, firstRun = false } = {}) {
   const row = el('div', 'grid-2');
   const fLen = el('div', 'field');
   fLen.append(el('label', null, 'Longueur (m)'));
-  const len = document.createElement('input');
-  len.type = 'number';
-  len.inputMode = 'decimal';
-  len.step = '0.1';
-  len.min = '2';
-  len.max = '30';
-  len.value = draft.lengthM ?? '';
-  len.placeholder = '6,5';
-  len.addEventListener('input', () => {
-    draft.lengthM = len.value ? Number(len.value.replace(',', '.')) : null;
-    paint();
+  /* Champ TEXTE et non `number` : sur un clavier français, « 6,5 » tapé dans
+   * un `type="number"` ressort à « 65 » — la virgule est avalée avant que le
+   * code la voie. C'est ce qui laissait la longueur vide, et donc la fiche
+   * réputée incomplète alors qu'elle était remplie. Voir `ui/dom.js`. */
+  const len = decimalInput({
+    value: draft.lengthM,
+    placeholder: '6,5',
+    onInput: (n) => { draft.lengthM = n; paint(); },
   });
   fLen.append(len);
 
