@@ -113,6 +113,74 @@
   </div>
 </div>
 
+<!-- ═══ Portail de connexion ═══════════════════════════════════════════
+     Visible par défaut, AVANT que le JavaScript ne tourne. C'est délibéré :
+     dans l'autre sens, l'utilisateur déjà connecté verrait l'écran de
+     connexion clignoter à chaque lancement, et celui qui ne l'est pas
+     apercevrait l'app une fraction de seconde avant d'en être sorti.
+     `js/ui/authgate.js` l'efface dès qu'une session locale est trouvée.  -->
+<div class="auth-gate" id="auth-gate">
+  <canvas class="auth-sea" id="auth-sea" aria-hidden="true"></canvas>
+  <div class="auth-inner">
+    <div class="auth-brand">
+      <div class="auth-logo">⚓</div>
+      <h1>Grim’s Compagnon</h1>
+      <p class="auth-sub">Navigation &amp; pêche — secteur de Dieppe</p>
+    </div>
+
+    <form class="ag-form card" novalidate>
+      <h2 class="ag-title" id="ag-mode-title">Connexion</h2>
+
+      <div class="ag-field">
+        <label for="ag-email">E-mail</label>
+        <input type="email" id="ag-email" name="email" autocomplete="email"
+               inputmode="email" autocapitalize="none" autocorrect="off"
+               placeholder="toi@exemple.fr" required>
+      </div>
+
+      <div class="ag-field">
+        <label for="ag-pass">Mot de passe</label>
+        <input type="password" id="ag-pass" name="password"
+               autocomplete="current-password" placeholder="8 caractères minimum" required>
+      </div>
+
+      <div class="ag-field" hidden>
+        <label for="ag-pass2">Confirme le mot de passe</label>
+        <input type="password" id="ag-pass2" name="password2" autocomplete="new-password">
+      </div>
+
+      <div class="ag-field" hidden>
+        <label for="ag-name">Nom du bateau <span class="ag-opt">facultatif</span></label>
+        <input type="text" id="ag-name" name="nickname" autocomplete="off"
+               autocapitalize="words" placeholder="Ex. Grim’s">
+      </div>
+
+      <!-- Découvert seulement si le serveur refuse faute de code : sur une
+           installation ouverte, il n'y a rien à demander. -->
+      <div class="ag-field" hidden>
+        <label for="ag-invite">Code d’invitation</label>
+        <input type="text" id="ag-invite" name="invite" autocomplete="off"
+               autocapitalize="none" autocorrect="off">
+      </div>
+
+      <p class="ag-err" id="ag-err" aria-live="polite"></p>
+
+      <button class="btn btn-primary btn-lg" id="ag-go" type="submit">Se connecter</button>
+      <div class="ag-links">
+        <button class="ag-link" id="ag-toggle" type="button">Créer un compte</button>
+        <button class="ag-link" id="ag-forgot" type="button">Mot de passe oublié</button>
+      </div>
+    </form>
+
+    <p class="auth-note">
+      Le compte sert à retrouver ton journal, tes marques et ton carnet de sondes
+      sur un autre appareil, et à les sauvegarder. Ton mot de passe est chiffré
+      sur ce téléphone : le serveur ne le reçoit jamais.
+      <br>Une fois connecté, l’app fonctionne entièrement hors ligne.
+    </p>
+  </div>
+</div>
+
 <!-- ═══ Écran d'accueil / permissions ══════════════════════════════════ -->
 <div class="gate" id="gate">
   <div class="gate-inner">
@@ -126,9 +194,15 @@
       <li><b>Navigation GPS</b> — cap à tenir corrigé de la dérive, heure d’arrivée, alerte d’arrivée</li>
       <li><b>Horizon</b> — identification des feux et des bouées autour de toi</li>
     </ul>
+    <!-- Ce texte annonçait « aucun compte, aucun serveur, aucune donnée
+         envoyée ». C'est devenu faux le jour où la connexion est devenue
+         obligatoire, et une app qui se trompe sur ce qu'elle fait des données
+         de quelqu'un ne mérite pas qu'on la croie sur le reste. -->
     <p class="gate-note">
-      Tout reste sur ton téléphone. Aucun compte, aucun serveur, aucune donnée envoyée.
-      Marée, soleil, lune et courant sont calculés à bord et fonctionnent sans réseau.
+      Position, marée, soleil, lune et courant sont calculés à bord et
+      fonctionnent sans réseau. Ce qui remonte au compte, ce sont tes prises,
+      tes marques et tes sondes — pour les retrouver ailleurs et ne pas les
+      perdre. Rien d’autre ne sort du téléphone.
     </p>
     <button class="btn btn-primary btn-lg" id="gate-go" type="button">Activer les capteurs</button>
     <button class="btn btn-ghost" id="gate-skip" type="button">Continuer sans capteurs</button>

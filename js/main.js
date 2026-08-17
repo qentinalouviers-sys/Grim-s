@@ -51,6 +51,7 @@ import * as record from './fishing/record.js';
 import * as traces from './fishing/traces.js';
 import * as soundings from './fishing/soundings.js';
 import * as sync from './core/sync.js';
+import * as authgate from './ui/authgate.js';
 import { SPECIES_ORDER } from './fishing/species.js';
 
 // Importé pour son effet de bord autant que pour son API : le module abonne la
@@ -137,6 +138,19 @@ async function boot() {
   // Compte & synchro : restaure la session puis synchronise en tâche de fond,
   // sans jamais bloquer l'écran ni dépendre du réseau.
   await sync.initSync();
+
+  /* PORTAIL DE CONNEXION — on ne rentre pas sans compte.
+   *
+   * Il se juge sur la session locale que `initSync` vient de relire, JAMAIS
+   * sur une réponse du serveur. Un jeton déjà enregistré ouvre l'app
+   * immédiatement, sans réseau : c'est ce qui permet de partir en mer, de
+   * perdre la couverture, et de garder MOB et SOS sous la main. Interroger le
+   * serveur ici transformerait chaque sortie hors de portée en app morte.
+   *
+   * Tout ce qui précède est déjà chargé : les données locales, la marée, le
+   * carnet de sondes. Seul l'affichage attend. */
+  await authgate.requireAuth();
+
   if (sync.isLoggedIn()) setTimeout(() => sync.sync().catch(() => {}), 2000);
 
   record.mountFab();

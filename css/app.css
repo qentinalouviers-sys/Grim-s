@@ -861,6 +861,105 @@ input[type=range]::-moz-range-thumb {
 .gate-note { font-size: 11.5px; color: var(--txt-3); margin: 0 0 18px; line-height: 1.5; }
 .gate .btn-ghost { margin-top: 8px; }
 
+/* ══ Portail de connexion ══════════════════════════════════════════════
+   z-index 90 : AU-DESSUS du portail des capteurs (80). Les deux peuvent être
+   à l'écran en même temps au tout premier lancement, et c'est la connexion
+   qui passe d'abord — demander l'accès au GPS avant de savoir qui est là
+   n'aurait aucun sens.                                                     */
+.auth-gate {
+  position: fixed; inset: 0; z-index: 90;
+  background: radial-gradient(120% 80% at 50% 0%, #0d2033 0%, #050b14 68%);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--safe-t) + 16px) 20px calc(var(--safe-b) + 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  opacity: 1;
+  transition: opacity .25s ease;
+}
+.auth-gate[hidden] { display: none; }
+/* Le fondu se joue AVANT que l'élément quitte le flux : le retirer d'un coup
+   ferait apparaître l'app d'un seul bloc, sans transition. */
+.auth-gate.is-leaving { opacity: 0; pointer-events: none; }
+
+.auth-sea {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+.auth-inner {
+  position: relative;      /* au-dessus du canvas */
+  width: 100%; max-width: 380px;
+  margin: auto 0;
+}
+
+.auth-brand { text-align: center; margin-bottom: 18px; }
+.auth-logo { font-size: 46px; line-height: 1; margin-bottom: 4px; }
+.auth-brand h1 { font-size: 25px; letter-spacing: -0.02em; margin: 0; }
+.auth-sub { color: var(--txt-2); font-size: 13px; margin: 5px 0 0; }
+
+.ag-form { background: rgba(16, 29, 46, .82); backdrop-filter: blur(8px); padding: 16px; }
+.ag-title {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--txt-3); font-weight: 700; margin: 0 0 14px;
+}
+
+.ag-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 11px; }
+.ag-field[hidden] { display: none; }
+.ag-field label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--txt-3); font-weight: 700;
+}
+.ag-opt { text-transform: none; letter-spacing: 0; font-weight: 500; opacity: .7; }
+.ag-field input {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  font-size: 16px;         /* 16 px : en dessous, iOS zoome à la mise au point */
+  min-height: 44px;
+  color: var(--txt);
+  width: 100%;
+  box-sizing: border-box;
+}
+.ag-field input:focus { outline: 2px solid var(--cyan); outline-offset: -1px; }
+
+.ag-err { color: #ffb4a2; font-size: 12.5px; margin: 0 0 10px; min-height: 1.2em; line-height: 1.4; }
+
+.ag-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.ag-link {
+  background: none; border: 0; padding: 6px 2px;
+  color: var(--txt-2); font-size: 12.5px; text-decoration: underline;
+  min-height: 34px;
+}
+.ag-link:disabled { opacity: .5; }
+/* Sur un écran de 320 px, les deux liens passent chacun sur deux lignes et le
+   bas du formulaire devient brouillon. Un point de moins suffit à les tenir. */
+@media (max-width: 340px) { .ag-link { font-size: 11.5px; } }
+
+.auth-note {
+  color: var(--txt-3); font-size: 11.5px; line-height: 1.55;
+  text-align: center; margin: 16px 0 0;
+}
+
+/* Écran court : le décor cède la place au formulaire. On resserre les marges,
+   jamais la hauteur des champs — 44 px est le minimum pour viser au pouce sur
+   un bateau qui bouge, et ce n'est pas une valeur qu'on rogne pour gagner de
+   la place. Le formulaire d'inscription complet défile, et c'est normal :
+   cinq champs ne tiennent pas sur un écran de 568 px. */
+@media (max-height: 640px) {
+  .auth-gate { align-items: flex-start; }
+  .auth-logo { font-size: 30px; }
+  .auth-brand { margin-bottom: 10px; }
+  .auth-brand h1 { font-size: 20px; }
+  .auth-sub { display: none; }
+  .ag-form { padding: 13px; }
+  .ag-title { margin-bottom: 10px; }
+  .ag-field { margin-bottom: 8px; }
+  .ag-err:empty { display: none; }
+  .auth-note { display: none; }
+}
+
 /* ══ Toasts ════════════════════════════════════════════════════════════ */
 .toast-host {
   position: fixed; z-index: 90;
