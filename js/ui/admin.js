@@ -1,19 +1,30 @@
 /* ==========================================================================
  * ui/admin.js — le panneau d'administration
  * --------------------------------------------------------------------------
- * Il montre QUI utilise le service, jamais CE QU'ILS Y METTENT.
+ * Il montre QUI utilise le service. Ce qu'ils y déposent se regarde ailleurs,
+ * dans « Carte du fonds » (`ui/corpusmap.js`) — une porte séparée, nommée, et
+ * qui dit ce qu'elle ouvre.
  *
- * Adresse, nom du bateau, date d'inscription, dernière venue, nombre
- * d'enregistrements, état de suspension. Pas une marque, pas une sonde, pas
- * une trace : ce sont des postes de pêche relevés à bord par des gens qui
- * n'ont pas envie de les publier, et administrer un service ne donne pas le
- * droit de lire ce qu'on y dépose. Le serveur applique déjà cette règle —
- * aucune de ses requêtes d'administration ne lit la donnée — mais elle mérite
- * d'être répétée ici, parce que c'est ici qu'on serait tenté de l'oublier.
+ * Ici : adresse, nom du bateau, fiche du bateau, date d'inscription, dernière
+ * venue, nombre d'enregistrements, état de suspension. De l'IDENTITÉ.
+ *
+ * La séparation est volontaire et vaut d'être défendue. Le fonds de pêche —
+ * marques, sondes, traces, prises — est ce que l'app existe pour rassembler,
+ * et il DOIT être consultable : un corpus qu'on ne peut pas regarder ne
+ * devient jamais un modèle. Mais ce sont aussi des postes relevés à bord par
+ * des gens qui ne les publient pas volontiers. Le compromis tenu est donc
+ * celui-ci : on l'ouvre, sur un écran qui dit son nom, derrière son propre
+ * préfixe d'URL et dans son propre module serveur — et les pêcheurs
+ * l'apprennent de l'app à l'inscription, jamais d'une mauvaise surprise.
+ *
+ * Ce fichier-ci, lui, ne lit toujours que l'identité. Garder la frontière
+ * visible dans le code est ce qui empêchera, dans six mois, de faire glisser
+ * une colonne de trop dans une requête « juste pour dépanner ».
  * ========================================================================== */
 
 import { el, clear, button, toast, openSheet, closeSheet } from './dom.js';
 import * as sync from '../core/sync.js';
+import { openCorpusMap } from './corpusmap.js';
 
 const nf = new Intl.NumberFormat('fr-FR');
 
@@ -112,6 +123,15 @@ function render(body, { ov, us }) {
   /* Le volume, pas le contenu : `length(data)` mesure sans jamais rapporter. */
   vol.append(el('p', 'tiny', 'Volumes seulement — le contenu des comptes n’est pas lisible depuis ici.'));
   body.append(vol);
+
+  /* --- Le fonds de données -------------------------------------------- */
+  const fonds = el('div', 'card');
+  fonds.append(el('div', 'field-label', 'Fonds de données'));
+  fonds.append(el('p', 'tiny',
+    'Les prises, les sondes et les marques de tous les comptes, sur une carte — '
+    + 'et l’export destiné à entraîner le modèle.'));
+  fonds.append(button('Carte du fonds', 'btn-primary', () => openCorpusMap(us.users)));
+  body.append(fonds);
 
   /* --- La liste des comptes ------------------------------------------- */
   const list = el('div', 'card');
@@ -224,7 +244,88 @@ function userRow(u, us) {
     },
   );
   act.append(b);
+  /* Le détail d'un compte : ce qu'il a déposé, en volumes et en espèces. Un
+   * écran à part parce que c'est une autre question que « qui est inscrit » —
+   * et qu'on ne la pose pas par accident en faisant défiler la liste. */
+  act.append(button('Détail', '', () => openUserDetail(u)));
   row.append(act);
 
   return row;
+}
+
+/* ==========================================================================
+ * Le détail d'UN compte
+ * --------------------------------------------------------------------------
+ * Ce que ce compte a déposé : volumes par collection, nombre de prises,
+ * combien portent une position, ses espèces, son record.
+ *
+ * Des AGRÉGATS, jamais la liste des points. La carte du fonds montre les
+ * positions de tout le monde, ce qui sert à comprendre le poisson ; dérouler
+ * ici les cent dernières marques d'une personne nommée servirait à autre
+ * chose, et cette chose-là n'a aucune raison d'exister.
+ * ========================================================================== */
+export async function openUserDetail(u) {
+  const body = el('div');
+  body.append(el('p', 'tiny', 'Chargement…'));
+  openSheet(u.bateau || u.email, body);
+
+  let d;
+  try {
+    d = await sync.apiCall(`/api/admin/corpus/user?id=${encodeURIComponent(u.id)}`);
+  } catch (e) {
+    clear(body);
+    body.append(el('p', 'c-red', `Impossible de charger : ${e?.message || 'erreur'}`));
+    return;
+  }
+
+  clear(body);
+
+  const ident = el('div', 'card');
+  ident.append(el('div', 'field-label', 'Compte'));
+  ident.append(el('div', 'admin-user-name', d.compte.bateau || '— sans nom de bateau —'));
+  ident.append(el('div', 'admin-user-mail', d.compte.email));
+  ident.append(el('p', 'tiny',
+    `Inscrit le ${new Date(d.compte.inscritLe).toLocaleDateString('fr-FR')}`
+    + (d.compte.suspendu ? ' · compte suspendu' : '')));
+  body.append(ident);
+
+  const ch = el('div', 'card');
+  ch.append(el('div', 'field-label', 'Ce qu’il a relevé'));
+  const g = el('div', 'admin-grid');
+  const t = (v, l) => {
+    const x = el('div', 'admin-tile');
+    x.append(el('div', 'admin-tile-val', nf.format(v)));
+    x.append(el('div', 'admin-tile-lab', l));
+    return x;
+  };
+  g.append(t(d.prises.n, 'prises'), t(d.prises.situees, 'avec position'), t(d.sondes, 'sondes'));
+  ch.append(g);
+  if (d.prises.premiere) {
+    const j = (ms) => new Date(ms).toLocaleDateString('fr-FR');
+    ch.append(el('p', 'tiny', `De ${j(d.prises.premiere)} à ${j(d.prises.derniere)}.`));
+  }
+  body.append(ch);
+
+  if (d.especes?.length) {
+    const e = el('div', 'card');
+    e.append(el('div', 'field-label', 'Ses espèces'));
+    for (const sp of d.especes) {
+      const r = el('div', 'admin-row');
+      r.append(el('span', 'admin-row-k', sp.nom || '—'));
+      r.append(el('span', 'admin-row-v',
+        `${nf.format(sp.n)}${sp.record_cm ? ` · record ${sp.record_cm} cm` : ''}`));
+      e.append(r);
+    }
+    body.append(e);
+  }
+
+  const v = el('div', 'card');
+  v.append(el('div', 'field-label', 'Volumes'));
+  for (const c of d.collections) {
+    const r = el('div', 'admin-row');
+    r.append(el('span', 'admin-row-k', c.collection));
+    r.append(el('span', 'admin-row-v', `${nf.format(c.n)} · ${poids(c.octets)}`));
+    v.append(r);
+  }
+  body.append(v);
 }

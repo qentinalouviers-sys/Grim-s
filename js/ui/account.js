@@ -84,6 +84,26 @@ function renderConnected(body) {
   body.append(el('p', 'tiny',
     'La déconnexion ne supprime rien : tes données restent sur cet appareil. Elles ne seront simplement plus synchronisées.'));
 
+  /* Le même texte qu'à l'inscription, consultable à tout moment.
+   *
+   * Une mention qu'on ne voit qu'une fois, le jour où l'on crée son compte, ne
+   * vaut pas grand-chose six mois plus tard — et les comptes créés AVANT elle
+   * ne l'ont jamais vue du tout. Repliée par défaut : présente pour qui la
+   * cherche, sans encombrer un écran qu'on ouvre pour synchroniser. */
+  const det = el('details', 'card');
+  det.append(el('summary', 'field-label', 'Ce que deviennent mes relevés'));
+  det.append(el('p', 'tiny',
+    'Les prises que tu enregistres — espèce, taille, position, marée, vent, fond — '
+    + 'sont mises en commun pour construire le modèle de prévision de l’app. Elles '
+    + 'sont rattachées à ton compte et l’administrateur du service peut les '
+    + 'consulter. Ton carnet de sondes et tes marques suivent la même règle. Rien '
+    + 'n’est vendu, rien n’est publié sous ton nom.'));
+  det.append(el('p', 'tiny',
+    'Tu peux à tout moment récupérer l’intégralité de tes données avec « Exporter », '
+    + 'ou supprimer ton compte : la suppression efface aussi tout ce que tu as déposé '
+    + 'sur le serveur, y compris du fonds commun.'));
+  body.append(det);
+
   sync.onDone(paintStatus);
 }
 

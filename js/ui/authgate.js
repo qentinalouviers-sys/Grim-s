@@ -248,6 +248,11 @@ function build(gate) {
     creating = next;
     fieldOf(pass2).hidden = !creating;
     fieldOf(name).hidden = !creating;
+    /* La mention sur les données n'apparaît qu'à la création : c'est le seul
+     * instant où elle informe une décision. La répéter à chaque connexion la
+     * transformerait en bandeau qu'on apprend à ne plus lire. Elle reste
+     * consultable ensuite depuis Réglages. */
+    $('ag-consent').hidden = !creating;
     pass.autocomplete = creating ? 'new-password' : 'current-password';
     primary.textContent = creating ? 'Créer le compte' : 'Se connecter';
     toggle.textContent = creating ? 'J’ai déjà un compte' : 'Créer un compte';

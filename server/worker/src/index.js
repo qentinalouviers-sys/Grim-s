@@ -11,6 +11,7 @@ import { ApiError, corsHeaders, json, readBody } from './http.js';
 import * as auth from './auth.js';
 import * as sync from './sync.js';
 import * as admin from './admin.js';
+import * as corpus from './corpus.js';
 import * as crew from './crew.js';
 
 export default {
@@ -145,6 +146,34 @@ export default {
           const me = await auth.requireUser(request, env);
           admin.requireAdmin(env, me);
           return json(await admin.users(env, url), 200, cors);
+        }
+
+        /* Le FONDS de données, par opposition aux comptes. Séparé dans son
+         * propre module et derrière son propre préfixe : la frontière entre
+         * « qui est inscrit » et « ce qu'ils ont relevé » doit rester visible
+         * dans les URL comme elle l'est dans les fichiers. */
+        case 'GET /api/admin/corpus/points': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await corpus.points(env, url), 200, cors);
+        }
+
+        case 'GET /api/admin/corpus/stats': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await corpus.stats(env), 200, cors);
+        }
+
+        case 'GET /api/admin/corpus/user': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await corpus.userDetail(env, url), 200, cors);
+        }
+
+        case 'GET /api/admin/corpus/export': {
+          const me = await auth.requireUser(request, env);
+          admin.requireAdmin(env, me);
+          return json(await corpus.exportCorpus(env, url), 200, cors);
         }
 
         case 'POST /api/admin/suspend': {

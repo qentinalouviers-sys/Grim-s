@@ -20,6 +20,7 @@
 
 import { state, subscribe, set, on, emit } from '../core/store.js';
 import { el, clear, button, toast, openSheet, closeSheet, decimalInput } from '../ui/dom.js';
+import { loadLeaflet } from '../ui/leaflet.js';
 import * as fmt from '../core/fmt.js';
 import { distance, bearing, destination as project, toGPX } from '../core/geo.js';
 import * as presence from '../core/presence.js';
@@ -49,8 +50,6 @@ import * as record from '../fishing/record.js';
 // est « le réseau est une option, jamais une dépendance », c'était le seul
 // écran qui trahissait le principe. 42 ko gzippés, et la carte s'ouvre dès la
 // première fois, en mode avion.
-const LEAFLET_CSS = 'vendor/leaflet/leaflet.css';
-const LEAFLET_JS = 'vendor/leaflet/leaflet.js';
 
 let L = null;
 let map = null;
@@ -94,30 +93,6 @@ let ui = {
   target: null,   // cible de dérive inverse
   mode: 'forward',
 };
-
-/* ==========================================================================
- * Chargement de Leaflet
- * --------------------------------------------------------------------------
- * Fichier local, précaché par le service worker avec le reste de la coque.
- * L'échec ne devrait plus survenir ; le repli reste en place au cas où le
- * cache serait purgé pendant que l'appareil est hors ligne.
- * ========================================================================== */
-function loadLeaflet() {
-  if (window.L) return Promise.resolve(window.L);
-  return new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = LEAFLET_CSS;
-    document.head.append(link);
-
-    const s = document.createElement('script');
-    s.src = LEAFLET_JS;
-    s.async = true;
-    s.onload = () => resolve(window.L);
-    s.onerror = () => reject(new Error('Leaflet indisponible'));
-    document.head.append(s);
-  });
-}
 
 /* ==========================================================================
  * Couche de tuiles avec cache IndexedDB

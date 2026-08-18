@@ -2488,3 +2488,59 @@ body.angling .fab { display: none; }
 .drive-flow { padding: 7px 10px 8px; }
 .drive-flow .drive-lbl { margin-bottom: 4px; }
 .drive-flow canvas { border-radius: var(--r-sm); display: block; }
+
+/* ==========================================================================
+ * Carte du fonds de données (administration)
+ * --------------------------------------------------------------------------
+ * La carte a une hauteur FIXE et non un pourcentage : elle vit dans une
+ * feuille qui défile, et un conteneur en `%` de hauteur y mesure zéro —
+ * Leaflet n'affiche alors qu'un rectangle gris, sans erreur pour l'expliquer.
+ * ========================================================================== */
+.corpus-map {
+  height: 340px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b1220;
+  margin-top: 8px;
+}
+.corpus-map .leaflet-container { height: 100%; background: #0b1220; }
+
+.corpus-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 12px;
+  margin-top: 8px; font-size: 11px; color: var(--muted);
+}
+.corpus-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.corpus-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  display: inline-block; flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, .35);
+  margin-right: 6px;
+}
+
+/* Rangée de filtres. `overflow-x: auto` plutôt qu'un retour à la ligne : sur
+ * un téléphone, une rangée qui se replie en trois pousse la carte hors écran. */
+.chip-row {
+  display: flex; gap: 6px;
+  overflow-x: auto; padding: 2px 0 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.chip-row .chip { flex: 0 0 auto; cursor: pointer; }
+.chip-row .chip.is-on {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(34, 184, 207, .12);
+}
+
+/* La mention sur les données, à la création du compte. Encadrée à gauche
+ * plutôt qu'en gris pâle : c'est un texte qui doit se lire, pas se deviner. */
+.ag-consent {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  border-left: 3px solid var(--cyan);
+  background: rgba(255, 255, 255, .04);
+  border-radius: 0 8px 8px 0;
+  text-align: left;
+}
