@@ -369,6 +369,35 @@ if _sw and _bd:
     )
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 8. Les raccourcis du manifeste mènent-ils quelque part ?
+# ---------------------------------------------------------------------------
+# Un raccourci d'écran d'accueil qui pointe sur un écran supprimé ne casse
+# rien de visible : le routeur retombe sur NAV. C'est pire qu'une erreur — le
+# raccourci promet « Horizon », ouvre autre chose, et personne ne signale un
+# bug qui n'affiche pas de message.
+#
+# C'est exactement ce qui est arrivé : le mode HORIZON a été supprimé, son
+# raccourci est resté dans le manifeste, et il a fallu relire le fichier pour
+# une tout autre raison pour s'en apercevoir. Ce contrôle-ci l'aurait dit.
+import json as _json
+
+_man = _json.loads(_read("manifest.webmanifest"))
+_views = set(re.findall(r"^\s{2}'?([a-z-]+)'?:", _read("js", "main.js")[
+    _read("js", "main.js").index("const VIEWS = {"):
+    _read("js", "main.js").index("const VIEWS = {") + 400
+], re.M))
+
+for _sc in _man.get("shortcuts", []):
+    _route = _sc.get("url", "").split("#")[-1]
+    check(
+        _route in _views,
+        f"le raccourci « {_sc.get('short_name')} » mène à un écran qui existe (#{_route})"
+        if _route in _views
+        else f"RACCOURCI MORT — « {_sc.get('short_name')} » pointe sur #{_route}, "
+             f"qui n'est pas un écran. Écrans connus : {sorted(_views)}",
+    )
+
+# ═══════════════════════════════════════════════════════════════════════════
 print()
 for n in notes:
     print(f"  ℹ {n}")
