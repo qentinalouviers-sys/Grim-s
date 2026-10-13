@@ -3,7 +3,7 @@
     "Constantes harmoniques ajustées automatiquement par scripts/fit_harmonics.py.",
     "Ne pas éditer à la main : le prochain passage écrasera les valeurs.",
     "Ajusté sur 274 points couvrant 70.6 jours.",
-    "Écart RMS 3.5 cm, écart maximal 12.2 cm.",
+    "Écart RMS 3.5 cm, écart maximal 12.3 cm.",
     "g : phase en degrés, référence Greenwich, convention de scripts/tidal.py",
     "et js/data/harmonics.js — les deux DOIVENT rester identiques.",
     "Les constituants portant 'held' n'étaient pas séparables sur cette durée :",
@@ -17,119 +17,119 @@
   "lat": 49.9319,
   "lon": 1.0847,
   "datum": "ZH (zéro hydrographique SHOM)",
-  "z0": 5.1145,
-  "meanSpringRange": 8.455,
+  "z0": 5.1144,
+  "meanSpringRange": 8.454,
   "provisional": false,
-  "fittedAt": "2026-10-13T09:29:45+00:00",
+  "fittedAt": "2026-10-13T20:15:36+00:00",
   "rmsM": 0.035,
-  "maxErrorM": 0.1221,
+  "maxErrorM": 0.1228,
   "spanDays": 70.6,
   "nPoints": 274,
   "resolvedCount": 10,
   "constituents": {
     "M2": {
-      "A": 3.1842,
-      "g": 305.87
+      "A": 3.1833,
+      "g": 305.93
     },
     "S2": {
-      "A": 1.0435,
-      "g": 349.81
+      "A": 1.0438,
+      "g": 349.9
     },
     "N2": {
-      "A": 0.5227,
-      "g": 277.47
+      "A": 0.5226,
+      "g": 277.53
     },
     "M4": {
-      "A": 0.1884,
-      "g": 163.93,
+      "A": 0.1886,
+      "g": 164.09,
       "held": true
     },
     "MS4": {
-      "A": 0.1315,
-      "g": 242.84,
+      "A": 0.1317,
+      "g": 243.0,
       "held": true
     },
     "M6": {
-      "A": 0.0916,
-      "g": 78.94,
+      "A": 0.0918,
+      "g": 79.14,
       "held": true
     },
     "K1": {
-      "A": 0.0828,
-      "g": 119.58
+      "A": 0.0829,
+      "g": 119.6
     },
     "O1": {
       "A": 0.0403,
-      "g": 26.69
+      "g": 26.73
     },
     "MSF": {
-      "A": 0.0576,
-      "g": 261.69
+      "A": 0.0578,
+      "g": 261.78
     },
     "MM": {
-      "A": 0.0486,
-      "g": 357.49
+      "A": 0.0475,
+      "g": 357.03
     },
     "L2": {
-      "A": 0.0902,
-      "g": 264.67
+      "A": 0.0906,
+      "g": 264.51
     },
     "K2": {
-      "A": 0.3678,
-      "g": 348.25,
+      "A": 0.3668,
+      "g": 348.23,
       "held": true
     },
     "NU2": {
-      "A": 0.1676,
-      "g": 297.54,
+      "A": 0.1678,
+      "g": 297.76,
       "held": true
     },
     "2N2": {
-      "A": 0.1512,
-      "g": 253.49
+      "A": 0.1504,
+      "g": 253.41
     },
     "MU2": {
-      "A": 0.0354,
-      "g": 117.65,
+      "A": 0.0357,
+      "g": 117.61,
       "held": true
     },
     "MN4": {
-      "A": 0.0695,
-      "g": 87.65,
+      "A": 0.0684,
+      "g": 87.9,
       "held": true
     },
     "2MS6": {
-      "A": 0.0297,
-      "g": 269.22,
+      "A": 0.0309,
+      "g": 269.41,
       "held": true
     },
     "P1": {
-      "A": 0.0309,
-      "g": 87.89,
+      "A": 0.0312,
+      "g": 87.97,
       "held": true
     },
     "Q1": {
       "A": 0.009,
-      "g": 330.39
+      "g": 330.35
     },
     "T2": {
-      "A": 0.0886,
-      "g": 23.24,
+      "A": 0.089,
+      "g": 22.63,
       "held": true
     },
     "S1": {
-      "A": 0.0116,
-      "g": 154.92,
+      "A": 0.0118,
+      "g": 155.12,
       "held": true
     },
     "LDA2": {
-      "A": 0.1233,
-      "g": 304.0,
+      "A": 0.1238,
+      "g": 303.69,
       "held": true
     },
     "MF": {
       "A": 0.0262,
-      "g": 332.75,
+      "g": 332.7,
       "held": true
     }
   }
